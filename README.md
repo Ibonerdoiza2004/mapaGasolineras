@@ -273,14 +273,11 @@ src/test/java/com/example/gasolineras_api/
 ```bash
 cd frontend
 
-# Instalar herramientas (primera vez)
-npm install --save-dev vitest @testing-library/react @testing-library/jest-dom
+# Instalar dependencias (incluye Vitest y React Testing Library)
+npm install
 
 # Ejecutar tests
 npm run test
-
-# Con cobertura
-npm run test:coverage
 ```
 
 ---
@@ -389,8 +386,8 @@ POSTGRES_HOST=postgres-db
 POSTGRES_PORT=5432
 
 # Frontend
-VITE_API_URL=https://api.tudominio.com
-VITE_MAP_LIBRARY=leaflet
+PUBLIC_API_URL=https://api.tudominio.com
+PUBLIC_MAP_LIBRARY=leaflet
 EOF
 ```
 
@@ -449,7 +446,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        VITE_API_URL: ${VITE_API_URL}
+        PUBLIC_API_URL: ${PUBLIC_API_URL}
     container_name: gasolineras-frontend
     ports:
       - "3000:3000"
@@ -594,35 +591,19 @@ curl http://localhost:3000
 
 ---
 
-## 🔐 Variables de Entorno (.env)
+## 🔐 Variables de Entorno (cuando sean necesarias)
 
-Crea `.env` en la raíz (no incluir en Git):
+La versión actual no necesita variables de entorno para ejecutar el frontend o
+el backend localmente. Cuando se integre la API, las variables públicas del
+frontend deberán añadirse en `frontend/.env.local` usando el prefijo `PUBLIC_`:
 
 ```bash
-# ===== DESARROLLO =====
-NODE_ENV=development
-VITE_API_URL=http://localhost:8080
-VITE_MAP_LIBRARY=leaflet
-
-# ===== PRODUCCIÓN =====
-# NODE_ENV=production
-# VITE_API_URL=https://api.tudominio.com
-
-# ===== BASE DE DATOS =====
-POSTGRES_DB=gasolineras_dev
-POSTGRES_USER=postgres
-POSTGRES_PASSWORD=postgrespassword
-POSTGRES_HOST=localhost
-POSTGRES_PORT=5432
-
-# ===== BACKEND =====
-SPRING_PROFILES_ACTIVE=dev
-SERVER_PORT=8080
-
-# ===== APIs EXTERNAS (Opcional) =====
-MAPBOX_TOKEN=
-GOOGLE_MAPS_API_KEY=
+PUBLIC_API_URL=http://localhost:8080
+PUBLIC_MAP_LIBRARY=leaflet
 ```
+
+Las variables de base de datos y del backend pertenecen a la configuración del
+backend o al entorno de despliegue, no al frontend.
 
 **Agregar a `.gitignore`:**
 
