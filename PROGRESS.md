@@ -59,3 +59,4 @@ sus pruebas han terminado correctamente.
 | 2026-08-15 | T-03.2 | Mapa a pantalla completa y panel inferior contraíble | Completada; comprobación estática validada |
 | 2026-08-15 | T-03.3 | Puntos de ruptura, áreas táctiles y scroll interno | Completada; comprobación estática validada |
 | 2026-08-16 | Mantenimiento — entorno Docker de desarrollo | Completada | Compose con perfiles, imágenes de desarrollo y documentación; configuración e imágenes validadas. |
+| 2026-08-16 | Mantenimiento — compatibilidad ARM64 de PostGIS | Completada | Imagen nativa basada en PostgreSQL 15; PostGIS 3.6 y la inicialización se validaron en contenedor. |

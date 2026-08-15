@@ -3,7 +3,9 @@ name: mapa-gasolineras-dev
 
 services:
   db:
-    image: postgis/postgis:15-3.3-alpine
+    build:
+      context: ./database
+      dockerfile: Dockerfile.dev
     profiles: ["db", "backend", "all"]
     env_file:
       - ./backend/.env.local

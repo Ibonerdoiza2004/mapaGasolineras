@@ -100,7 +100,9 @@ utilizarán para crear PostgreSQL y para conectar el backend.
 El archivo `docker-compose.dev.yml` utiliza perfiles. Todos los comandos usan
 las credenciales locales de `backend/.env.local`; el código se monta como
 volumen, por lo que Spring Boot y Astro recargan los cambios durante el
-desarrollo.
+desarrollo. La imagen de PostgreSQL se construye desde la imagen oficial y
+funciona tanto en equipos AMD64 como ARM64 (por ejemplo, servidores Oracle
+Cloud basados en Ampere).
 
 | Necesidad | Comando |
 | :--- | :--- |
