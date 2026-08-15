@@ -263,310 +263,86 @@ npm run test
 
 ## 🚀 Despliegue en Producción
 
-### 1️⃣ Build para Producción
+El despliegue está automatizado con GitHub Actions
+(`.github/workflows/deploy-production.yml`):
 
-#### Backend (JAR ejecutable)
+- **Push/PR a `dev`**: tests y build de todo el proyecto.
+- **PR a `main`**: tests y smoke test de producción (sin desplegar).
+- **Push a `main` (o merge de PR)**: tests, smoke test y despliegue:
+  - **Backend + BD** → servidor Oracle vía SSH (`docker compose up --build`).
+  - **Frontend** → Cloudflare Pages (build estático de Astro).
 
-```bash
-cd backend
-./mvnw clean package -DskipTests
+### Topología
 
-# Output: backend/target/gasolineras-api-*.jar
-```
+- Frontend estático en Cloudflare Pages (`https://tudominio.com`).
+- API en el subdominio `https://api.tudominio.com`, servida por Caddy en Oracle
+  y expuesta mediante Cloudflare (modo SSL/TLS **Full**). `PUBLIC_API_URL` apunta
+  a `https://api.tudominio.com`.
+- Caddy en Oracle hace `reverse_proxy` de todo el tráfico a `backend:8080`.
 
-#### Frontend (Build Astro optimizado)
+### Secretos y variables de GitHub
 
-```bash
-cd frontend
-npm run build
+Configúralos en *Settings → Secrets and variables → Actions*:
 
-# Output: frontend/dist/
-npm run preview  # Verificar localmente
-```
+| Secreto / variable | Descripción |
+| :--- | :--- |
+| `CLOUDFLARE_API_TOKEN` | Token de Cloudflare con permiso `Pages:Edit`. |
+| `CLOUDFLARE_ACCOUNT_ID` | Identificador de la cuenta de Cloudflare. |
+| `CLOUDFLARE_PROJECT_NAME` | Nombre del proyecto de Cloudflare Pages. |
+| `ORACLE_HOST` | IP o hostname del servidor de Oracle. |
+| `ORACLE_SSH_USER` | Usuario SSH del servidor (p. ej. `ubuntu` u `opc`). |
+| `ORACLE_SSH_KEY` | Clave privada SSH de despliegue. |
+| `POSTGRES_DB` | Nombre de la base de datos de producción. |
+| `POSTGRES_USER` | Usuario de la base de datos de producción. |
+| `POSTGRES_PASSWORD` | Contraseña de la base de datos de producción. |
+| `DOMAIN` | `api.tudominio.com` (subdominio de la API). |
+| `PUBLIC_API_URL` *(variable)* | `https://api.tudominio.com`. |
+| `PUBLIC_MAP_LIBRARY` *(variable)* | `leaflet`. |
 
-### 2️⃣ Comprar Dominio en Cloudflare
+### Preparación del servidor de Oracle
 
-1. Ve a [Cloudflare.com](https://www.cloudflare.com)
-2. **Registra tu dominio** (o usa uno existente)
-3. Apunta los nameservers a Cloudflare
-4. Espera propagación DNS (~5-30 min)
+1. Instalar Docker y Compose v2:
 
-### 3️⃣ Configurar DNS en Cloudflare
+   ```bash
+   sudo apt update && sudo apt install -y docker.io docker-compose-v2 git
+   sudo systemctl enable --now docker
+   sudo usermod -aG docker $USER
+   ```
 
-Crea estos registros A en Cloudflare Dashboard:
+2. Clonar el repositorio una vez (se actualiza solo en cada despliegue):
 
-| Tipo | Nombre | Contenido | TTL | Proxy |
-| :--- | :--- | :--- | :--- | :--- |
-| **A** | `@` | IP Oracle Cloud VM | Auto | ☁️ Proxied |
-| **A** | `www` | IP Oracle Cloud VM | Auto | ☁️ Proxied |
-| **A** | `api` | IP Oracle Cloud VM | Auto | ☁️ Proxied |
+   ```bash
+   git clone https://github.com/TU_USUARIO/mapaGasolineras.git
+   ```
 
-> **IP Oracle Cloud:** Obtén de Oracle Cloud Console → Instances → Public IP Address
+3. Añadir la clave pública correspondiente a `ORACLE_SSH_KEY` en
+   `~/.ssh/authorized_keys` del usuario de despliegue.
 
-### 4️⃣ Habilitar Seguridad en Cloudflare ✅ GRATIS
+### Preparación en Cloudflare
 
-**Automáticamente activado en plan gratuito:**
-- 🛡️ **Protección DDoS** - Defensa básica incluida
-- 📦 **Caching** - Archivos estáticos cacheados automáticamente
-- 🔒 **SSL/TLS** - Certificado HTTPS automático
-- 🔐 **Firewall** - Reglas básicas de seguridad
+1. Crear un proyecto de **Cloudflare Pages** apuntando al repositorio y anotar
+   su nombre y el *Account ID*.
+2. Crear un token de API con permiso **Cloudflare Pages: Edit**.
+3. Crear los registros DNS:
+   - `@` y `www` → Cloudflare Pages.
+   - `api` (tipo A) → IP pública del servidor Oracle, con proxy (nube naranja).
+4. Configurar SSL/TLS en modo **Full**.
 
-**Configuración recomendada:**
-```
-Caching Level:     Cache Everything
-Browser Cache TTL: 30 minutes
-SSL/TLS:           Full (Strict)
-```
+### Despliegue manual (opcional)
 
-### 5️⃣ Preparar Oracle Cloud VM
-
-Conéctate a tu VM por SSH:
-
-```bash
-# Actualizar sistema
-sudo apt update && sudo apt upgrade -y
-
-# Instalar Java 21, Docker, Compose y Git
-sudo apt install -y openjdk-21-jdk docker.io docker-compose-v2 git
-
-# Agregar usuario al grupo docker (sin sudo)
-sudo usermod -aG docker $USER
-newgrp docker
-
-# Iniciar Docker automáticamente
-sudo systemctl enable --now docker
-
-# Verificar instalación
-java -version
-docker --version
-docker compose version
-```
-
-### 6️⃣ Configurar Variables de Entorno
-
-En tu VM:
+Para desplegar el backend y la base de datos a mano en el servidor:
 
 ```bash
-cd /home/ubuntu  # o tu usuario
-git clone https://github.com/TU_USUARIO/mapaGasolineras.git
 cd mapaGasolineras
-
-# Crear archivo .env
-cat > .env << EOF
-# Backend
-SPRING_PROFILES_ACTIVE=prod
-SERVER_PORT=8080
-JAVA_OPTS=-Xmx512m -Xms256m
-
-# PostgreSQL (Producción)
-POSTGRES_DB=gasolineras_prod
-POSTGRES_USER=postgres
-POSTGRES_PASSWORD=TU_PASSWORD_SEGURO_AQUI
-POSTGRES_HOST=postgres-db
-POSTGRES_PORT=5432
-
-# Frontend
-PUBLIC_API_URL=https://api.tudominio.com
-PUBLIC_MAP_LIBRARY=leaflet
-EOF
+git pull
+# Crear .env.production con DOMAIN y POSTGRES_* reales.
+docker compose --env-file .env.production -f docker-compose.prod.yml up --build -d
 ```
 
-> ⚠️ **IMPORTANTE:** Cambia la contraseña a algo seguro
-
-### 7️⃣ Crear Docker Compose para Producción
-
-Crea archivo `docker-compose.prod.yml`:
-
-```yaml
-version: '3.8'
-
-services:
-  postgres-db:
-    image: postgis/postgis:latest
-    container_name: postgis-prod
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
-    restart: unless-stopped
-    networks:
-      - gasolineras-net
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    container_name: gasolineras-backend
-    ports:
-      - "8080:8080"
-    environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
-      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
-      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
-      SPRING_PROFILES_ACTIVE: prod
-      JAVA_OPTS: ${JAVA_OPTS}
-    depends_on:
-      postgres-db:
-        condition: service_healthy
-    restart: unless-stopped
-    networks:
-      - gasolineras-net
-
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-      args:
-        PUBLIC_API_URL: ${PUBLIC_API_URL}
-    container_name: gasolineras-frontend
-    ports:
-      - "3000:3000"
-    restart: unless-stopped
-    networks:
-      - gasolineras-net
-
-volumes:
-  postgres_data:
-
-networks:
-  gasolineras-net:
-    driver: bridge
-```
-
-### 8️⃣ Crear Dockerfiles
-
-**`backend/Dockerfile`:**
-
-```dockerfile
-FROM eclipse-temurin:21-jdk-alpine
-
-WORKDIR /app
-COPY . .
-
-RUN ./mvnw clean package -DskipTests
-
-EXPOSE 8080
-ENTRYPOINT ["java", "-jar"]
-CMD ["target/gasolineras-api-*.jar"]
-```
-
-**`frontend/Dockerfile`:**
-
-```dockerfile
-FROM node:22-alpine as builder
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci
-COPY . .
-RUN npm run build
-
-FROM node:22-alpine
-WORKDIR /app
-RUN npm install -g http-server
-COPY --from=builder /app/dist ./dist
-EXPOSE 3000
-CMD ["http-server", "dist", "-p", "3000"]
-```
-
-### 9️⃣ Iniciar Servicios en Producción
+Para verificar:
 
 ```bash
-# Levantar todos los contenedores
-docker compose -f docker-compose.prod.yml --env-file .env up -d
-
-# Ver logs en tiempo real
-docker compose -f docker-compose.prod.yml logs -f
-
-# Ver logs de un servicio específico
-docker compose -f docker-compose.prod.yml logs -f backend
-
-# Detener servicios
-docker compose -f docker-compose.prod.yml down
-```
-
-### 🔟 Configurar Nginx Reverse Proxy (Opcional)
-
-Para servir en puertos 80/443:
-
-```bash
-sudo apt install -y nginx
-
-# Crear configuración
-sudo tee /etc/nginx/sites-available/default > /dev/null << 'EOF'
-upstream backend {
-    server ${BACKEND_HOST}:${BACKEND_PORT};
-}
-
-upstream frontend {
-    server ${FRONTEND_HOST}:${FRONTEND_PORT};
-}
-
-server {
-    listen 80;
-    listen [::]:80;
-    server_name _;
-    return 301 https://$host$request_uri;
-}
-
-server {
-    listen 443 ssl http2;
-    listen [::]:443 ssl http2;
-    server_name tudominio.com www.tudominio.com;
-
-    # SSL gestionado por Cloudflare
-    ssl_certificate /path/to/cert.pem;
-    ssl_certificate_key /path/to/key.pem;
-
-    location / {
-        proxy_pass http://frontend;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-}
-
-server {
-    listen 443 ssl http2;
-    listen [::]:443 ssl http2;
-    server_name api.tudominio.com;
-
-    ssl_certificate /path/to/cert.pem;
-    ssl_certificate_key /path/to/key.pem;
-
-    location / {
-        proxy_pass http://backend;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    }
-}
-EOF
-
-# Reiniciar Nginx
-sudo systemctl restart nginx
-```
-
-### 1️⃣1️⃣ Verificar Despliegue
-
-```bash
-# Ver contenedores activos
-docker ps
-
-# Verificar conectividad Backend
-curl "${BACKEND_URL}/api/health"
-
-# Verificar conectividad Frontend
-curl "${FRONTEND_URL}"
+curl https://api.tudominio.com/actuator/health
 ```
 
 ---

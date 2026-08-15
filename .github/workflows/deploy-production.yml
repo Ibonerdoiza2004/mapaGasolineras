@@ -1,0 +1,123 @@
+name: Production build and deploy
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  deployments: write
+
+jobs:
+  tests:
+    uses: ./.github/workflows/test-suite.yml
+
+  compose-production:
+    name: Production Compose smoke test
+    needs: tests
+    runs-on: ubuntu-24.04
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure isolated production environment
+        run: |
+          cp .env.production.example .env.production
+          sed -i 's|^DOMAIN=.*|DOMAIN=localhost|' .env.production
+
+      - name: Build and start production services
+        run: docker compose --env-file .env.production -f docker-compose.prod.yml up --build --detach
+
+      - name: Verify backend health and PostGIS
+        run: |
+          curl --insecure --fail --show-error --retry 30 --retry-delay 2 --retry-connrefused https://localhost/actuator/health
+          docker compose --env-file .env.production -f docker-compose.prod.yml exec --no-TTY db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "SELECT postgis_version();"' | grep -q '^3\.'
+
+      - name: Show service logs after failure
+        if: failure()
+        run: docker compose --env-file .env.production -f docker-compose.prod.yml logs --no-color
+
+      - name: Stop production services
+        if: always()
+        run: docker compose --env-file .env.production -f docker-compose.prod.yml down --volumes --remove-orphans
+
+  deploy-oracle:
+    name: Deploy backend and database to Oracle
+    needs: compose-production
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Prepare production environment file
+        run: |
+          cat > .env.production <<'EOF'
+          DOMAIN=${{ secrets.DOMAIN }}
+          POSTGRES_DB=${{ secrets.POSTGRES_DB }}
+          POSTGRES_USER=${{ secrets.POSTGRES_USER }}
+          POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
+          EOF
+
+      - name: Upload environment file
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.ORACLE_HOST }}
+          username: ${{ secrets.ORACLE_SSH_USER }}
+          key: ${{ secrets.ORACLE_SSH_KEY }}
+          port: ${{ secrets.ORACLE_SSH_PORT || 22 }}
+          source: .env.production
+          target: /home/${{ secrets.ORACLE_SSH_USER }}/mapaGasolineras
+
+      - name: Deploy with Docker Compose
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.ORACLE_HOST }}
+          username: ${{ secrets.ORACLE_SSH_USER }}
+          key: ${{ secrets.ORACLE_SSH_KEY }}
+          port: ${{ secrets.ORACLE_SSH_PORT || 22 }}
+          script: |
+            set -e
+            cd /home/${{ secrets.ORACLE_SSH_USER }}/mapaGasolineras
+            git fetch origin main
+            git reset --hard origin/main
+            docker compose --env-file .env.production -f docker-compose.prod.yml up --build --detach
+            docker image prune --filter dangling=true --force
+
+  deploy-cloudflare:
+    name: Deploy frontend to Cloudflare Pages
+    needs: compose-production
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build static site
+        working-directory: frontend
+        env:
+          PUBLIC_API_URL: ${{ vars.PUBLIC_API_URL }}
+          PUBLIC_MAP_LIBRARY: ${{ vars.PUBLIC_MAP_LIBRARY || 'leaflet' }}
+        run: npm run build
+
+      - name: Publish to Cloudflare Pages
+        uses: cloudflare/pages-action@v1
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          projectName: ${{ secrets.CLOUDFLARE_PROJECT_NAME }}
+          directory: frontend/dist
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}

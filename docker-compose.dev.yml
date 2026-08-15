@@ -5,7 +5,7 @@ services:
   db:
     build:
       context: ./database
-      dockerfile: Dockerfile.dev
+      dockerfile: Dockerfile
     profiles: ["db", "backend", "all"]
     env_file:
       - ./backend/.env.local

@@ -60,3 +60,4 @@ sus pruebas han terminado correctamente.
 | 2026-08-15 | T-03.3 | Puntos de ruptura, áreas táctiles y scroll interno | Completada; comprobación estática validada |
 | 2026-08-16 | Mantenimiento — entorno Docker de desarrollo | Completada | Compose con perfiles, imágenes de desarrollo y documentación; configuración e imágenes validadas. |
 | 2026-08-16 | Mantenimiento — compatibilidad ARM64 de PostGIS | Completada | Imagen nativa basada en PostgreSQL 15; PostGIS 3.6 y la inicialización se validaron en contenedor. |
+| 2026-08-16 | T-05.4 — CI y validación de despliegues | Completada | Flujos de GitHub Actions: tests+build en `dev`, tests+build en PR a `main` y despliegue (Oracle back+bd, Cloudflare Pages front) al hacer push a `main`. |

@@ -1,0 +1,5 @@
+https://{$DOMAIN} {
+    encode zstd gzip
+    tls internal
+    reverse_proxy backend:8080
+}

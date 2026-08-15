@@ -1,0 +1,98 @@
+# HAZ_ESTO — Tareas pendientes fuera del repositorio
+
+Ya está implementado y validado en el repo todo lo de CI/CD. Esto es lo que
+falta hacer **fuera del repositorio** para que el despliegue funcione.
+
+## 1. Crear la rama `dev`
+
+Hoy solo existe `main`. El workflow de dev se dispara con `dev`:
+
+```bash
+git checkout -b dev
+git push -u origin dev
+```
+
+## 2. Añadir secretos y variables en GitHub
+
+Ve a **GitHub → Settings → Secrets and variables → Actions** y añade:
+
+### Secrets
+
+| Nombre | Valor |
+| :--- | :--- |
+| `CLOUDFLARE_API_TOKEN` | Token de Cloudflare con permiso **Cloudflare Pages: Edit** |
+| `CLOUDFLARE_ACCOUNT_ID` | Identificador de tu cuenta de Cloudflare |
+| `CLOUDFLARE_PROJECT_NAME` | Nombre del proyecto de Cloudflare Pages |
+| `ORACLE_HOST` | IP o hostname de la VM de Oracle |
+| `ORACLE_SSH_USER` | Usuario SSH del servidor (p. ej. `ubuntu` u `opc`) |
+| `ORACLE_SSH_KEY` | Clave **privada** SSH de despliegue (sin passphrase) |
+| `POSTGRES_DB` | Nombre de la base de datos de producción |
+| `POSTGRES_USER` | Usuario de la base de datos de producción |
+| `POSTGRES_PASSWORD` | Contraseña de la base de datos de producción |
+| `DOMAIN` | `api.tudominio.com` (subdominio de la API) |
+
+### Variables (no secretos)
+
+| Nombre | Valor |
+| :--- | :--- |
+| `PUBLIC_API_URL` | `https://api.tudominio.com` |
+| `PUBLIC_MAP_LIBRARY` | `leaflet` |
+
+## 3. Preparar el servidor de Oracle
+
+Conecta por SSH a la VM y ejecuta una vez:
+
+```bash
+# Instalar Docker y Compose v2
+sudo apt update && sudo apt install -y docker.io docker-compose-v2 git
+sudo systemctl enable --now docker
+sudo usermod -aG docker $USER
+# Cierra y vuelve a abrir la sesión para que el grupo docker haga efecto.
+
+# Clonar el repositorio (se actualiza solo en cada despliegue)
+git clone https://github.com/Ibonerdoiza2004/mapaGasolineras.git
+```
+
+Añade la clave **pública** correspondiente a `ORACLE_SSH_KEY` para que GitHub
+Actions pueda conectarse:
+
+```bash
+# En el servidor, con la clave pública ya copiada en el portapapeles:
+mkdir -p ~/.ssh && chmod 700 ~/.ssh
+echo "CLAVE_PUBLICA_AQUI" >> ~/.ssh/authorized_keys
+chmod 600 ~/.ssh/authorized_keys
+```
+
+## 4. Configurar Cloudflare
+
+1. Crear un proyecto de **Cloudflare Pages**:
+   - En el dashboard: **Workers & Pages → Create → Pages → Connect to Git** y
+     elige el repositorio. No importa el build command que sugiera; el
+     despliegue lo hace GitHub Actions.
+   - Anota el **Account ID** (Dashboard → tu dominio → Overview) y el **nombre
+     del proyecto** para los secretos de arriba.
+
+2. Crear el **token de API**:
+   - **My Profile → API Tokens → Create Token**.
+   - Permisos: `Account → Cloudflare Pages → Edit`.
+   - Guarda el token como `CLOUDFLARE_API_TOKEN`.
+
+3. Crear los **registros DNS** (en el dominio correspondiente):
+
+   | Tipo | Nombre | Contenido | Proxy |
+   | :--- | :--- | :--- | :--- |
+   | A | `api` | IP pública de Oracle | ☁️ Proxied (nube naranja) |
+   | CNAME/A | `@` | Cloudflare Pages | ☁️ Proxied |
+   | CNAME/A | `www` | Cloudflare Pages | ☁️ Proxied |
+
+4. **SSL/TLS**: configúralo en modo **Full** (no "Strict"), porque Caddy en
+   Oracle usa un certificado interno (`tls internal`).
+
+## 5. Verificar
+
+1. Hacer un `git push origin dev` → deben ejecutarse los tests y el build.
+2. Abrir una PR a `main` → tests + smoke test de producción (sin desplegar).
+3. Hacer merge de la PR a `main` → tests + despliegue a Oracle y Cloudflare.
+4. Comprobar:
+   - API: `curl https://api.tudominio.com/actuator/health` → debe responder `UP`.
+   - Front: abrir `https://tudominio.com` y ver la web servida por Cloudflare.

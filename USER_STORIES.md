@@ -88,7 +88,7 @@ automatizadas **para** introducir funcionalidades sin regresiones.
 - [ ] T-05.2 Añadir Vitest y React Testing Library para componentes React.
 - [ ] T-05.3 Establecer convenciones para DTO, errores de API y variables de
   entorno.
-- [ ] T-05.4 Configurar una comprobación de build y tests en integración
+- [x] T-05.4 Configurar una comprobación de build y tests en integración
   continua.
 
 ---
