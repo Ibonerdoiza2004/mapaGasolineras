@@ -7,12 +7,12 @@ sus pruebas han terminado correctamente.
 ## Estado actual
 
 - **Fase activa:** Fase 0 — Base técnica, visual y accesible
-- **Historia activa:** US-02 — Estructura y navegación de la aplicación
+- **Historia activa:** US-03 — Diseño adaptable del explorador
 - **Siguiente historia:** US-03 — Diseño adaptable del explorador
-- **Siguiente tarea:** T-03.1 — Diseñar el patrón de panel lateral y mapa para
-  pantallas de escritorio
+- **Tarea pendiente:** T-03.4 — Probar las vistas en tamaños móvil, tableta y
+  escritorio
 - **Última tarea completada:** T-02.4 — Metadatos SEO por página
-- **Porcentaje de tareas completadas:** 8 / 150
+- **Porcentaje de tareas completadas:** 11 / 150
 - **Pruebas automatizadas:** 22 / 114 casos planificados (US-01 y US-02)
 
 ## Historias
@@ -54,3 +54,7 @@ sus pruebas han terminado correctamente.
 | 2026-08-15 | T-02.2 | Cabecera con marca, navegación y tema | Completada; build validado |
 | 2026-08-15 | T-02.3 | Navegación responsive y estado activo | Completada; build validado |
 | 2026-08-15 | T-02.4 | Metadatos SEO por página | Completada; tests y build validados |
+| 2026-08-15 | T-03.1 | Diseño e integración del panel lateral y mapa de escritorio | Completada; comprobación estática validada |
+| 2026-08-15 | T-03.2 | Inicio del panel inferior deslizable para móvil | En curso |
+| 2026-08-15 | T-03.2 | Mapa a pantalla completa y panel inferior contraíble | Completada; comprobación estática validada |
+| 2026-08-15 | T-03.3 | Puntos de ruptura, áreas táctiles y scroll interno | Completada; comprobación estática validada |

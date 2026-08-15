@@ -54,11 +54,11 @@ escritorio **para** encontrar gasolineras desde cualquier dispositivo.
 
 **Tareas**
 
-- [ ] T-03.1 Diseñar el patrón de panel lateral y mapa para pantallas de
+- [x] T-03.1 Diseñar el patrón de panel lateral y mapa para pantallas de
   escritorio.
-- [ ] T-03.2 Implementar mapa a pantalla completa y panel inferior deslizable
+- [x] T-03.2 Implementar mapa a pantalla completa y panel inferior deslizable
   para móvil.
-- [ ] T-03.3 Definir puntos de ruptura, áreas táctiles y comportamiento de
+- [x] T-03.3 Definir puntos de ruptura, áreas táctiles y comportamiento de
   scroll sin ocultar controles importantes.
 - [ ] T-03.4 Probar las vistas en tamaños móvil, tableta y escritorio.
 

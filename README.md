@@ -93,33 +93,43 @@ conda create -n gas -c conda-forge openjdk=21 maven nodejs=22 -y
 conda activate gas
 ```
 
-### 3️⃣ Levantar Base de Datos (PostgreSQL + PostGIS)
+### 3️⃣ Configurar credenciales de PostgreSQL
+
+Si todavía no existe `backend/.env.local`, créalo a partir de la plantilla:
+
+```bash
+cp backend/.env.example backend/.env.local
+```
+
+Edita `backend/.env.local` y configura el usuario, contraseña, base de datos,
+host y puerto que utilizará este entorno. El mismo usuario y contraseña se
+utilizarán para crear PostgreSQL y para conectar el backend.
+
+### 4️⃣ Crear la Base de Datos (PostgreSQL + PostGIS)
 
 ```bash
 # Opción A: Usar Docker Compose (RECOMENDADO)
-docker compose up -d
+# Usa las credenciales definidas en backend/.env.local
+docker compose --env-file backend/.env.local -f docker-compose.dev.yml up -d
 
-# Opción B: Ejecutar directamente con Docker
-docker run --name postgis-gasolineras \
-  -e POSTGRES_DB=gasolineras_dev \
-  -e POSTGRES_USER=postgres \
-  -e POSTGRES_PASSWORD=postgrespassword \
-  -p 5432:5432 \
-  -d postgis/postgis
+# Comprobar que el contenedor está activo
+docker compose --env-file backend/.env.local -f docker-compose.dev.yml ps
 ```
 
-✅ **PostgreSQL está listo en:** `localhost:5432`
+La primera ejecución descarga PostGIS y crea automáticamente la base de datos,
+el usuario y la contraseña indicados en `backend/.env.local`. No es necesario
+ejecutar SQL manualmente.
 
-### 4️⃣ Arrancar Backend (Spring Boot)
+### 5️⃣ Arrancar Backend (Spring Boot)
 
 ```bash
 cd backend
 ./mvnw spring-boot:run
 ```
 
-✅ **API disponible en:** `http://localhost:8080`
+✅ **API disponible en:** `${BACKEND_URL}`
 
-### 5️⃣ Arrancar Frontend (Astro + React)
+### 6️⃣ Arrancar Frontend (Astro + React)
 
 En **otra terminal** con `conda activate gas`:
 
@@ -129,7 +139,7 @@ npm install
 npm run dev
 ```
 
-✅ **App web en:** `http://localhost:5173`
+✅ **App web disponible en:** `${FRONTEND_URL}`
 
 ---
 
@@ -139,7 +149,7 @@ Para inspeccionar BD con **DBeaver** o **pgAdmin**:
 
 | Parámetro | Valor |
 | :--- | :--- |
-| **Host** | `localhost` |
+| **Host** | `${POSTGRES_HOST}` |
 | **Puerto** | `5432` |
 | **Database** | `gasolineras_dev` |
 | **Usuario** | `postgres` |
@@ -347,19 +357,20 @@ Conéctate a tu VM por SSH:
 # Actualizar sistema
 sudo apt update && sudo apt upgrade -y
 
-# Instalar Docker, Compose y Git
-sudo apt install -y docker.io docker-compose git
+# Instalar Java 21, Docker, Compose y Git
+sudo apt install -y openjdk-21-jdk docker.io docker-compose-v2 git
 
 # Agregar usuario al grupo docker (sin sudo)
 sudo usermod -aG docker $USER
 newgrp docker
 
 # Iniciar Docker automáticamente
-sudo systemctl enable docker
-sudo systemctl start docker
+sudo systemctl enable --now docker
 
 # Verificar instalación
+java -version
 docker --version
+docker compose version
 ```
 
 ### 6️⃣ Configurar Variables de Entorno
@@ -523,11 +534,11 @@ sudo apt install -y nginx
 # Crear configuración
 sudo tee /etc/nginx/sites-available/default > /dev/null << 'EOF'
 upstream backend {
-    server 127.0.0.1:8080;
+    server ${BACKEND_HOST}:${BACKEND_PORT};
 }
 
 upstream frontend {
-    server 127.0.0.1:3000;
+    server ${FRONTEND_HOST}:${FRONTEND_PORT};
 }
 
 server {
@@ -583,27 +594,30 @@ sudo systemctl restart nginx
 docker ps
 
 # Verificar conectividad Backend
-curl http://localhost:8080/api/health
+curl "${BACKEND_URL}/api/health"
 
 # Verificar conectividad Frontend
-curl http://localhost:3000
+curl "${FRONTEND_URL}"
 ```
 
 ---
 
 ## 🔐 Variables de Entorno (cuando sean necesarias)
 
-La versión actual no necesita variables de entorno para ejecutar el frontend o
-el backend localmente. Cuando se integre la API, las variables públicas del
+El frontend y el backend reciben sus endpoints y credenciales mediante
+variables de entorno. Las variables públicas del
 frontend deberán añadirse en `frontend/.env.local` usando el prefijo `PUBLIC_`:
 
 ```bash
-PUBLIC_API_URL=http://localhost:8080
+PUBLIC_API_URL=https://api.example.com
 PUBLIC_MAP_LIBRARY=leaflet
 ```
 
 Las variables de base de datos y del backend pertenecen a la configuración del
-backend o al entorno de despliegue, no al frontend.
+backend o al entorno de despliegue, no al frontend. Para desarrollo, copia
+`backend/.env.example` como `backend/.env.local` y completa las variables de
+PostgreSQL. `SERVER_PORT` usa `8080` si no se especifica; el host y las
+credenciales de base de datos nunca tienen valores implícitos.
 
 **Agregar a `.gitignore`:**
 
@@ -742,7 +756,7 @@ kill -9 [PID]
 
 ```bash
 # Conectar a la BD
-psql -U postgres -d gasolineras_dev -h localhost
+psql -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -h "${POSTGRES_HOST}" -p "${POSTGRES_PORT}"
 
 # Dentro de psql, habilitar extensiones
 CREATE EXTENSION postgis;
