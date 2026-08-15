@@ -83,17 +83,7 @@ git clone https://github.com/TU_USUARIO/mapaGasolineras.git
 cd mapaGasolineras
 ```
 
-### 2️⃣ Crear Entorno Conda
-
-```bash
-# Crear entorno con todas las herramientas necesarias
-conda create -n gas -c conda-forge openjdk=21 maven nodejs=22 -y
-
-# Activar entorno
-conda activate gas
-```
-
-### 3️⃣ Configurar credenciales de PostgreSQL
+### 2️⃣ Configurar credenciales de PostgreSQL
 
 Si todavía no existe `backend/.env.local`, créalo a partir de la plantilla:
 
@@ -105,41 +95,34 @@ Edita `backend/.env.local` y configura el usuario, contraseña, base de datos,
 host y puerto que utilizará este entorno. El mismo usuario y contraseña se
 utilizarán para crear PostgreSQL y para conectar el backend.
 
-### 4️⃣ Crear la Base de Datos (PostgreSQL + PostGIS)
+### 3️⃣ Arrancar los servicios con Docker Compose
+
+El archivo `docker-compose.dev.yml` utiliza perfiles. Todos los comandos usan
+las credenciales locales de `backend/.env.local`; el código se monta como
+volumen, por lo que Spring Boot y Astro recargan los cambios durante el
+desarrollo.
+
+| Necesidad | Comando |
+| :--- | :--- |
+| Solo PostgreSQL + PostGIS | `docker compose --env-file backend/.env.local -f docker-compose.dev.yml --profile db up -d` |
+| Backend y su base de datos | `docker compose --env-file backend/.env.local -f docker-compose.dev.yml --profile backend up --build` |
+| Solo frontend | `docker compose -f docker-compose.dev.yml --profile frontend up --build` |
+| Aplicación completa | `docker compose --env-file backend/.env.local -f docker-compose.dev.yml --profile all up --build` |
+
+La primera ejecución descarga las imágenes y dependencias. La aplicación
+completa queda disponible en `http://localhost:4321` y el backend en
+`http://localhost:8080`. En Compose, el backend conecta a PostgreSQL mediante
+el nombre interno `db`; no hay que cambiar `POSTGRES_HOST=localhost` en el
+archivo local, que se conserva para ejecutar el backend fuera de Docker.
+
+Para detener los servicios y conservar los datos de PostgreSQL:
 
 ```bash
-# Opción A: Usar Docker Compose (RECOMENDADO)
-# Usa las credenciales definidas en backend/.env.local
-docker compose --env-file backend/.env.local -f docker-compose.dev.yml up -d
-
-# Comprobar que el contenedor está activo
-docker compose --env-file backend/.env.local -f docker-compose.dev.yml ps
+docker compose -f docker-compose.dev.yml --profile all down
 ```
 
-La primera ejecución descarga PostGIS y crea automáticamente la base de datos,
-el usuario y la contraseña indicados en `backend/.env.local`. No es necesario
-ejecutar SQL manualmente.
-
-### 5️⃣ Arrancar Backend (Spring Boot)
-
-```bash
-cd backend
-./mvnw spring-boot:run
-```
-
-✅ **API disponible en:** `${BACKEND_URL}`
-
-### 6️⃣ Arrancar Frontend (Astro + React)
-
-En **otra terminal** con `conda activate gas`:
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-✅ **App web disponible en:** `${FRONTEND_URL}`
+Usa `docker compose -f docker-compose.dev.yml --profile all down --volumes`
+solo si quieres eliminar también los datos locales de la base de datos.
 
 ---
 
@@ -149,11 +132,11 @@ Para inspeccionar BD con **DBeaver** o **pgAdmin**:
 
 | Parámetro | Valor |
 | :--- | :--- |
-| **Host** | `${POSTGRES_HOST}` |
-| **Puerto** | `5432` |
-| **Database** | `gasolineras_dev` |
-| **Usuario** | `postgres` |
-| **Contraseña** | `postgrespassword` |
+| **Host** | `localhost` |
+| **Puerto** | Valor de `POSTGRES_PORT` en `backend/.env.local` |
+| **Database** | Valor de `POSTGRES_DB` en `backend/.env.local` |
+| **Usuario** | Valor de `POSTGRES_USER` en `backend/.env.local` |
+| **Contraseña** | Valor de `POSTGRES_PASSWORD` en `backend/.env.local` |
 
 ---
 
@@ -174,7 +157,7 @@ mapaGasolineras/
 │   │       └── data.sql           # Datos iniciales
 │   ├── pom.xml                    # Dependencias Maven
 │   ├── mvnw                       # Maven Wrapper
-│   └── Dockerfile                 # Para producción
+│   └── Dockerfile.dev             # Imagen de desarrollo
 │
 ├── 📂 frontend/                   # Astro + React
 │   ├── src/
@@ -185,11 +168,9 @@ mapaGasolineras/
 │   ├── package.json
 │   ├── tsconfig.json
 │   ├── astro.config.mjs
-│   └── Dockerfile                 # Para producción
+│   └── Dockerfile.dev             # Imagen de desarrollo
 │
-├── 📄 docker-compose.yml          # Dev: PostgreSQL + PostGIS
-├── 📄 docker-compose.prod.yml     # Prod: Backend + Frontend + BD
-├── 📄 .env.example                # Template variables entorno
+├── 📄 docker-compose.dev.yml      # Servicios de desarrollo y perfiles
 └── 📄 README.md                   # Este archivo
 ```
 
@@ -200,17 +181,8 @@ mapaGasolineras/
 ### ⚡ Inicio Rápido (Rutina Diaria)
 
 ```bash
-# 1. Activar entorno
-conda activate gas
-
-# 2. Levantar base de datos
-docker compose up -d
-
-# 3. Iniciar Backend (Terminal 1)
-cd backend && ./mvnw spring-boot:run
-
-# 4. Iniciar Frontend (Terminal 2)
-cd frontend && npm run dev
+# Arrancar base de datos, backend y frontend en primer plano.
+docker compose --env-file backend/.env.local -f docker-compose.dev.yml --profile all up --build
 ```
 
 ### 🧹 Ejecución Limpia (Clean Run)
@@ -218,15 +190,11 @@ cd frontend && npm run dev
 Si haces cambios grandes o Maven no detecta cambios:
 
 ```bash
-# Backend
-cd backend && ./mvnw clean spring-boot:run
+# Detener los servicios y borrar también los datos locales de PostgreSQL.
+docker compose --env-file backend/.env.local -f docker-compose.dev.yml --profile all down --volumes
 
-# Frontend
-cd frontend && rm -rf node_modules package-lock.json && npm install && npm run dev
-
-# Base de Datos (recrear desde cero)
-docker compose down -v
-docker compose up -d
+# Reconstruir y volver a iniciar todo el entorno.
+docker compose --env-file backend/.env.local -f docker-compose.dev.yml --profile all up --build
 ```
 
 ### 📦 Actualizar Dependencias
@@ -246,8 +214,7 @@ npm outdated
 ### 🛑 Apagar Entorno
 
 ```bash
-docker compose down
-conda deactivate
+docker compose --env-file backend/.env.local -f docker-compose.dev.yml --profile all down
 ```
 
 ---

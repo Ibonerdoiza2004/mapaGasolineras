@@ -1,12 +1,57 @@
 
+name: mapa-gasolineras-dev
+
 services:
-  db-dev:
+  db:
     image: postgis/postgis:15-3.3-alpine
-    container_name: gasolineras_db_dev
-    restart: always
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB no está definido}
-      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER no está definido}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD no está definido}
+    profiles: ["db", "backend", "all"]
+    env_file:
+      - ./backend/.env.local
     ports:
-      - "${POSTGRES_PORT:?POSTGRES_PORT no está definido}:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    profiles: ["backend", "all"]
+    env_file:
+      - ./backend/.env.local
+    environment:
+      # Dentro de la red Docker PostgreSQL siempre escucha en 5432.
+      POSTGRES_HOST: db
+      POSTGRES_PORT: "5432"
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "${SERVER_PORT:-8080}:${SERVER_PORT:-8080}"
+    volumes:
+      - ./backend:/workspace
+      - backend-maven-cache:/root/.m2
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    profiles: ["frontend", "all"]
+    environment:
+      CHOKIDAR_USEPOLLING: "true"
+    ports:
+      - "4321:4321"
+    volumes:
+      - ./frontend:/app
+      - frontend-node-modules:/app/node_modules
+
+volumes:
+  postgres-data:
+  backend-maven-cache:
+  frontend-node-modules:
