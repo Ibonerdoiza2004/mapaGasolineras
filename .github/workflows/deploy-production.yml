@@ -100,7 +100,7 @@ jobs:
             mv /home/${{ secrets.ORACLE_SSH_USER }}/deploy.tar.gz /home/${{ secrets.ORACLE_SSH_USER }}/mapaGasolineras/
             mv /home/${{ secrets.ORACLE_SSH_USER }}/.env.production /home/${{ secrets.ORACLE_SSH_USER }}/mapaGasolineras/
             cd /home/${{ secrets.ORACLE_SSH_USER }}/mapaGasolineras
-            rm -rf backend database docker-compose.prod.yml Caddyfile
+            sudo rm -rf backend database docker-compose.prod.yml Caddyfile
             tar -xzf deploy.tar.gz
             rm -f deploy.tar.gz
             docker compose --env-file .env.production -f docker-compose.prod.yml up --build --detach

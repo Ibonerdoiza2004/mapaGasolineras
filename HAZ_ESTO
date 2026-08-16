@@ -146,6 +146,22 @@ sudo usermod -aG docker $USER
 > código (backend, base de datos y configuración) por SCP en cada despliegue y
 > construye las imágenes allí.
 
+El usuario de despliegue necesita `sudo` sin contraseña (viene activado por
+defecto en las imágenes cloud de Ubuntu y Oracle Linux) para limpiar la
+carpeta antes de cada despliegue. Compruébalo con:
+
+```bash
+sudo -n true && echo "sudo sin contraseña OK"
+```
+
+Si no funciona, ejecuta `sudo visudo` y asegúrate de que haya una línea como:
+
+```text
+ubuntu ALL=(ALL) NOPASSWD:ALL
+```
+
+(sustituye `ubuntu` por tu usuario de despliegue).
+
 La clave pública correspondiente a `ORACLE_SSH_KEY` ya debe estar en
 `~/.ssh/authorized_keys`, porque es la misma clave con la que accedes tú.
 Comprueba sus permisos:
