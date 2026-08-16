@@ -68,6 +68,7 @@ jobs:
           host: ${{ secrets.ORACLE_HOST }}
           username: ${{ secrets.ORACLE_SSH_USER }}
           key: ${{ secrets.ORACLE_SSH_KEY }}
+          passphrase: ${{ secrets.ORACLE_SSH_PASSPHRASE }}
           port: ${{ secrets.ORACLE_SSH_PORT || 22 }}
           source: .env.production
           target: /home/${{ secrets.ORACLE_SSH_USER }}/mapaGasolineras
@@ -78,6 +79,7 @@ jobs:
           host: ${{ secrets.ORACLE_HOST }}
           username: ${{ secrets.ORACLE_SSH_USER }}
           key: ${{ secrets.ORACLE_SSH_KEY }}
+          passphrase: ${{ secrets.ORACLE_SSH_PASSPHRASE }}
           port: ${{ secrets.ORACLE_SSH_PORT || 22 }}
           script: |
             set -e

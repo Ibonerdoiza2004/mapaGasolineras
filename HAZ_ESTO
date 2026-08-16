@@ -26,6 +26,7 @@ Ve a **GitHub → Settings → Secrets and variables → Actions** y añade:
 | `ORACLE_HOST` | IP o hostname de la VM de Oracle |
 | `ORACLE_SSH_USER` | Usuario SSH del servidor (p. ej. `ubuntu` u `opc`) |
 | `ORACLE_SSH_KEY` | Clave **privada** SSH de despliegue (sin passphrase) |
+| `ORACLE_SSH_PASSPHRASE` | Passphrase de la clave SSH, solo si la clave tiene una |
 | `POSTGRES_DB` | Nombre de la base de datos de producción |
 | `POSTGRES_USER` | Usuario de la base de datos de producción |
 | `POSTGRES_PASSWORD` | Contraseña de la base de datos de producción |
@@ -37,6 +38,97 @@ Ve a **GitHub → Settings → Secrets and variables → Actions** y añade:
 | :--- | :--- |
 | `PUBLIC_API_URL` | `https://api.tudominio.com` |
 | `PUBLIC_MAP_LIBRARY` | `leaflet` |
+
+## 2b. De dónde sacar cada secreto
+
+### `CLOUDFLARE_ACCOUNT_ID`
+
+1. Entra en [dash.cloudflare.com](https://dash.cloudflare.com).
+2. El **Account ID** aparece en la columna derecha de cualquier página, en
+   **Workers & Pages → Overview**, o en la barra lateral inferior.
+3. También puedes verlo en el dominio: **Dashboard → tu dominio → Overview →
+   API (columna derecha) → Account ID**.
+
+### `CLOUDFLARE_API_TOKEN`
+
+1. Ve a **My Profile** (arriba a la derecha) → **API Tokens**.
+2. Pulsa **Create Token** → **Create Custom Token**.
+3. Configura:
+   - Permissions: `Account` → `Cloudflare Pages` → `Edit`.
+   - Account Resources: `Include` → tu cuenta.
+   - Zone Resources: `All zones`.
+4. Pulsa **Continue to summary** → **Create Token**.
+5. Copia el token (solo se muestra una vez) y guárdalo como
+   `CLOUDFLARE_API_TOKEN`.
+
+> No reutilices la *Global API Key*. Usa un token con permiso limitado a Pages.
+
+### `ORACLE_HOST`
+
+1. Entra en [cloud.oracle.com](https://cloud.oracle.com) → **Compute → Instances**.
+2. Abre tu instancia y copia el campo **Public IP Address**.
+3. Ese valor es `ORACLE_HOST` (ej. `140.238.x.x`).
+   Si usas un hostname/DDNS, puedes poner ese hostname en su lugar.
+
+### `ORACLE_SSH_USER`
+
+Es el usuario con el que haces SSH a la VM:
+
+| Imagen de la VM | Usuario |
+| :--- | :--- |
+| Ubuntu | `ubuntu` |
+| Oracle Linux / Ampere | `opc` |
+
+Puedes comprobarlo en la consola: **Instances → tu instancia → Instance
+details → Cloud Shell / SSH**, o mirando con qué usuario te conectas hoy.
+
+### `ORACLE_SSH_KEY`
+
+Usa la misma clave privada con la que ya puedes entrar por SSH a Oracle. No
+es necesario generar otra clave ni añadir otra clave pública al servidor.
+
+Si normalmente entras con `ssh -i ~/.ssh/mi-clave ubuntu@...`, el archivo
+`~/.ssh/mi-clave` es la clave que debes usar. Copia su contenido con:
+
+```bash
+cat ~/.ssh/mi-clave
+```
+
+Copia **todo** el contenido, incluidas las líneas `BEGIN` y `END`, como el
+secreto `ORACLE_SSH_KEY`. La clave pública correspondiente ya está en
+`/home/ubuntu/.ssh/authorized_keys` porque es la que usas para entrar.
+
+Si tu clave pide una passphrase al usarla, guarda esa passphrase en
+`ORACLE_SSH_PASSPHRASE`. Si no pide passphrase, no crees ese secret o déjalo
+vacío.
+
+Si se añadieron intentos de la clave temporal `github-actions-deploy`, se
+pueden limpiar en el servidor con:
+
+```bash
+sed -i '/github-actions-deploy/d' ~/.ssh/authorized_keys
+```
+
+### `DOMAIN`
+
+Es el subdominio por el que se accederá a la API del backend (en Oracle):
+
+```text
+api.tudominio.com
+```
+
+- Debe coincidir con el registro DNS `A` `api` que crearás en Cloudflare.
+- Sustituye `tudominio.com` por tu dominio real.
+- Si aún no tienes dominio, este valor queda pendiente hasta comprarlo; sin
+  dominio no podrás terminar el despliegue HTTPS.
+
+### Relación entre los valores
+
+```text
+DOMAIN          = api.tudominio.com
+PUBLIC_API_URL  = https://api.tudominio.com   (variable, no secreto)
+DNS record      = api  →  IP de Oracle  (proxied)
+```
 
 ## 3. Preparar el servidor de Oracle
 
@@ -50,27 +142,34 @@ sudo usermod -aG docker $USER
 # Cierra y vuelve a abrir la sesión para que el grupo docker haga efecto.
 
 # Clonar el repositorio (se actualiza solo en cada despliegue)
-git clone https://github.com/Ibonerdoiza2004/mapaGasolineras.git
+git clone https://github.com/TU_USUARIO/mapaGasolineras.git
 ```
 
-Añade la clave **pública** correspondiente a `ORACLE_SSH_KEY` para que GitHub
-Actions pueda conectarse:
+La clave pública correspondiente a `ORACLE_SSH_KEY` ya debe estar en
+`~/.ssh/authorized_keys`, porque es la misma clave con la que accedes tú.
+Comprueba sus permisos:
 
 ```bash
-# En el servidor, con la clave pública ya copiada en el portapapeles:
-mkdir -p ~/.ssh && chmod 700 ~/.ssh
-echo "CLAVE_PUBLICA_AQUI" >> ~/.ssh/authorized_keys
+chmod 700 ~/.ssh
 chmod 600 ~/.ssh/authorized_keys
 ```
 
 ## 4. Configurar Cloudflare
 
-1. Crear un proyecto de **Cloudflare Pages**:
-   - En el dashboard: **Workers & Pages → Create → Pages → Connect to Git** y
-     elige el repositorio. No importa el build command que sugiera; el
-     despliegue lo hace GitHub Actions.
-   - Anota el **Account ID** (Dashboard → tu dominio → Overview) y el **nombre
-     del proyecto** para los secretos de arriba.
+1. Crear un proyecto de **Cloudflare Pages mediante Direct Upload**:
+   - En el dashboard: **Workers & Pages → Create → Pages → Direct Upload**.
+   - No elijas **Connect to Git**. GitHub Actions será el único sistema que
+     hará el build y el despliegue.
+   - Usa como nombre exacto del proyecto: `mapagasolineras`.
+   - Anota el **Account ID** (Dashboard → tu dominio → Overview).
+   - Si Cloudflare exige crear el proyecto desde la terminal, ejecuta:
+
+     ```bash
+     npx wrangler login
+     npx wrangler pages project create mapagasolineras
+     ```
+
+     Cuando pregunte por la rama de producción, responde `main`.
 
 2. Crear el **token de API**:
    - **My Profile → API Tokens → Create Token**.
@@ -85,8 +184,36 @@ chmod 600 ~/.ssh/authorized_keys
    | CNAME/A | `@` | Cloudflare Pages | ☁️ Proxied |
    | CNAME/A | `www` | Cloudflare Pages | ☁️ Proxied |
 
-4. **SSL/TLS**: configúralo en modo **Full** (no "Strict"), porque Caddy en
-   Oracle usa un certificado interno (`tls internal`).
+4. **SSL/TLS**: Caddy emite un certificado Let's Encrypt real por HTTPS
+   automático, por lo que puedes usar **Full (strict)**. Si prefieres, **Full**
+   también funciona.
+
+### Alternativa temporal sin dominio: `nip.io`
+
+Mientras no tengas dominio, puedes usar `nip.io`, que resuelve
+`api.TU_IP.nip.io` a tu IP de Oracle:
+
+```text
+DOMAIN         = api.TU_IP.nip.io
+PUBLIC_API_URL = https://api.TU_IP.nip.io
+```
+
+(Sustituye `TU_IP` por tu IP pública de Oracle, la misma que `ORACLE_HOST`).
+
+Con `nip.io`, Caddy obtiene un certificado Let's Encrypt real y el frontend de
+Cloudflare Pages puede llamar a la API sin errores de certificado. No hace
+falta ningún registro DNS en Cloudflare ni configurar el proxy para la API:
+el tráfico va directo a la IP de Oracle.
+
+Requisitos en Oracle:
+
+- Abrir los puertos **80** y **443** en el *Security List* de tu VCN (ingress)
+  para que Caddy pueda validar el certificado (puerto 80) y servir HTTPS
+  (puerto 443).
+- La IP pública debe ser alcanzable desde internet.
+
+Limitaciones: `nip.io` es un servicio público y gratuito, útil para pruebas.
+Para producción real compra un dominio propio.
 
 ## 5. Verificar
 

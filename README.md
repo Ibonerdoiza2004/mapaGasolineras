@@ -276,8 +276,11 @@ El despliegue está automatizado con GitHub Actions
 
 - Frontend estático en Cloudflare Pages (`https://tudominio.com`).
 - API en el subdominio `https://api.tudominio.com`, servida por Caddy en Oracle
-  y expuesta mediante Cloudflare (modo SSL/TLS **Full**). `PUBLIC_API_URL` apunta
-  a `https://api.tudominio.com`.
+  y expuesta mediante Cloudflare. Caddy emite un certificado Let's Encrypt real
+  (HTTPS automático). `PUBLIC_API_URL` apunta a `https://api.tudominio.com`.
+- Mientras no haya dominio propio, puedes usar `nip.io` como alternativa
+  temporal: `DOMAIN=api.<IP>.nip.io` y
+  `PUBLIC_API_URL=https://api.<IP>.nip.io`.
 - Caddy en Oracle hace `reverse_proxy` de todo el tráfico a `backend:8080`.
 
 ### Secretos y variables de GitHub
@@ -320,13 +323,15 @@ Configúralos en *Settings → Secrets and variables → Actions*:
 
 ### Preparación en Cloudflare
 
-1. Crear un proyecto de **Cloudflare Pages** apuntando al repositorio y anotar
-   su nombre y el *Account ID*.
+1. Crear un proyecto de **Cloudflare Pages mediante Direct Upload**. No lo
+   conectes al repositorio de GitHub: GitHub Actions es el único sistema que
+   compila y despliega el frontend. Usa como nombre exacto `mapagasolineras` y
+   anota el *Account ID*.
 2. Crear un token de API con permiso **Cloudflare Pages: Edit**.
 3. Crear los registros DNS:
    - `@` y `www` → Cloudflare Pages.
    - `api` (tipo A) → IP pública del servidor Oracle, con proxy (nube naranja).
-4. Configurar SSL/TLS en modo **Full**.
+4. Configurar SSL/TLS en modo **Full (strict)** (Caddy emite certificado real).
 
 ### Despliegue manual (opcional)
 
