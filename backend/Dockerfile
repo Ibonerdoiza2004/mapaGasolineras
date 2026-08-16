@@ -6,7 +6,7 @@ COPY pom.xml ./
 RUN mvn --batch-mode dependency:go-offline
 
 COPY src ./src
-RUN mvn --batch-mode package --skipTests
+RUN mvn --batch-mode package -DskipTests
 
 FROM eclipse-temurin:21-jre-jammy
 
