@@ -1,0 +1,80 @@
+# Comandos de desarrollo con go-task (https://taskfile.dev)
+#
+# Requisito: Docker Desktop con WSL2 (o Docker + Docker Compose v2).
+# La configuración de credenciales vive en backend/.env.local.
+
+version: '3'
+
+vars:
+  ENV_FILE: backend/.env.local
+  COMPOSE_FILE: docker-compose.dev.yml
+
+tasks:
+  default:
+    aliases: [up, dev]
+    desc: Arranca la aplicación completa (base de datos + backend + frontend)
+    cmds:
+      - docker compose --env-file {{.ENV_FILE}} -f {{.COMPOSE_FILE}} --profile all up --build
+
+  db:
+    desc: Arranca solo la base de datos PostgreSQL/PostGIS
+    cmds:
+      - docker compose --env-file {{.ENV_FILE}} -f {{.COMPOSE_FILE}} --profile db up -d
+
+  backend:
+    desc: Arranca el backend junto con su base de datos
+    cmds:
+      - docker compose --env-file {{.ENV_FILE}} -f {{.COMPOSE_FILE}} --profile backend up --build
+
+  frontend:
+    desc: Arranca solo el frontend (Astro)
+    cmds:
+      - docker compose -f {{.COMPOSE_FILE}} --profile frontend up --build
+
+  down:
+    desc: Detiene los servicios conservando los datos de la base de datos
+    cmds:
+      - docker compose -f {{.COMPOSE_FILE}} --profile all down
+
+  clean:
+    desc: Detiene los servicios y borra también los datos locales
+    cmds:
+      - docker compose -f {{.COMPOSE_FILE}} --profile all down --volumes --remove-orphans
+
+  logs:
+    desc: Sigue los logs de todos los servicios
+    cmds:
+      - docker compose -f {{.COMPOSE_FILE}} --profile all logs -f
+
+  ps:
+    desc: Muestra el estado de los servicios
+    cmds:
+      - docker compose -f {{.COMPOSE_FILE}} --profile all ps
+
+  health:
+    desc: Comprueba la salud del backend y de la base de datos
+    cmds:
+      - curl --fail --silent http://localhost:8080/actuator/health
+
+  test:backend:
+    desc: Ejecuta los tests del backend (requiere Java 21 y la base de datos arriba)
+    dir: backend
+    deps: [db]
+    cmds:
+      - ./mvnw test
+
+  test:frontend:
+    desc: Ejecuta los tests del frontend (requiere Node.js 22)
+    dir: frontend
+    cmds:
+      - npm run test
+
+  test:
+    desc: Ejecuta los tests de backend y frontend
+    deps: [test:backend, test:frontend]
+
+  build:
+    desc: Compila el frontend para producción
+    dir: frontend
+    cmds:
+      - npm run build

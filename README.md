@@ -152,7 +152,13 @@ mapaGasolineras/
 │   │   │   ├── controller/        # REST Controllers
 │   │   │   ├── service/           # Lógica de negocio
 │   │   │   ├── repository/        # Queries espaciales PostGIS
-│   │   │   └── entity/            # Modelos JPA
+│   │   │   ├── domain/            # Entidades JPA del dominio
+│   │   │   ├── dto/               # Objetos de transferencia de datos
+│   │   │   ├── mapper/            # Conversiones dominio <-> DTO
+│   │   │   ├── exception/         # Excepciones y manejo de errores
+│   │   │   ├── config/            # Configuración de Spring
+│   │   │   ├── client/            # Clientes de APIs externas
+│   │   │   └── scheduler/         # Tareas programadas
 │   │   └── resources/
 │   │       ├── application.properties
 │   │       ├── application-prod.properties
