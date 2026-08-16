@@ -127,6 +127,22 @@ jobs:
         working-directory: frontend
         run: npm ci
 
+      - name: Validate frontend API URL
+        env:
+          PUBLIC_API_URL: ${{ vars.PUBLIC_API_URL }}
+        run: |
+          test -n "$PUBLIC_API_URL" || {
+            echo "PUBLIC_API_URL no está definida en las variables de GitHub"
+            exit 1
+          }
+          case "$PUBLIC_API_URL" in
+            https://*) ;;
+            *)
+              echo "PUBLIC_API_URL debe usar HTTPS en producción"
+              exit 1
+              ;;
+          esac
+
       - name: Build static site
         working-directory: frontend
         env:
