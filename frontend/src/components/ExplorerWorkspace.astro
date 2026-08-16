@@ -7,6 +7,7 @@ const stations = [
 		brand: 'Marca independiente',
 		address: 'Av. de la Industria, 24',
 		price: '1,459 €/l',
+		fuel: 'Gasolina 95',
 		distance: '1,2 km',
 		tag: 'Mejor precio',
 	},
@@ -15,6 +16,7 @@ const stations = [
 		brand: 'Red nacional',
 		address: 'Calle Mayor, 108',
 		price: '1,479 €/l',
+		fuel: 'Diésel',
 		distance: '2,4 km',
 		tag: '',
 	},
@@ -23,10 +25,17 @@ const stations = [
 		brand: 'Red nacional',
 		address: 'Carretera M-30, km 12',
 		price: '1,489 €/l',
+		fuel: 'Gasolina 98',
 		distance: '3,8 km',
 		tag: '',
 	},
 ];
+
+const fuelClass: Record<string, string> = {
+	Diésel: 'station-card__fuel--diesel',
+	'Gasolina 95': 'station-card__fuel--gasolina-95',
+	'Gasolina 98': 'station-card__fuel--gasolina-98',
+};
 ---
 
 <section class="explorer" aria-label="Explorador de gasolineras">
@@ -91,15 +100,21 @@ const stations = [
 			</label>
 		</div>
 
-		<div class="explorer__stations">
+		<ol class="explorer__stations" aria-label="Lista de gasolineras cercanas">
 			{stations.map((station, index) => (
-				<article class:list={["station-card", { "station-card--featured": index === 0 }]}>
+				<li class:list={["station-card", { "station-card--featured": index === 0 }]}>
 					<div class="station-card__topline">
 						<div>
 							{station.tag && <span class="station-card__tag">{station.tag}</span>}
 							<h3>{station.name}</h3>
 						</div>
-						<strong>{station.price}</strong>
+						<div class="station-card__price">
+							<strong>{station.price}</strong>
+							<span class:list={['station-card__fuel', fuelClass[station.fuel]]}>
+								<span class="station-card__fuel-dot" aria-hidden="true"></span>
+								{station.fuel}
+							</span>
+						</div>
 					</div>
 					<p class="station-card__brand">{station.brand}</p>
 					<p class="station-card__address">{station.address}</p>
@@ -107,13 +122,13 @@ const stations = [
 						<span>{station.distance}</span>
 						<span>Actualizado hoy</span>
 					</div>
-				</article>
+				</li>
 			))}
-		</div>
+		</ol>
 		</div>
 	</details>
 
-	<div class="explorer__map" role="img" aria-label="Mapa de gasolineras cercanas">
+	<div class="explorer__map" role="region" aria-label="Mapa de gasolineras cercanas">
 		<div class="map-grid" aria-hidden="true"></div>
 		<div class="map-road map-road--horizontal" aria-hidden="true"></div>
 		<div class="map-road map-road--vertical" aria-hidden="true"></div>
@@ -130,3 +145,12 @@ const stations = [
 		<div class="map-attribution">Mapa base preparado para Leaflet · OpenStreetMap</div>
 	</div>
 </section>
+
+<script>
+	import { enhanceExplorerPanel } from './explorerPanel';
+
+	const panel = document.querySelector<HTMLDetailsElement>('.explorer__sidebar');
+	if (panel) {
+		enhanceExplorerPanel(panel);
+	}
+</script>

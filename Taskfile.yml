@@ -8,6 +8,7 @@ version: '3'
 vars:
   ENV_FILE: backend/.env.local
   COMPOSE_FILE: docker-compose.dev.yml
+  TEST_COMPOSE_FILE: docker-compose.test.yml
 
 tasks:
   default:
@@ -58,22 +59,34 @@ tasks:
 
   test:backend:
     desc: Ejecuta los tests del backend en un contenedor desechable
-    deps: [db]
     cmds:
-      - docker compose --env-file {{.ENV_FILE}} -f {{.COMPOSE_FILE}} run --rm backend mvn --batch-mode test
+      - docker compose --env-file {{.ENV_FILE}} -f {{.COMPOSE_FILE}} up -d --wait --wait-timeout 120 db
+      - docker compose --env-file {{.ENV_FILE}} -f {{.COMPOSE_FILE}} run --rm backend mvn --batch-mode verify
 
   test:frontend:
-    desc: Ejecuta los tests del frontend (requiere Node.js 22)
-    dir: frontend
+    desc: Ejecuta los tests unitarios del frontend en un contenedor desechable
     cmds:
-      - npm run test
+      - docker compose -f {{.TEST_COMPOSE_FILE}} run --rm --build frontend-test npm run test
+
+  test:e2e:
+    desc: Ejecuta los tests E2E de Playwright (móvil y escritorio)
+    cmds:
+      - docker compose -f {{.TEST_COMPOSE_FILE}} run --rm --build frontend-test npm run test:e2e
 
   test:
-    desc: Ejecuta los tests de backend y frontend
-    deps: [test:backend, test:frontend]
+    desc: Ejecuta todos los tests (backend, frontend unitario y E2E)
+    deps: [test:backend, test:frontend, test:e2e]
+
+  lint:
+    desc: Ejecuta lint y comprobación de tipos del frontend
+    cmds:
+      - docker compose -f {{.TEST_COMPOSE_FILE}} run --rm --build frontend-test sh -c "npm run lint && npm run typecheck"
+
+  check:
+    desc: Ejecuta el gate completo de CI local (lint, tipado, tests y build)
+    deps: [lint, test, build]
 
   build:
     desc: Compila el frontend para producción
-    dir: frontend
     cmds:
-      - npm run build
+      - docker compose -f {{.TEST_COMPOSE_FILE}} run --rm --build frontend-test npm run build

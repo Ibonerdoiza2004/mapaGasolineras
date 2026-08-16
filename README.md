@@ -229,17 +229,24 @@ docker compose --env-file backend/.env.local -f docker-compose.dev.yml --profile
 
 ## 🧪 Testing
 
+Los tests se ejecutan en contenedores desechables; no es necesario instalar
+Node.js ni Java en el host. Desde la raíz del proyecto:
+
+```bash
+task test          # backend + frontend unitario + E2E (Playwright)
+task test:backend  # solo backend (JUnit 5)
+task test:frontend # solo frontend unitario (Vitest + React Testing Library)
+task test:e2e      # solo E2E (Playwright, móvil y escritorio)
+task lint          # ESLint + astro check
+task check         # lint + tipado + tests + build (gate completo de CI local)
+```
+
 ### Backend - JUnit 5 + Mockito
 
 ```bash
+# Equivalente directo si prefieres correrlo sin Task:
 cd backend
-
-# Ejecutar tests
-./mvnw test
-
-# Con reporte de cobertura
-./mvnw clean test jacoco:report
-# 📊 Abre: target/site/jacoco/index.html
+./mvnw verify
 ```
 
 **Estructura de tests recomendada:**
@@ -253,16 +260,14 @@ src/test/java/com/example/gasolineras_api/
     └── GasolinerasRepositoryTest.java
 ```
 
-### Frontend - Vitest + React Testing Library
+### Frontend - Vitest + React Testing Library + Playwright
+
+Los tests de componentes usan Vitest y React Testing Library (interactúan con la
+interfaz), y los flujos completos se cubren con Playwright en `frontend/e2e/`.
 
 ```bash
-cd frontend
-
-# Instalar dependencias (incluye Vitest y React Testing Library)
-npm install
-
-# Ejecutar tests
-npm run test
+task test:frontend  # unitarios
+task test:e2e       # navegador real
 ```
 
 ---

@@ -67,4 +67,18 @@ describe('tokens visuales', () => {
 			contrastRatio(token(selectedTheme, foreground), token(selectedTheme, background)),
 		).toBeGreaterThanOrEqual(4.5);
 	});
+
+	it.each([
+		['light', '--color-diesel'],
+		['light', '--color-gasoline-95'],
+		['light', '--color-gasoline-98'],
+		['dark', '--color-diesel'],
+		['dark', '--color-gasoline-95'],
+		['dark', '--color-gasoline-98'],
+	])('mantiene contraste no textual (3:1) del combustible %s sobre la superficie', (theme, color) => {
+		const selectedTheme = theme as keyof typeof themeCss;
+		expect(
+			contrastRatio(token(selectedTheme, color), token(selectedTheme, '--color-surface')),
+		).toBeGreaterThanOrEqual(3);
+	});
 });
