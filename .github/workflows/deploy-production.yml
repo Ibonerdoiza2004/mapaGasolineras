@@ -103,6 +103,7 @@ jobs:
             sudo rm -rf backend database docker-compose.prod.yml Caddyfile
             tar -xzf deploy.tar.gz
             rm -f deploy.tar.gz
+            docker compose --env-file .env.production -f docker-compose.prod.yml down --remove-orphans || true
             docker compose --env-file .env.production -f docker-compose.prod.yml up --build --detach
             docker image prune --filter dangling=true --force
 
