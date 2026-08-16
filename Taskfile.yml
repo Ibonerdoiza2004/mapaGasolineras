@@ -57,11 +57,10 @@ tasks:
       - curl --fail --silent http://localhost:8080/actuator/health
 
   test:backend:
-    desc: Ejecuta los tests del backend (requiere Java 21 y la base de datos arriba)
-    dir: backend
+    desc: Ejecuta los tests del backend en un contenedor desechable
     deps: [db]
     cmds:
-      - ./mvnw test
+      - docker compose --env-file {{.ENV_FILE}} -f {{.COMPOSE_FILE}} run --rm backend mvn --batch-mode test
 
   test:frontend:
     desc: Ejecuta los tests del frontend (requiere Node.js 22)

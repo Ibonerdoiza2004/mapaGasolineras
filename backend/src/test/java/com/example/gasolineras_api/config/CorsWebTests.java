@@ -31,7 +31,7 @@ class CorsWebTests {
 	@Test
 	void rechazaUnOrigenNoConfigurado() throws Exception {
 		mockMvc.perform(get("/api/hello").header("Origin", "http://evil.example.com"))
-				.andExpect(status().isOk())
+				.andExpect(status().isForbidden())
 				.andExpect(header().doesNotExist("Access-Control-Allow-Origin"));
 	}
 
