@@ -1,0 +1,16 @@
+name: CI
+
+on:
+  push:
+    branches-ignore: [main]
+  pull_request:
+    branches-ignore: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    name: Tests, lint, type-check and build
+    uses: ./.github/workflows/test-suite.yml

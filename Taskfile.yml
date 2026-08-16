@@ -1,0 +1,92 @@
+# Comandos de desarrollo con go-task (https://taskfile.dev)
+#
+# Requisito: Docker Desktop con WSL2 (o Docker + Docker Compose v2).
+# La configuración de credenciales vive en backend/.env.local.
+
+version: '3'
+
+vars:
+  ENV_FILE: backend/.env.local
+  COMPOSE_FILE: docker-compose.dev.yml
+  TEST_COMPOSE_FILE: docker-compose.test.yml
+
+tasks:
+  default:
+    aliases: [up, dev]
+    desc: Arranca la aplicación completa (base de datos + backend + frontend)
+    cmds:
+      - docker compose --env-file {{.ENV_FILE}} -f {{.COMPOSE_FILE}} --profile all up --build
+
+  db:
+    desc: Arranca solo la base de datos PostgreSQL/PostGIS
+    cmds:
+      - docker compose --env-file {{.ENV_FILE}} -f {{.COMPOSE_FILE}} --profile db up -d
+
+  backend:
+    desc: Arranca el backend junto con su base de datos
+    cmds:
+      - docker compose --env-file {{.ENV_FILE}} -f {{.COMPOSE_FILE}} --profile backend up --build
+
+  frontend:
+    desc: Arranca solo el frontend (Astro)
+    cmds:
+      - docker compose -f {{.COMPOSE_FILE}} --profile frontend up --build
+
+  down:
+    desc: Detiene los servicios conservando los datos de la base de datos
+    cmds:
+      - docker compose -f {{.COMPOSE_FILE}} --profile all down
+
+  clean:
+    desc: Detiene los servicios y borra también los datos locales
+    cmds:
+      - docker compose -f {{.COMPOSE_FILE}} --profile all down --volumes --remove-orphans
+
+  logs:
+    desc: Sigue los logs de todos los servicios
+    cmds:
+      - docker compose -f {{.COMPOSE_FILE}} --profile all logs -f
+
+  ps:
+    desc: Muestra el estado de los servicios
+    cmds:
+      - docker compose -f {{.COMPOSE_FILE}} --profile all ps
+
+  health:
+    desc: Comprueba la salud del backend y de la base de datos
+    cmds:
+      - curl --fail --silent http://localhost:8080/actuator/health
+
+  test:backend:
+    desc: Ejecuta los tests del backend en un contenedor desechable
+    cmds:
+      - docker compose --env-file {{.ENV_FILE}} -f {{.COMPOSE_FILE}} up -d --wait --wait-timeout 120 db
+      - docker compose --env-file {{.ENV_FILE}} -f {{.COMPOSE_FILE}} run --rm backend mvn --batch-mode verify
+
+  test:frontend:
+    desc: Ejecuta los tests unitarios del frontend en un contenedor desechable
+    cmds:
+      - docker compose -f {{.TEST_COMPOSE_FILE}} run --rm --build frontend-test npm run test
+
+  test:e2e:
+    desc: Ejecuta los tests E2E de Playwright (móvil y escritorio)
+    cmds:
+      - docker compose -f {{.TEST_COMPOSE_FILE}} run --rm --build frontend-test npm run test:e2e
+
+  test:
+    desc: Ejecuta todos los tests (backend, frontend unitario y E2E)
+    deps: [test:backend, test:frontend, test:e2e]
+
+  lint:
+    desc: Ejecuta lint y comprobación de tipos del frontend
+    cmds:
+      - docker compose -f {{.TEST_COMPOSE_FILE}} run --rm --build frontend-test sh -c "npm run lint && npm run typecheck"
+
+  check:
+    desc: Ejecuta el gate completo de CI local (lint, tipado, tests y build)
+    deps: [lint, test, build]
+
+  build:
+    desc: Compila el frontend para producción
+    cmds:
+      - docker compose -f {{.TEST_COMPOSE_FILE}} run --rm --build frontend-test npm run build

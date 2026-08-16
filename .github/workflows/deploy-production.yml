@@ -21,7 +21,7 @@ jobs:
     runs-on: ubuntu-24.04
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Configure isolated production environment
         run: |
@@ -33,7 +33,17 @@ jobs:
 
       - name: Verify backend health and PostGIS
         run: |
-          curl --insecure --fail --show-error --retry 30 --retry-delay 2 --retry-connrefused https://localhost/actuator/health
+          for attempt in $(seq 1 60); do
+            if curl --insecure --fail --silent https://localhost/actuator/health >/dev/null; then
+              echo "Backend healthy after $attempt attempt(s)"
+              break
+            fi
+            if [ "$attempt" -eq 60 ]; then
+              echo "Backend did not become healthy in time"
+              exit 1
+            fi
+            sleep 2
+          done
           docker compose --env-file .env.production -f docker-compose.prod.yml exec --no-TTY db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "SELECT postgis_version();"' | grep -q '^3\.'
 
       - name: Show service logs after failure
@@ -51,7 +61,10 @@ jobs:
     runs-on: ubuntu-24.04
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
+
+      - name: Prepare deployment archive
+        run: tar -czf deploy.tar.gz backend database docker-compose.prod.yml Caddyfile
 
       - name: Prepare production environment file
         run: |
@@ -60,17 +73,19 @@ jobs:
           POSTGRES_DB=${{ secrets.POSTGRES_DB }}
           POSTGRES_USER=${{ secrets.POSTGRES_USER }}
           POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
+          CORS_ALLOWED_ORIGINS=${{ vars.CORS_ALLOWED_ORIGINS }}
           EOF
 
-      - name: Upload environment file
+      - name: Upload deployment files
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.ORACLE_HOST }}
           username: ${{ secrets.ORACLE_SSH_USER }}
           key: ${{ secrets.ORACLE_SSH_KEY }}
+          passphrase: ${{ secrets.ORACLE_SSH_PASSPHRASE }}
           port: ${{ secrets.ORACLE_SSH_PORT || 22 }}
-          source: .env.production
-          target: /home/${{ secrets.ORACLE_SSH_USER }}/mapaGasolineras
+          source: deploy.tar.gz,.env.production
+          target: /home/${{ secrets.ORACLE_SSH_USER }}
 
       - name: Deploy with Docker Compose
         uses: appleboy/ssh-action@v1.2.0
@@ -78,12 +93,18 @@ jobs:
           host: ${{ secrets.ORACLE_HOST }}
           username: ${{ secrets.ORACLE_SSH_USER }}
           key: ${{ secrets.ORACLE_SSH_KEY }}
+          passphrase: ${{ secrets.ORACLE_SSH_PASSPHRASE }}
           port: ${{ secrets.ORACLE_SSH_PORT || 22 }}
           script: |
             set -e
+            mkdir -p /home/${{ secrets.ORACLE_SSH_USER }}/mapaGasolineras
+            mv /home/${{ secrets.ORACLE_SSH_USER }}/deploy.tar.gz /home/${{ secrets.ORACLE_SSH_USER }}/mapaGasolineras/
+            mv /home/${{ secrets.ORACLE_SSH_USER }}/.env.production /home/${{ secrets.ORACLE_SSH_USER }}/mapaGasolineras/
             cd /home/${{ secrets.ORACLE_SSH_USER }}/mapaGasolineras
-            git fetch origin main
-            git reset --hard origin/main
+            sudo rm -rf backend database docker-compose.prod.yml Caddyfile
+            tar -xzf deploy.tar.gz
+            rm -f deploy.tar.gz
+            docker compose --env-file .env.production -f docker-compose.prod.yml down --remove-orphans || true
             docker compose --env-file .env.production -f docker-compose.prod.yml up --build --detach
             docker image prune --filter dangling=true --force
 
@@ -94,9 +115,9 @@ jobs:
     runs-on: ubuntu-24.04
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
@@ -105,6 +126,22 @@ jobs:
       - name: Install dependencies
         working-directory: frontend
         run: npm ci
+
+      - name: Validate frontend API URL
+        env:
+          PUBLIC_API_URL: ${{ vars.PUBLIC_API_URL }}
+        run: |
+          test -n "$PUBLIC_API_URL" || {
+            echo "PUBLIC_API_URL no está definida en las variables de GitHub"
+            exit 1
+          }
+          case "$PUBLIC_API_URL" in
+            https://*) ;;
+            *)
+              echo "PUBLIC_API_URL debe usar HTTPS en producción"
+              exit 1
+              ;;
+          esac
 
       - name: Build static site
         working-directory: frontend

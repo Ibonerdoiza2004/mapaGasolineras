@@ -152,7 +152,13 @@ mapaGasolineras/
 │   │   │   ├── controller/        # REST Controllers
 │   │   │   ├── service/           # Lógica de negocio
 │   │   │   ├── repository/        # Queries espaciales PostGIS
-│   │   │   └── entity/            # Modelos JPA
+│   │   │   ├── domain/            # Entidades JPA del dominio
+│   │   │   ├── dto/               # Objetos de transferencia de datos
+│   │   │   ├── mapper/            # Conversiones dominio <-> DTO
+│   │   │   ├── exception/         # Excepciones y manejo de errores
+│   │   │   ├── config/            # Configuración de Spring
+│   │   │   ├── client/            # Clientes de APIs externas
+│   │   │   └── scheduler/         # Tareas programadas
 │   │   └── resources/
 │   │       ├── application.properties
 │   │       ├── application-prod.properties
@@ -223,17 +229,24 @@ docker compose --env-file backend/.env.local -f docker-compose.dev.yml --profile
 
 ## 🧪 Testing
 
+Los tests se ejecutan en contenedores desechables; no es necesario instalar
+Node.js ni Java en el host. Desde la raíz del proyecto:
+
+```bash
+task test          # backend + frontend unitario + E2E (Playwright)
+task test:backend  # solo backend (JUnit 5)
+task test:frontend # solo frontend unitario (Vitest + React Testing Library)
+task test:e2e      # solo E2E (Playwright, móvil y escritorio)
+task lint          # ESLint + astro check
+task check         # lint + tipado + tests + build (gate completo de CI local)
+```
+
 ### Backend - JUnit 5 + Mockito
 
 ```bash
+# Equivalente directo si prefieres correrlo sin Task:
 cd backend
-
-# Ejecutar tests
-./mvnw test
-
-# Con reporte de cobertura
-./mvnw clean test jacoco:report
-# 📊 Abre: target/site/jacoco/index.html
+./mvnw verify
 ```
 
 **Estructura de tests recomendada:**
@@ -247,16 +260,14 @@ src/test/java/com/example/gasolineras_api/
     └── GasolinerasRepositoryTest.java
 ```
 
-### Frontend - Vitest + React Testing Library
+### Frontend - Vitest + React Testing Library + Playwright
+
+Los tests de componentes usan Vitest y React Testing Library (interactúan con la
+interfaz), y los flujos completos se cubren con Playwright en `frontend/e2e/`.
 
 ```bash
-cd frontend
-
-# Instalar dependencias (incluye Vitest y React Testing Library)
-npm install
-
-# Ejecutar tests
-npm run test
+task test:frontend  # unitarios
+task test:e2e       # navegador real
 ```
 
 ---
@@ -276,8 +287,11 @@ El despliegue está automatizado con GitHub Actions
 
 - Frontend estático en Cloudflare Pages (`https://tudominio.com`).
 - API en el subdominio `https://api.tudominio.com`, servida por Caddy en Oracle
-  y expuesta mediante Cloudflare (modo SSL/TLS **Full**). `PUBLIC_API_URL` apunta
-  a `https://api.tudominio.com`.
+  y expuesta mediante Cloudflare. Caddy emite un certificado Let's Encrypt real
+  (HTTPS automático). `PUBLIC_API_URL` apunta a `https://api.tudominio.com`.
+- Mientras no haya dominio propio, puedes usar `nip.io` como alternativa
+  temporal: `DOMAIN=api.<IP>.nip.io` y
+  `PUBLIC_API_URL=https://api.<IP>.nip.io`.
 - Caddy en Oracle hace `reverse_proxy` de todo el tráfico a `backend:8080`.
 
 ### Secretos y variables de GitHub
@@ -304,38 +318,36 @@ Configúralos en *Settings → Secrets and variables → Actions*:
 1. Instalar Docker y Compose v2:
 
    ```bash
-   sudo apt update && sudo apt install -y docker.io docker-compose-v2 git
+   sudo apt update && sudo apt install -y docker.io docker-compose-v2
    sudo systemctl enable --now docker
    sudo usermod -aG docker $USER
    ```
 
-2. Clonar el repositorio una vez (se actualiza solo en cada despliegue):
-
-   ```bash
-   git clone https://github.com/TU_USUARIO/mapaGasolineras.git
-   ```
-
-3. Añadir la clave pública correspondiente a `ORACLE_SSH_KEY` en
+2. Añadir la clave pública correspondiente a `ORACLE_SSH_KEY` en
    `~/.ssh/authorized_keys` del usuario de despliegue.
+
+   No hace falta clonar el repositorio: GitHub Actions sube el código por SCP en
+   cada despliegue.
 
 ### Preparación en Cloudflare
 
-1. Crear un proyecto de **Cloudflare Pages** apuntando al repositorio y anotar
-   su nombre y el *Account ID*.
+1. Crear un proyecto de **Cloudflare Pages mediante Direct Upload**. No lo
+   conectes al repositorio de GitHub: GitHub Actions es el único sistema que
+   compila y despliega el frontend. Usa como nombre exacto `mapagasolineras` y
+   anota el *Account ID*.
 2. Crear un token de API con permiso **Cloudflare Pages: Edit**.
 3. Crear los registros DNS:
    - `@` y `www` → Cloudflare Pages.
    - `api` (tipo A) → IP pública del servidor Oracle, con proxy (nube naranja).
-4. Configurar SSL/TLS en modo **Full**.
+4. Configurar SSL/TLS en modo **Full (strict)** (Caddy emite certificado real).
 
 ### Despliegue manual (opcional)
 
 Para desplegar el backend y la base de datos a mano en el servidor:
 
 ```bash
+# En el servidor, con el código y el archivo .env.production ya copiados:
 cd mapaGasolineras
-git pull
-# Crear .env.production con DOMAIN y POSTGRES_* reales.
 docker compose --env-file .env.production -f docker-compose.prod.yml up --build -d
 ```
 

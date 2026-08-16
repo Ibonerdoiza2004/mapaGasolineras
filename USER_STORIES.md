@@ -60,7 +60,7 @@ escritorio **para** encontrar gasolineras desde cualquier dispositivo.
   para móvil.
 - [x] T-03.3 Definir puntos de ruptura, áreas táctiles y comportamiento de
   scroll sin ocultar controles importantes.
-- [ ] T-03.4 Probar las vistas en tamaños móvil, tableta y escritorio.
+- [x] T-03.4 Probar las vistas en tamaños móvil, tableta y escritorio.
 
 ### US-04 — Accesibilidad transversal
 
@@ -69,12 +69,12 @@ web sin barreras **para** acceder a la misma información y acciones.
 
 **Tareas**
 
-- [ ] T-04.1 Añadir etiquetas, nombres accesibles y foco visible a controles,
+- [x] T-04.1 Añadir etiquetas, nombres accesibles y foco visible a controles,
   filtros, paneles y marcadores alternativos.
-- [ ] T-04.2 Implementar orden de foco y cierre correcto de diálogos y paneles.
-- [ ] T-04.3 Asegurar que precio, ahorro y tipo de combustible no dependan solo
+- [x] T-04.2 Implementar orden de foco y cierre correcto de diálogos y paneles.
+- [x] T-04.3 Asegurar que precio, ahorro y tipo de combustible no dependan solo
   del color.
-- [ ] T-04.4 Ejecutar pruebas de teclado y lector de pantalla en el flujo MVP.
+- [x] T-04.4 Ejecutar pruebas de teclado y lector de pantalla en el flujo MVP.
 
 ### US-05 — Base de calidad frontend y backend
 
@@ -83,10 +83,10 @@ automatizadas **para** introducir funcionalidades sin regresiones.
 
 **Tareas**
 
-- [ ] T-05.1 Configurar scripts de lint, pruebas y build para frontend y
+- [x] T-05.1 Configurar scripts de lint, pruebas y build para frontend y
   backend.
-- [ ] T-05.2 Añadir Vitest y React Testing Library para componentes React.
-- [ ] T-05.3 Establecer convenciones para DTO, errores de API y variables de
+- [x] T-05.2 Añadir Vitest y React Testing Library para componentes React.
+- [x] T-05.3 Establecer convenciones para DTO, errores de API y variables de
   entorno.
 - [x] T-05.4 Configurar una comprobación de build y tests en integración
   continua.
@@ -548,28 +548,28 @@ pruebas son parte de la aceptación de la historia, no una tarea opcional.
 
 ### US-03 — Diseño adaptable
 
-- [ ] TEST-03.1 En móvil, tableta y escritorio se muestran los controles
+- [x] TEST-03.1 En móvil, tableta y escritorio se muestran los controles
   correspondientes sin desbordamiento horizontal.
-- [ ] TEST-03.2 El panel inferior móvil puede abrirse, cerrarse y desplazarse
+- [x] TEST-03.2 El panel inferior móvil puede abrirse, cerrarse y desplazarse
   sin bloquear el mapa.
-- [ ] TEST-03.3 Un tamaño de viewport límite conserva acciones y contenido
+- [x] TEST-03.3 Un tamaño de viewport límite conserva acciones y contenido
   accesibles.
 
 ### US-04 — Accesibilidad transversal
 
-- [ ] TEST-04.1 Todos los controles tienen nombre accesible, foco visible y
+- [x] TEST-04.1 Todos los controles tienen nombre accesible, foco visible y
   orden de tabulación lógico.
-- [ ] TEST-04.2 Un diálogo o panel se puede abrir, usar y cerrar solo con
+- [x] TEST-04.2 Un diálogo o panel se puede abrir, usar y cerrar solo con
   teclado.
-- [ ] TEST-04.3 La auditoría falla ante contraste insuficiente, etiqueta
+- [x] TEST-04.3 La auditoría falla ante contraste insuficiente, etiqueta
   ausente o dependencia exclusiva del color.
 
 ### US-05 — Calidad frontend y backend
 
-- [ ] TEST-05.1 El build, lint y conjunto de tests pasan en un checkout limpio.
-- [ ] TEST-05.2 Un error de tipado, lint o test provoca un resultado fallido del
+- [x] TEST-05.1 El build, lint y conjunto de tests pasan en un checkout limpio.
+- [x] TEST-05.2 Un error de tipado, lint o test provoca un resultado fallido del
   pipeline.
-- [ ] TEST-05.3 Las variables obligatorias ausentes generan un error de
+- [x] TEST-05.3 Las variables obligatorias ausentes generan un error de
   configuración comprensible.
 
 ### US-06 — Importar estaciones y precios
