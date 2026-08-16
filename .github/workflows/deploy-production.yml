@@ -63,6 +63,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Prepare deployment archive
+        run: tar -czf deploy.tar.gz backend database docker-compose.prod.yml Caddyfile
+
       - name: Prepare production environment file
         run: |
           cat > .env.production <<'EOF'
@@ -72,7 +75,7 @@ jobs:
           POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
           EOF
 
-      - name: Upload environment file
+      - name: Upload deployment files
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.ORACLE_HOST }}
@@ -80,8 +83,8 @@ jobs:
           key: ${{ secrets.ORACLE_SSH_KEY }}
           passphrase: ${{ secrets.ORACLE_SSH_PASSPHRASE }}
           port: ${{ secrets.ORACLE_SSH_PORT || 22 }}
-          source: .env.production
-          target: /home/${{ secrets.ORACLE_SSH_USER }}/mapaGasolineras
+          source: deploy.tar.gz,.env.production
+          target: /home/${{ secrets.ORACLE_SSH_USER }}
 
       - name: Deploy with Docker Compose
         uses: appleboy/ssh-action@v1.2.0
@@ -93,9 +96,13 @@ jobs:
           port: ${{ secrets.ORACLE_SSH_PORT || 22 }}
           script: |
             set -e
+            mkdir -p /home/${{ secrets.ORACLE_SSH_USER }}/mapaGasolineras
+            mv /home/${{ secrets.ORACLE_SSH_USER }}/deploy.tar.gz /home/${{ secrets.ORACLE_SSH_USER }}/mapaGasolineras/
+            mv /home/${{ secrets.ORACLE_SSH_USER }}/.env.production /home/${{ secrets.ORACLE_SSH_USER }}/mapaGasolineras/
             cd /home/${{ secrets.ORACLE_SSH_USER }}/mapaGasolineras
-            git fetch origin main
-            git reset --hard origin/main
+            rm -rf backend database docker-compose.prod.yml Caddyfile
+            tar -xzf deploy.tar.gz
+            rm -f deploy.tar.gz
             docker compose --env-file .env.production -f docker-compose.prod.yml up --build --detach
             docker image prune --filter dangling=true --force
 

@@ -307,19 +307,16 @@ Configúralos en *Settings → Secrets and variables → Actions*:
 1. Instalar Docker y Compose v2:
 
    ```bash
-   sudo apt update && sudo apt install -y docker.io docker-compose-v2 git
+   sudo apt update && sudo apt install -y docker.io docker-compose-v2
    sudo systemctl enable --now docker
    sudo usermod -aG docker $USER
    ```
 
-2. Clonar el repositorio una vez (se actualiza solo en cada despliegue):
-
-   ```bash
-   git clone https://github.com/TU_USUARIO/mapaGasolineras.git
-   ```
-
-3. Añadir la clave pública correspondiente a `ORACLE_SSH_KEY` en
+2. Añadir la clave pública correspondiente a `ORACLE_SSH_KEY` en
    `~/.ssh/authorized_keys` del usuario de despliegue.
+
+   No hace falta clonar el repositorio: GitHub Actions sube el código por SCP en
+   cada despliegue.
 
 ### Preparación en Cloudflare
 
@@ -338,9 +335,8 @@ Configúralos en *Settings → Secrets and variables → Actions*:
 Para desplegar el backend y la base de datos a mano en el servidor:
 
 ```bash
+# En el servidor, con el código y el archivo .env.production ya copiados:
 cd mapaGasolineras
-git pull
-# Crear .env.production con DOMAIN y POSTGRES_* reales.
 docker compose --env-file .env.production -f docker-compose.prod.yml up --build -d
 ```
 

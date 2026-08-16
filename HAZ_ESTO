@@ -136,14 +136,15 @@ Conecta por SSH a la VM y ejecuta una vez:
 
 ```bash
 # Instalar Docker y Compose v2
-sudo apt update && sudo apt install -y docker.io docker-compose-v2 git
+sudo apt update && sudo apt install -y docker.io docker-compose-v2
 sudo systemctl enable --now docker
 sudo usermod -aG docker $USER
 # Cierra y vuelve a abrir la sesión para que el grupo docker haga efecto.
-
-# Clonar el repositorio (se actualiza solo en cada despliegue)
-git clone https://github.com/TU_USUARIO/mapaGasolineras.git
 ```
+
+> No hace falta clonar el repositorio en el servidor: GitHub Actions sube el
+> código (backend, base de datos y configuración) por SCP en cada despliegue y
+> construye las imágenes allí.
 
 La clave pública correspondiente a `ORACLE_SSH_KEY` ya debe estar en
 `~/.ssh/authorized_keys`, porque es la misma clave con la que accedes tú.
