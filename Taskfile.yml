@@ -32,6 +32,11 @@ tasks:
     cmds:
       - docker compose -f {{.COMPOSE_FILE}} --profile frontend up --build
 
+  deps:
+    desc: Reinstala las dependencias del frontend en el volumen de desarrollo
+    cmds:
+      - docker compose --env-file {{.ENV_FILE}} -f {{.COMPOSE_FILE}} --profile frontend run --rm frontend npm ci
+
   down:
     desc: Detiene los servicios conservando los datos de la base de datos
     cmds:
@@ -58,20 +63,21 @@ tasks:
       - curl --fail --silent http://localhost:8080/actuator/health
 
   test:backend:
-    desc: Ejecuta los tests del backend en un contenedor desechable
+    desc: Ejecuta los tests del backend contra una base de datos aislada y desechable
     cmds:
-      - docker compose --env-file {{.ENV_FILE}} -f {{.COMPOSE_FILE}} up -d --wait --wait-timeout 120 db
-      - docker compose --env-file {{.ENV_FILE}} -f {{.COMPOSE_FILE}} run --rm backend mvn --batch-mode verify
+      - docker compose --ansi never --env-file {{.ENV_FILE}} -f {{.TEST_COMPOSE_FILE}} up -d --wait --wait-timeout 120 db-test
+      - defer: docker compose --ansi never --env-file {{.ENV_FILE}} -f {{.TEST_COMPOSE_FILE}} down db-test
+      - docker compose --ansi never --env-file {{.ENV_FILE}} -f {{.TEST_COMPOSE_FILE}} run --rm -T backend-test mvn --batch-mode verify
 
   test:frontend:
     desc: Ejecuta los tests unitarios del frontend en un contenedor desechable
     cmds:
-      - docker compose -f {{.TEST_COMPOSE_FILE}} run --rm --build frontend-test npm run test
+      - docker compose --ansi never -f {{.TEST_COMPOSE_FILE}} run --rm -T --build frontend-test npm run test
 
   test:e2e:
     desc: Ejecuta los tests E2E de Playwright (móvil y escritorio)
     cmds:
-      - docker compose -f {{.TEST_COMPOSE_FILE}} run --rm --build frontend-test npm run test:e2e
+      - docker compose --ansi never -f {{.TEST_COMPOSE_FILE}} run --rm -T --build frontend-test npm run test:e2e
 
   test:
     desc: Ejecuta todos los tests (backend, frontend unitario y E2E)
@@ -80,7 +86,7 @@ tasks:
   lint:
     desc: Ejecuta lint y comprobación de tipos del frontend
     cmds:
-      - docker compose -f {{.TEST_COMPOSE_FILE}} run --rm --build frontend-test sh -c "npm run lint && npm run typecheck"
+      - docker compose --ansi never -f {{.TEST_COMPOSE_FILE}} run --rm -T --build frontend-test sh -c "npm run lint && npm run typecheck"
 
   check:
     desc: Ejecuta el gate completo de CI local (lint, tipado, tests y build)
@@ -89,4 +95,4 @@ tasks:
   build:
     desc: Compila el frontend para producción
     cmds:
-      - docker compose -f {{.TEST_COMPOSE_FILE}} run --rm --build frontend-test npm run build
+      - docker compose --ansi never -f {{.TEST_COMPOSE_FILE}} run --rm -T --build frontend-test npm run build

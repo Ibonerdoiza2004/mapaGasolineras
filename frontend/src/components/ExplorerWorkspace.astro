@@ -1,5 +1,6 @@
 ---
 import '../styles/explorer.css';
+import LeafletMap from './LeafletMap';
 
 const stations = [
 	{
@@ -29,6 +30,12 @@ const stations = [
 		distance: '3,8 km',
 		tag: '',
 	},
+];
+
+const mapStations = [
+	{ id: 'norte', lat: 40.426, lon: -3.7038, rotulo: 'Estación Norte', price: 1.459, isBest: true },
+	{ id: 'centro', lat: 40.4168, lon: -3.6938, rotulo: 'Gasolinera Centro', price: 1.479 },
+	{ id: 'este', lat: 40.406, lon: -3.6838, rotulo: 'Área de servicio Este', price: 1.489 },
 ];
 
 const fuelClass: Record<string, string> = {
@@ -128,21 +135,13 @@ const fuelClass: Record<string, string> = {
 		</div>
 	</details>
 
-	<div class="explorer__map" role="region" aria-label="Mapa de gasolineras cercanas">
-		<div class="map-grid" aria-hidden="true"></div>
-		<div class="map-road map-road--horizontal" aria-hidden="true"></div>
-		<div class="map-road map-road--vertical" aria-hidden="true"></div>
-		<div class="map-label map-label--north" aria-hidden="true">Zona Norte</div>
-		<div class="map-label map-label--south" aria-hidden="true">Centro</div>
-		<span class="map-marker map-marker--active" style="--marker-x: 42%; --marker-y: 34%" aria-hidden="true">1</span>
-		<span class="map-marker" style="--marker-x: 64%; --marker-y: 52%" aria-hidden="true">2</span>
-		<span class="map-marker" style="--marker-x: 30%; --marker-y: 69%" aria-hidden="true">3</span>
-		<span class="map-marker" style="--marker-x: 76%; --marker-y: 26%" aria-hidden="true">4</span>
-		<div class="map-controls" aria-label="Controles del mapa">
-			<button type="button" aria-label="Acercar mapa">+</button>
-			<button type="button" aria-label="Alejar mapa">−</button>
-		</div>
-		<div class="map-attribution">Mapa base preparado para Leaflet · OpenStreetMap</div>
+	<div class="explorer__map">
+		<LeafletMap
+			client:load
+			stations={mapStations}
+			center={[40.4168, -3.7038]}
+			zoom={13}
+		/>
 	</div>
 </section>
 

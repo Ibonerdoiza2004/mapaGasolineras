@@ -7,13 +7,14 @@ sus pruebas han terminado correctamente.
 ## Estado actual
 
 - **Fase activa:** Fase 1 — MVP: descubrir y comparar
-- **Historia activa:** US-06 — Importar estaciones y precios oficiales
-- **Siguiente historia:** US-06 — Importar estaciones y precios oficiales
-- **Tarea pendiente:** T-06.1 — Implementar un cliente del conjunto oficial del
-  Geoportal/MITECO
-- **Última tarea completada:** US-05 — Base de calidad frontend y backend
-- **Porcentaje de tareas completadas:** 19 / 150
-- **Pruebas automatizadas:** 79 / 114 casos planificados (71 unitarias + 8 E2E)
+- **Historia activa:** US-11 — Obtener ubicación del dispositivo
+- **Siguiente historia:** US-11 — Obtener ubicación del dispositivo
+- **Tarea pendiente:** T-11.1 — Solicitar geolocalización solo tras una acción
+  clara del usuario
+- **Última tarea completada:** TEST-10.3 — Un fallo de teselas muestra
+  alternativa o mensaje sin romper la lista de estaciones
+- **Porcentaje de tareas completadas:** 39 / 150
+- **Pruebas automatizadas:** 120 / 122 casos planificados (112 unitarias + 8 E2E)
 
 ## Historias
 
@@ -24,7 +25,12 @@ sus pruebas han terminado correctamente.
 | US-03 | Diseño adaptable del explorador | 0 | Completada |
 | US-04 | Accesibilidad transversal | 0 | Completada |
 | US-05 | Base de calidad frontend y backend | 0 | Completada |
-| US-06–US-22 | MVP: descubrir y comparar | 1 | Pendiente |
+| US-06 | Importar estaciones y precios oficiales | 1 | Completada |
+| US-07 | Almacenar datos geoespaciales e históricos | 1 | Completada |
+| US-08 | Consultar gasolineras cercanas | 1 | Completada |
+| US-09 | Consultar el detalle de una estación | 1 | Completada |
+| US-10 | Visualizar el mapa interactivo | 1 | Completada |
+| US-11–US-22 | MVP: descubrir y comparar | 1 | Pendiente |
 | US-23–US-30 | Planificador de rutas sin cuenta | 2 | Pendiente |
 | US-31–US-35 | Personalización con cuenta | 3 | Pendiente |
 | US-36–US-38 | Análisis y administración | 4 | Pendiente |
@@ -72,3 +78,28 @@ sus pruebas han terminado correctamente.
 | 2026-08-16 | T-05.2 | Vitest y React Testing Library para componentes React | Confirmado: pruebas de componentes que interactúan con la interfaz (`ThemeToggle`, `HelloApi`) |
 | 2026-08-16 | T-05.3 | Convenciones de DTO, errores de API y variables de entorno | Documentadas en AGENTS.md |
 | 2026-08-16 | TEST-US-05 | Verificación completa de calidad | `npm run check` (typecheck + lint + 71 unitarios + 8 E2E + build) pasa en limpio |
+| 2026-08-17 | T-06.1 | Cliente del Geoportal/MITECO | DTOs JSON, cliente REST con MockRestServiceServer, 6/6 tests; API real verificada (JSON, 11k estaciones) |
+| 2026-08-17 | T-06.1 | Taskfile: defer + --ansi never + -T | DB se para tras tests; spinner ANSI y TTY corregidos |
+| 2026-08-17 | T-06.2 | Normalización de datos del Geoportal | FuelType, NormalizedStation, GeoportalStationNormalizer; 15/15 tests pasan |
+| 2026-08-17 | T-06.3 | Importación periódica con registro | FuelStationImportService, FuelStationImportScheduler, SchedulerConfig; 5/5 tests |
+| 2026-08-17 | T-06.4 | Manejo de proveedor no disponible | El servicio atrapa FuelStationDataClientException y devuelve fallo sin tocar datos; ya cubierto por tests existentes |
+| 2026-08-17 | T-07.1 | Entidades JPA con PostGIS | Station (Point 4326), CurrentPrice, PriceSnapshot + repositorios; 3/3 tests de persistencia pasan |
+| 2026-08-17 | T-07.2 | Índices espaciales y de consulta | SpatialIndexInitializer (GIST) + @Index en PriceSnapshot; se eliminó schema.sql por conflicto en tests |
+| 2026-08-17 | T-07.3 | Reglas de actualización e idempotencia | FuelStationPersistenceService con upsert (station, current_price) y snapshots idempotentes por fecha; 5/5 tests |
+| 2026-08-17 | Mantenimiento | Scheduler disparaba la importación en tests | Añadido initialDelayString a @Scheduled; daemon threads en TaskScheduler |
+| 2026-08-17 | T-07.4 | Pruebas de repositorio y validación | @PrePersist/@PreUpdate valida coordenadas; tests de rechazo de geometría fuera de rango y combustible nulo; 45/45 tests |
+| 2026-08-17 | T-08.1 | Endpoint GET /api/stations/nearby | StationController + StationService + consulta espacial ST_DWithin; proyección NearbyStationProjection |
+| 2026-08-17 | T-08.2 | Distancia, precio, ahorro y fecha | StationService calcula distancia km, mejor precio y ahorro; orden por precio/distancia/ahorro |
+| 2026-08-17 | T-08.3 | Validación de parámetros y errores | InvalidParameterException + ApiError + GlobalExceptionHandler; lat/lon/radio/combustible/orden validados con 400 |
+| 2026-08-17 | T-08.4 | Pruebas de servicio, controlador y espaciales | StationServiceTest 5, StationControllerTest 7, NearbyStationQueryTest 3; 60/60 tests |
+| 2026-08-17 | T-09.1 | Endpoint GET /api/stations/{id} | StationDetailDto + StationService.getStationDetail + ResourceNotFoundException |
+| 2026-08-17 | T-09.2 | Ficha completa con precios | Dirección, marca, horario, tipoVenta, margen y precios por combustible |
+| 2026-08-17 | T-09.3 | Error 404 comprensible | ResourceNotFoundException → ApiError NOT_FOUND |
+| 2026-08-17 | T-09.4 | Pruebas de contrato | StationServiceTest 8, StationControllerTest 9; 65/65 tests |
+| 2026-08-17 | T-10.1 | Isla React Leaflet | LeafletMap.tsx con import dinámico (`await import('leaflet')`), tipo `client:load` |
+| 2026-08-17 | T-10.2 | Proveedor de teselas configurable | `PUBLIC_MAP_TILE_URL` con OpenStreetMap por defecto; 7/7 tests de LeafletMap |
+| 2026-08-17 | T-10.3 | Vista, zoom y atribución | zoomControl:false + `L.control.zoom` con títulos en español; zoom 3–19; marcadores con `keyboard:true` |
+| 2026-08-17 | T-10.4 | Fallback de mapa | Alternativa de listado si el mapa no carga; E2E y unitarios cubren el fallo de teselas |
+| 2026-08-17 | TEST-US-10 | Verificación completa de US-10 | Unitarios 78/78, typecheck/lint/build limpios, E2E 8/8 (orden de foco adaptado a Leaflet) |
+| 2026-08-17 | Mantenimiento — aislamiento de tests | `test:backend` usa `docker-compose.test.yml` con `db-test` + `backend-test` y volumen propio `postgres-test-data` | Los tests ya no apagan la BD de desarrollo ni comparten sus datos; verificado con la BD de dev levantada (sigue healthy tras `task test`) |
+| 2026-08-17 | Mantenimiento — parpadeo del selector de tema | Script inline al final del body parchea el botón antes de pintar; `useState` con inicializador perezoso lee `window.__gasolinerasTheme` | Sin parpadeo de "Oscuro" al cargar/volver a la pestaña; sin mismatch de hidratación; 78/78 unitarios y 8/8 E2E pasan |

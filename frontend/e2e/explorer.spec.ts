@@ -28,7 +28,11 @@ test.describe('teclado — orden de foco y operación', () => {
 		test.skip(isMobile, 'orden de tabulación de escritorio');
 		await page.goto('/');
 
-		const expected = [
+		// La isla Leaflet se hidrata de forma asíncrona; se espera a que sus
+		// controles existan para que el orden de foco sea estable.
+		await expect(page.getByRole('button', { name: 'Acercar mapa' })).toBeVisible();
+
+		const panelOrder = [
 			['link', 'Mapa de Gasolineras, inicio'],
 			['link', 'Explorar'],
 			['link', 'Rutas'],
@@ -38,14 +42,23 @@ test.describe('teclado — orden de foco y operación', () => {
 			['combobox', 'Radio'],
 			['button', 'Usar mi ubicación'],
 			['combobox', 'Ordenar resultados'],
-			['button', 'Acercar mapa'],
-			['button', 'Alejar mapa'],
 		] as const;
 
-		for (const [role, name] of expected) {
+		for (const [role, name] of panelOrder) {
 			await page.keyboard.press('Tab');
 			await expect(page.getByRole(role, { name })).toBeFocused();
 		}
+
+		// Tras el panel, el foco entra en el mapa Leaflet (contenedor y
+		// marcadores) y desde ahí se alcanzan los controles de zoom con teclado.
+		let zoomReached = false;
+		for (let i = 0; i < 10 && !zoomReached; i += 1) {
+			await page.keyboard.press('Tab');
+			zoomReached = await page
+				.getByRole('button', { name: 'Acercar mapa' })
+				.evaluate((el) => el === document.activeElement);
+		}
+		await expect(page.getByRole('button', { name: 'Acercar mapa' })).toBeFocused();
 	});
 
 	test('el selector de tema se activa con el teclado', async ({ page }) => {

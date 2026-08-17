@@ -102,12 +102,12 @@ actualizados **para** tomar decisiones fiables.
 
 **Tareas**
 
-- [ ] T-06.1 Implementar un cliente del conjunto oficial del Geoportal/MITECO.
-- [ ] T-06.2 Normalizar nombres de combustibles, precios, coordenadas, horarios
+- [x] T-06.1 Implementar un cliente del conjunto oficial del Geoportal/MITECO.
+- [x] T-06.2 Normalizar nombres de combustibles, precios, coordenadas, horarios
   y servicios recibidos.
-- [ ] T-06.3 Programar una importación periódica con registro de resultado y
+- [x] T-06.3 Programar una importación periódica con registro de resultado y
   fecha de origen.
-- [ ] T-06.4 Manejar proveedor no disponible sin borrar los últimos datos
+- [x] T-06.4 Manejar proveedor no disponible sin borrar los últimos datos
   válidos.
 
 ### US-07 — Almacenar datos geoespaciales e históricos
@@ -117,11 +117,11 @@ geolocalizados **para** responder búsquedas rápidas y preservar trazabilidad.
 
 **Tareas**
 
-- [ ] T-07.1 Crear entidades y migraciones para estación, precio actual y
+- [x] T-07.1 Crear entidades y migraciones para estación, precio actual y
   snapshot histórico en PostgreSQL/PostGIS.
-- [ ] T-07.2 Añadir índices espaciales y de consulta por combustible y fecha.
-- [ ] T-07.3 Definir reglas de actualización e idempotencia de la importación.
-- [ ] T-07.4 Cubrir la persistencia con pruebas de repositorio.
+- [x] T-07.2 Añadir índices espaciales y de consulta por combustible y fecha.
+- [x] T-07.3 Definir reglas de actualización e idempotencia de la importación.
+- [x] T-07.4 Cubrir la persistencia con pruebas de repositorio.
 
 ### US-08 — Consultar gasolineras cercanas
 
@@ -130,13 +130,13 @@ comparar opciones relevantes a mi ubicación.
 
 **Tareas**
 
-- [ ] T-08.1 Implementar `GET /api/stations/nearby` con latitud, longitud,
+- [x] T-08.1 Implementar `GET /api/stations/nearby` con latitud, longitud,
   radio, combustible y ordenación.
-- [ ] T-08.2 Calcular y devolver distancia, precio aplicable, ahorro y fecha de
+- [x] T-08.2 Calcular y devolver distancia, precio aplicable, ahorro y fecha de
   actualización.
-- [ ] T-08.3 Validar límites de radio y parámetros incorrectos con errores
+- [x] T-08.3 Validar límites de radio y parámetros incorrectos con errores
   consistentes.
-- [ ] T-08.4 Añadir pruebas de servicio y controlador para consultas espaciales.
+- [x] T-08.4 Añadir pruebas de servicio y controlador para consultas espaciales.
 
 ### US-09 — Consultar el detalle de una estación
 
@@ -145,11 +145,11 @@ comparar opciones relevantes a mi ubicación.
 
 **Tareas**
 
-- [ ] T-09.1 Implementar `GET /api/stations/{id}` y su DTO de detalle.
-- [ ] T-09.2 Incluir dirección, marca, horario, servicios, combustibles y
+- [x] T-09.1 Implementar `GET /api/stations/{id}` y su DTO de detalle.
+- [x] T-09.2 Incluir dirección, marca, horario, servicios, combustibles y
   precios disponibles.
-- [ ] T-09.3 Devolver un error 404 comprensible cuando la estación no exista.
-- [ ] T-09.4 Añadir pruebas de contrato de la respuesta.
+- [x] T-09.3 Devolver un error 404 comprensible cuando la estación no exista.
+- [x] T-09.4 Añadir pruebas de contrato de la respuesta.
 
 ### US-10 — Visualizar el mapa interactivo
 
@@ -158,11 +158,11 @@ fluido **para** entender dónde están las gasolineras.
 
 **Tareas**
 
-- [ ] T-10.1 Integrar Leaflet en un componente React aislado de la página Astro.
-- [ ] T-10.2 Configurar proveedor de teselas mediante variable de entorno y
+- [x] T-10.1 Integrar Leaflet en un componente React aislado de la página Astro.
+- [x] T-10.2 Configurar proveedor de teselas mediante variable de entorno y
   establecer OpenStreetMap como valor base.
-- [ ] T-10.3 Ajustar vista, zoom mínimo/máximo y atribución obligatoria del mapa.
-- [ ] T-10.4 Renderizar un estado alternativo de listado cuando el mapa no pueda
+- [x] T-10.3 Ajustar vista, zoom mínimo/máximo y atribución obligatoria del mapa.
+- [x] T-10.4 Renderizar un estado alternativo de listado cuando el mapa no pueda
   cargarse.
 
 ### US-11 — Obtener ubicación del dispositivo
@@ -583,34 +583,34 @@ pruebas son parte de la aceptación de la historia, no una tarea opcional.
 
 ### US-07 — Persistencia geoespacial
 
-- [ ] TEST-07.1 Una estación con geometría válida se guarda y se recupera con
+- [x] TEST-07.1 Una estación con geometría válida se guarda y se recupera con
   coordenadas correctas.
-- [ ] TEST-07.2 Reprocesar el mismo snapshot es idempotente y no duplica datos.
-- [ ] TEST-07.3 Geometría fuera de rango o combustible desconocido provoca
+- [x] TEST-07.2 Reprocesar el mismo snapshot es idempotente y no duplica datos.
+- [x] TEST-07.3 Geometría fuera de rango o combustible desconocido provoca
   rechazo de validación.
 
 ### US-08 — Estaciones cercanas
 
-- [ ] TEST-08.1 Coordenadas y radio válidos devuelven estaciones ordenadas con
+- [x] TEST-08.1 Coordenadas y radio válidos devuelven estaciones ordenadas con
   distancia y ahorro calculados.
-- [ ] TEST-08.2 Parámetros ausentes, no numéricos o radio negativo devuelven
+- [x] TEST-08.2 Parámetros ausentes, no numéricos o radio negativo devuelven
   `400` y no consultan el repositorio.
-- [ ] TEST-08.3 Una zona sin resultados devuelve una lista vacía y un fallo de
+- [x] TEST-08.3 Una zona sin resultados devuelve una lista vacía y un fallo de
   base de datos devuelve el error de servicio previsto.
 
 ### US-09 — Detalle de estación
 
-- [ ] TEST-09.1 Un identificador existente devuelve ficha, horario, servicios y
+- [x] TEST-09.1 Un identificador existente devuelve ficha, horario, servicios y
   precios completos.
-- [ ] TEST-09.2 Un identificador inexistente devuelve `404` sin datos parciales.
-- [ ] TEST-09.3 Un identificador con formato inválido devuelve `400`.
+- [x] TEST-09.2 Un identificador inexistente devuelve `404` sin datos parciales.
+- [x] TEST-09.3 Un identificador con formato inválido devuelve `400`.
 
 ### US-10 — Mapa interactivo
 
-- [ ] TEST-10.1 El mapa se renderiza con atribución, zoom y desplazamiento.
-- [ ] TEST-10.2 Cambiar de nivel de zoom mantiene la posición y los controles
+- [x] TEST-10.1 El mapa se renderiza con atribución, zoom y desplazamiento.
+- [x] TEST-10.2 Cambiar de nivel de zoom mantiene la posición y los controles
   utilizables.
-- [ ] TEST-10.3 Un fallo de teselas muestra alternativa o mensaje sin romper la
+- [x] TEST-10.3 Un fallo de teselas muestra alternativa o mensaje sin romper la
   lista de estaciones.
 
 ### US-11 — Geolocalización

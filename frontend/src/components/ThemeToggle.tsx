@@ -4,27 +4,43 @@ type Theme = 'light' | 'dark';
 
 const THEME_STORAGE_KEY = 'gasolineras-theme';
 
+declare global {
+	interface Window {
+		// Tema resuelto por el script inline de BaseLayout antes de hidratar.
+		__gasolinerasTheme?: string;
+	}
+}
+
 function getSystemTheme(): Theme {
 	return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 }
 
+function getInitialTheme(): Theme {
+	if (typeof window === 'undefined') {
+		return 'light';
+	}
+	const resolved = window.__gasolinerasTheme;
+	if (resolved === 'light' || resolved === 'dark') {
+		return resolved;
+	}
+	let savedTheme: string | null = null;
+	try {
+		savedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
+	} catch {
+		// Se mantiene la preferencia del sistema si el almacenamiento no está disponible.
+	}
+	if (savedTheme === 'light' || savedTheme === 'dark') {
+		return savedTheme;
+	}
+	return getSystemTheme();
+}
+
 export default function ThemeToggle() {
-	const [theme, setTheme] = useState<Theme>('light');
+	const [theme, setTheme] = useState<Theme>(getInitialTheme);
 
 	useEffect(() => {
-		let savedTheme: string | null = null;
-		try {
-			savedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
-		} catch {
-			// Se mantiene la preferencia del sistema si el almacenamiento no está disponible.
-		}
-		const initialTheme: Theme = savedTheme === 'dark' || savedTheme === 'light'
-			? savedTheme
-			: getSystemTheme();
-
-		document.documentElement.dataset.theme = initialTheme;
-		setTheme(initialTheme);
-	}, []);
+		document.documentElement.dataset.theme = theme;
+	}, [theme]);
 
 	function toggleTheme() {
 		const nextTheme: Theme = theme === 'dark' ? 'light' : 'dark';
@@ -41,6 +57,7 @@ export default function ThemeToggle() {
 
 	return (
 		<button
+			id="theme-toggle"
 			className="theme-toggle"
 			type="button"
 			onClick={toggleTheme}

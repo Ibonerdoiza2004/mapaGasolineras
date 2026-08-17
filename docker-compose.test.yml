@@ -6,3 +6,39 @@ services:
       context: ./frontend
       dockerfile: Dockerfile.test
     working_dir: /app
+
+  db-test:
+    build:
+      context: ./database
+      dockerfile: Dockerfile
+    env_file:
+      - ./backend/.env.local
+    volumes:
+      - postgres-test-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  backend-test:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    env_file:
+      - ./backend/.env.local
+    environment:
+      # Dentro de la red Docker PostgreSQL siempre escucha en 5432.
+      POSTGRES_HOST: db-test
+      POSTGRES_PORT: "5432"
+    depends_on:
+      db-test:
+        condition: service_healthy
+    volumes:
+      - ./backend:/workspace
+      - backend-test-maven-cache:/root/.m2
+
+volumes:
+  postgres-test-data:
+  backend-test-maven-cache:

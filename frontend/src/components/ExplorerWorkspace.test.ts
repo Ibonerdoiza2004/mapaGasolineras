@@ -107,10 +107,11 @@ describe('ExplorerWorkspace — contrato de marcado responsive', () => {
 		expect(workspaceAstro).toContain('<summary>');
 	});
 
-	it('incluye mapa, filtros, resultados y controles de zoom', () => {
+	it('incluye mapa, filtros, resultados y la isla de mapa Leaflet', () => {
 		expect(workspaceAstro).toContain('class="explorer__map"');
 		expect(workspaceAstro).toContain('explorer__filters');
 		expect(workspaceAstro).toContain('station-card');
-		expect(workspaceAstro).toContain('map-controls');
+		expect(workspaceAstro).toContain('<LeafletMap');
+		expect(workspaceAstro).toContain('client:load');
 	});
 });

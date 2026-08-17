@@ -7,6 +7,7 @@ const workspaceAstro = readFileSync(
 	resolve(process.cwd(), 'src/components/ExplorerWorkspace.astro'),
 	'utf8',
 );
+const leafletMapSource = readFileSync(resolve(process.cwd(), 'src/components/LeafletMap.tsx'), 'utf8');
 const explorerCss = readFileSync(resolve(process.cwd(), 'src/styles/explorer.css'), 'utf8');
 const headerCss = readFileSync(resolve(process.cwd(), 'src/styles/site-header.css'), 'utf8');
 const themeToggleCss = readFileSync(resolve(process.cwd(), 'src/styles/theme-toggle.css'), 'utf8');
@@ -36,9 +37,9 @@ describe('ExplorerWorkspace — nombres accesibles de controles y filtros', () =
 		expect(workspaceAstro).toContain('Usar mi ubicación');
 	});
 
-	it('da un nombre accesible a los controles de zoom del mapa', () => {
-		expect(workspaceAstro).toContain('aria-label="Acercar mapa"');
-		expect(workspaceAstro).toContain('aria-label="Alejar mapa"');
+	it('integra el mapa Leaflet como isla accesible', () => {
+		expect(workspaceAstro).toContain('<LeafletMap');
+		expect(workspaceAstro).toContain('client:load');
 	});
 });
 
@@ -48,14 +49,14 @@ describe('ExplorerWorkspace — paneles y marcadores alternativos', () => {
 		expect(workspaceAstro).toContain('<strong>Gasolineras cercanas</strong>');
 	});
 
-	it('marca el mapa como región con nombre accesible', () => {
-		expect(workspaceAstro).toContain('role="region"');
-		expect(workspaceAstro).toContain('aria-label="Mapa de gasolineras cercanas"');
+	it('contiene el contenedor del mapa', () => {
+		expect(workspaceAstro).toContain('class="explorer__map"');
 	});
 
-	it('mantiene los marcadores decorativos fuera del orden de foco', () => {
-		const markerMatches = workspaceAstro.match(/class="map-marker[^"]*"[^>]*aria-hidden="true"/g) ?? [];
-		expect(markerMatches.length).toBeGreaterThanOrEqual(4);
+	it('delega la accesibilidad del mapa a la isla Leaflet con marcadores interactivos', () => {
+		expect(leafletMapSource).toContain('role="region"');
+		expect(leafletMapSource).toContain('aria-label="Mapa de gasolineras cercanas"');
+		expect(leafletMapSource).toContain('keyboard: true');
 	});
 
 	it('ofrece una lista ordenada como alternativa a los marcadores numerados', () => {
