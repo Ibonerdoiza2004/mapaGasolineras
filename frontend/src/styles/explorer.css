@@ -148,6 +148,13 @@
 	grid-template-columns: 1fr 1fr;
 }
 
+.explorer__location-group {
+	align-items: flex-start;
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-2);
+}
+
 .explorer__location {
 	align-items: center;
 	background: transparent;
@@ -163,6 +170,38 @@
 	min-height: 2.75rem;
 	padding: 0;
 	width: fit-content;
+}
+
+.explorer__location:disabled {
+	cursor: progress;
+	opacity: 0.7;
+}
+
+.explorer__location-status {
+	color: var(--color-success);
+	font-size: var(--font-size-sm);
+	margin: 0;
+}
+
+.explorer__location-error {
+	background-color: var(--color-danger-surface);
+	border-inline-start: 0.25rem solid var(--color-danger);
+	color: var(--color-text);
+	font-size: var(--font-size-sm);
+	margin: 0;
+	padding: var(--space-2) var(--space-3);
+}
+
+.explorer__location-manual {
+	background: none;
+	border: 0;
+	color: var(--color-brand-700);
+	cursor: pointer;
+	font: inherit;
+	font-size: inherit;
+	font-weight: 700;
+	padding: 0;
+	text-decoration: underline;
 }
 
 .explorer__list-heading {

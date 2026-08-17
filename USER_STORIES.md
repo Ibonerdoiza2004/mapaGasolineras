@@ -172,10 +172,10 @@ fluido **para** entender dónde están las gasolineras.
 
 **Tareas**
 
-- [ ] T-11.1 Solicitar geolocalización solo tras una acción clara del usuario.
-- [ ] T-11.2 Centrar mapa y consulta de cercanía al aceptar el permiso.
-- [ ] T-11.3 Mostrar una explicación y alternativa manual si se deniega o falla.
-- [ ] T-11.4 Probar los estados aceptado, denegado, no soportado y timeout.
+- [x] T-11.1 Solicitar geolocalización solo tras una acción clara del usuario.
+- [x] T-11.2 Centrar mapa y consulta de cercanía al aceptar el permiso.
+- [x] T-11.3 Mostrar una explicación y alternativa manual si se deniega o falla.
+- [x] T-11.4 Probar los estados aceptado, denegado, no soportado y timeout.
 
 ### US-12 — Buscar una ubicación manualmente
 
@@ -615,10 +615,10 @@ pruebas son parte de la aceptación de la historia, no una tarea opcional.
 
 ### US-11 — Geolocalización
 
-- [ ] TEST-11.1 Con permiso concedido, el mapa se centra y consulta cercanía.
-- [ ] TEST-11.2 Con permiso denegado, timeout o API no disponible, aparece la
+- [x] TEST-11.1 Con permiso concedido, el mapa se centra y consulta cercanía.
+- [x] TEST-11.2 Con permiso denegado, timeout o API no disponible, aparece la
   búsqueda manual y no se realiza una consulta con coordenadas falsas.
-- [ ] TEST-11.3 Una coordenada devuelta fuera de rango se rechaza.
+- [x] TEST-11.3 Una coordenada devuelta fuera de rango se rechaza.
 
 ### US-12 — Búsqueda manual
 

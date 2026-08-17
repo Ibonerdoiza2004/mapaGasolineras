@@ -1,6 +1,8 @@
 ---
 import '../styles/explorer.css';
 import LeafletMap from './LeafletMap';
+import LocationButton from './LocationButton';
+import { SPAIN_BOUNDS } from '../lib/spainBounds';
 
 const stations = [
 	{
@@ -66,7 +68,7 @@ const fuelClass: Record<string, string> = {
 				<span>Ubicación</span>
 				<div class="explorer__input-wrap">
 					<span aria-hidden="true">⌖</span>
-					<input type="search" placeholder="Ciudad, dirección o código postal" />
+					<input id="explorer-search" type="search" placeholder="Ciudad, dirección o código postal" />
 				</div>
 			</label>
 
@@ -89,10 +91,7 @@ const fuelClass: Record<string, string> = {
 				</label>
 			</div>
 
-			<button class="explorer__location" type="button">
-				<span aria-hidden="true">◎</span>
-				Usar mi ubicación
-			</button>
+			<LocationButton client:load />
 		</form>
 
 		<div class="explorer__list-heading">
@@ -141,6 +140,7 @@ const fuelClass: Record<string, string> = {
 			stations={mapStations}
 			center={[40.4168, -3.7038]}
 			zoom={13}
+			bounds={SPAIN_BOUNDS}
 		/>
 	</div>
 </section>

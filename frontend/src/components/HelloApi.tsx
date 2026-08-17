@@ -4,12 +4,15 @@ import { apiUrl } from '../config/runtime';
 
 type Status = 'loading' | 'success' | 'error';
 
+const RETRY_DELAY_MS = 5_000;
+
 export default function HelloApi() {
 	const [status, setStatus] = useState<Status>('loading');
 	const [message, setMessage] = useState('');
 
 	useEffect(() => {
 		let cancelled = false;
+		let retryTimer: ReturnType<typeof setTimeout> | undefined;
 
 		async function loadMessage() {
 			try {
@@ -25,6 +28,7 @@ export default function HelloApi() {
 			} catch {
 				if (!cancelled) {
 					setStatus('error');
+					retryTimer = setTimeout(() => void loadMessage(), RETRY_DELAY_MS);
 				}
 			}
 		}
@@ -33,6 +37,9 @@ export default function HelloApi() {
 
 		return () => {
 			cancelled = true;
+			if (retryTimer) {
+				clearTimeout(retryTimer);
+			}
 		};
 	}, []);
 

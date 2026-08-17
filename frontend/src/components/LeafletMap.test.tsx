@@ -2,9 +2,27 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import LeafletMap, { type MapStation } from './LeafletMap';
+import { dispatchUserLocation, LOCATION_EVENT } from '../lib/geolocation';
+import { SPAIN_BOUNDS } from '../lib/spainBounds';
 
-const { leafletMock, markerInstance } = vi.hoisted(() => {
-	const mapInstance = { remove: vi.fn() };
+const { leafletMock, markerInstance, mapState } = vi.hoisted(() => {
+	const mapState = {
+		size: { x: 1580, y: 1024 },
+		zoom: 5.25,
+		southWest: { x: 50, y: 1016 },
+		northEast: { x: 865, y: 133 },
+	};
+	const mapInstance = {
+		fitBounds: vi.fn(),
+		getSize: vi.fn(() => mapState.size),
+		getZoom: vi.fn(() => mapState.zoom),
+		project: vi.fn((latlng: [number, number]) => {
+			return latlng[0] < 30 ? mapState.southWest : mapState.northEast;
+		}),
+		remove: vi.fn(),
+		setView: vi.fn(),
+		unproject: vi.fn(() => ({ lat: 36.5, lng: -6.9 })),
+	};
 	const markerInstance = {
 		addTo: vi.fn(() => markerInstance),
 		on: vi.fn(),
@@ -13,6 +31,7 @@ const { leafletMock, markerInstance } = vi.hoisted(() => {
 	const tileLayerInstance = { addTo: vi.fn() };
 	const zoomControlInstance = { addTo: vi.fn() };
 	return {
+		mapState,
 		markerInstance,
 		zoomControlInstance,
 		leafletMock: {
@@ -35,6 +54,10 @@ const stations: MapStation[] = [
 describe('LeafletMap', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
+		mapState.size = { x: 1580, y: 1024 };
+		mapState.zoom = 5.25;
+		mapState.southWest = { x: 50, y: 1016 };
+		mapState.northEast = { x: 865, y: 133 };
 	});
 
 	afterEach(() => {
@@ -53,6 +76,8 @@ describe('LeafletMap', () => {
 				zoomControl: boolean;
 				minZoom: number;
 				maxZoom: number;
+				zoomSnap: number;
+				zoomDelta: number;
 			},
 		];
 		expect(options.center).toEqual([40.4168, -3.7038]);
@@ -60,6 +85,8 @@ describe('LeafletMap', () => {
 		expect(options.zoomControl).toBe(false);
 		expect(options.minZoom).toBe(3);
 		expect(options.maxZoom).toBe(19);
+		expect(options.zoomSnap).toBe(0.25);
+		expect(options.zoomDelta).toBe(0.25);
 		expect(leafletMock.tileLayer).toHaveBeenCalledWith(
 			'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
 			expect.objectContaining({
@@ -72,6 +99,10 @@ describe('LeafletMap', () => {
 			zoomOutTitle: 'Alejar mapa',
 		});
 		expect(container).toBeInstanceOf(HTMLElement);
+		const mapInstance = leafletMock.map.mock.results[0].value as {
+			fitBounds: ReturnType<typeof vi.fn>;
+		};
+		expect(mapInstance.fitBounds).not.toHaveBeenCalled();
 	});
 
 	it('crea un marcador por estación', async () => {
@@ -92,6 +123,50 @@ describe('LeafletMap', () => {
 
 		const region = screen.getByRole('region', { name: 'Mapa de gasolineras cercanas' });
 		expect(region).toBeInTheDocument();
+	});
+
+	it('ajusta la vista a los límites y apoya el borde inferior en el del mapa cuando la altura limita el encuadre', async () => {
+		render(<LeafletMap stations={stations} center={[40.4168, -3.7038]} zoom={13} bounds={SPAIN_BOUNDS} />);
+
+		await waitFor(() => expect(leafletMock.map).toHaveBeenCalledTimes(1));
+		const mapInstance = leafletMock.map.mock.results[0].value as {
+			fitBounds: ReturnType<typeof vi.fn>;
+			project: ReturnType<typeof vi.fn>;
+			setView: ReturnType<typeof vi.fn>;
+			unproject: ReturnType<typeof vi.fn>;
+		};
+		expect(mapInstance.fitBounds).toHaveBeenCalledWith(SPAIN_BOUNDS, { padding: [16, 16] });
+		expect(mapInstance.project).toHaveBeenNthCalledWith(1, SPAIN_BOUNDS[0], 5.25);
+		expect(mapInstance.project).toHaveBeenNthCalledWith(2, SPAIN_BOUNDS[1], 5.25);
+		expect(mapInstance.unproject).toHaveBeenCalledWith([457.5, 520], 5.25);
+		expect(mapInstance.setView).toHaveBeenCalledWith({ lat: 36.5, lng: -6.9 }, 5.25, { animate: false });
+	});
+
+	it('no desplaza el encuadre cuando es la anchura la que limita el mapa', async () => {
+		mapState.size = { x: 400, y: 700 };
+		mapState.zoom = 4;
+		mapState.southWest = { x: 20, y: 650 };
+		mapState.northEast = { x: 360, y: 150 };
+
+		render(<LeafletMap stations={stations} center={[40.4168, -3.7038]} zoom={13} bounds={SPAIN_BOUNDS} />);
+
+		await waitFor(() => expect(leafletMock.map).toHaveBeenCalledTimes(1));
+		const mapInstance = leafletMock.map.mock.results[0].value as {
+			fitBounds: ReturnType<typeof vi.fn>;
+			setView: ReturnType<typeof vi.fn>;
+		};
+		expect(mapInstance.fitBounds).toHaveBeenCalledWith(SPAIN_BOUNDS, { padding: [16, 16] });
+		expect(mapInstance.setView).not.toHaveBeenCalled();
+	});
+
+	it('no ajusta la vista si no se proporcionan límites', async () => {
+		render(<LeafletMap stations={stations} center={[40.4168, -3.7038]} zoom={13} />);
+
+		await waitFor(() => expect(leafletMock.map).toHaveBeenCalledTimes(1));
+		const mapInstance = leafletMock.map.mock.results[0].value as {
+			fitBounds: ReturnType<typeof vi.fn>;
+		};
+		expect(mapInstance.fitBounds).not.toHaveBeenCalled();
 	});
 
 	it('llama a onSelect al hacer clic en un marcador', async () => {
@@ -140,5 +215,46 @@ describe('LeafletMap', () => {
 		render(<LeafletMap stations={[]} center={[40.4168, -3.7038]} zoom={13} />);
 
 		expect(screen.getByRole('status')).toHaveTextContent('No hay estaciones');
+	});
+
+	it('centra el mapa y reordena los marcadores al recibir la ubicación del usuario', async () => {
+		const nearby = [
+			{ id: 'lejos', lat: 41.0, lon: -1.0, rotulo: 'LEJOS' },
+			{ id: 'cerca', lat: 40.42, lon: -3.7, rotulo: 'CERCA' },
+			{ id: 'medio', lat: 40.5, lon: -3.5, rotulo: 'MEDIO' },
+		];
+		render(<LeafletMap stations={nearby} center={[40.4168, -3.7038]} zoom={13} />);
+
+		await waitFor(() => expect(leafletMock.map).toHaveBeenCalledTimes(1));
+		const mapInstance = leafletMock.map.mock.results[0].value as {
+			setView: ReturnType<typeof vi.fn>;
+		};
+
+		dispatchUserLocation(40.4168, -3.7038);
+
+		await waitFor(() => {
+			expect(mapInstance.setView).toHaveBeenCalledWith([40.4168, -3.7038], 15);
+		});
+		await waitFor(() => expect(leafletMock.marker).toHaveBeenCalledTimes(6));
+		const calls = leafletMock.marker.mock.calls as unknown as [number, number][][];
+		const reordered = calls.slice(3).map(([coords]) => coords);
+		expect(reordered).toEqual([
+			[40.42, -3.7],
+			[40.5, -3.5],
+			[41, -1],
+		]);
+	});
+
+	it('ignora coordenadas fuera de rango en el evento de ubicación', async () => {
+		render(<LeafletMap stations={stations} center={[40.4168, -3.7038]} zoom={13} />);
+
+		await waitFor(() => expect(leafletMock.map).toHaveBeenCalledTimes(1));
+		const mapInstance = leafletMock.map.mock.results[0].value as {
+			setView: ReturnType<typeof vi.fn>;
+		};
+
+		window.dispatchEvent(new CustomEvent(LOCATION_EVENT, { detail: { lat: 120, lon: -3.7 } }));
+
+		expect(mapInstance.setView).not.toHaveBeenCalled();
 	});
 });

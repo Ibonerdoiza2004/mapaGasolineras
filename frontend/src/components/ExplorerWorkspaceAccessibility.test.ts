@@ -8,6 +8,10 @@ const workspaceAstro = readFileSync(
 	'utf8',
 );
 const leafletMapSource = readFileSync(resolve(process.cwd(), 'src/components/LeafletMap.tsx'), 'utf8');
+const locationButtonSource = readFileSync(
+	resolve(process.cwd(), 'src/components/LocationButton.tsx'),
+	'utf8',
+);
 const explorerCss = readFileSync(resolve(process.cwd(), 'src/styles/explorer.css'), 'utf8');
 const headerCss = readFileSync(resolve(process.cwd(), 'src/styles/site-header.css'), 'utf8');
 const themeToggleCss = readFileSync(resolve(process.cwd(), 'src/styles/theme-toggle.css'), 'utf8');
@@ -21,7 +25,9 @@ const explorerCssNormalized = normalize(explorerCss);
 describe('ExplorerWorkspace — nombres accesibles de controles y filtros', () => {
 	it('etiqueta el campo de búsqueda de ubicación', () => {
 		expect(workspaceAstro).toContain('<span>Ubicación</span>');
-		expect(workspaceAstro).toContain('<input type="search" placeholder="Ciudad, dirección o código postal" />');
+		expect(workspaceAstro).toContain(
+			'<input id="explorer-search" type="search" placeholder="Ciudad, dirección o código postal" />',
+		);
 	});
 
 	it('etiqueta los selectores de combustible y radio', () => {
@@ -34,7 +40,9 @@ describe('ExplorerWorkspace — nombres accesibles de controles y filtros', () =
 	});
 
 	it('da un nombre visible al botón de usar la ubicación', () => {
-		expect(workspaceAstro).toContain('Usar mi ubicación');
+		expect(workspaceAstro).toContain('<LocationButton client:load />');
+		expect(locationButtonSource).toContain('Usar mi ubicación');
+		expect(locationButtonSource).toContain('className="explorer__location"');
 	});
 
 	it('integra el mapa Leaflet como isla accesible', () => {

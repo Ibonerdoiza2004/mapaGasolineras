@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import HelloApi from './HelloApi';
@@ -20,6 +20,7 @@ function mockFetchResponse(overrides: Partial<Response> = {}) {
 
 describe('HelloApi', () => {
 	afterEach(() => {
+		vi.useRealTimers();
 		vi.unstubAllGlobals();
 	});
 
@@ -51,5 +52,30 @@ describe('HelloApi', () => {
 		await waitFor(() => {
 			expect(screen.getByRole('alert')).toHaveTextContent('No se pudo conectar');
 		});
+	});
+
+	it('reintenta y se recupera cuando el backend vuelve a estar disponible', async () => {
+		vi.useFakeTimers();
+		const fetchMock = vi
+			.fn()
+			.mockRejectedValueOnce(new Error('red caída'))
+			.mockResolvedValueOnce({
+				ok: true,
+				status: 200,
+				text: () => Promise.resolve('Hello World'),
+			});
+		vi.stubGlobal('fetch', fetchMock);
+		render(<HelloApi />);
+
+		await act(async () => {
+			await vi.advanceTimersByTimeAsync(0);
+		});
+		expect(screen.getByRole('alert')).toHaveTextContent('No se pudo conectar');
+
+		await act(async () => {
+			await vi.advanceTimersByTimeAsync(5_000);
+		});
+		expect(screen.getByRole('status')).toHaveTextContent('Mensaje del backend: Hello World');
+		expect(fetchMock).toHaveBeenCalledTimes(2);
 	});
 });

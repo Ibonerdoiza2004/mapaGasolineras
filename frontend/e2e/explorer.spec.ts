@@ -63,6 +63,7 @@ test.describe('teclado — orden de foco y operación', () => {
 
 	test('el selector de tema se activa con el teclado', async ({ page }) => {
 		await page.goto('/');
+		await expect(page.getByRole('button', { name: 'Acercar mapa' })).toBeVisible();
 
 		await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
 
@@ -105,5 +106,44 @@ test.describe('teclado — orden de foco y operación', () => {
 		await summary.press('Escape');
 		await expect(details).not.toHaveAttribute('open');
 		await expect(summary).toBeFocused();
+	});
+});
+
+test.describe('geolocalización', () => {
+	async function waitForHydration(page: import('@playwright/test').Page) {
+		// El botón existe en el HTML de servidor; esperar a que la isla React se
+		// hidrate (los controles del mapa solo existen tras la hidratación)
+		// para no perder el primer clic.
+		await expect(page.getByRole('button', { name: 'Acercar mapa' })).toBeVisible();
+	}
+
+	test('con permiso concedido, centra el mapa y confirma la ubicación', async ({ page }) => {
+		await page.context().grantPermissions(['geolocation']);
+		await page.context().setGeolocation({ latitude: 40.4168, longitude: -3.7038 });
+		await page.goto('/');
+		await waitForHydration(page);
+
+		await page.getByRole('button', { name: 'Usar mi ubicación' }).click();
+
+		await expect(
+			page.getByRole('status').filter({ hasText: 'Gasolineras actualizadas' }),
+		).toBeVisible();
+	});
+
+	test('con permiso denegado, explica el fallo y ofrece la búsqueda manual', async ({ page }) => {
+		await page.goto('/');
+		await waitForHydration(page);
+
+		await page.getByRole('button', { name: 'Usar mi ubicación' }).click();
+
+		await expect(
+			page.getByRole('alert').filter({ hasText: 'No podemos acceder a tu ubicación' }),
+		).toBeVisible();
+		await expect(
+			page.getByRole('button', { name: 'Buscar por ciudad o código postal' }),
+		).toBeVisible();
+
+		await page.getByRole('button', { name: 'Buscar por ciudad o código postal' }).click();
+		await expect(page.getByRole('searchbox', { name: 'Ubicación' })).toBeFocused();
 	});
 });

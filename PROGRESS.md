@@ -7,14 +7,14 @@ sus pruebas han terminado correctamente.
 ## Estado actual
 
 - **Fase activa:** Fase 1 — MVP: descubrir y comparar
-- **Historia activa:** US-11 — Obtener ubicación del dispositivo
-- **Siguiente historia:** US-11 — Obtener ubicación del dispositivo
-- **Tarea pendiente:** T-11.1 — Solicitar geolocalización solo tras una acción
-  clara del usuario
-- **Última tarea completada:** TEST-10.3 — Un fallo de teselas muestra
-  alternativa o mensaje sin romper la lista de estaciones
-- **Porcentaje de tareas completadas:** 39 / 150
-- **Pruebas automatizadas:** 120 / 122 casos planificados (112 unitarias + 8 E2E)
+- **Historia activa:** US-12 — Buscar una ubicación manualmente
+- **Siguiente historia:** US-12 — Buscar una ubicación manualmente
+- **Tarea pendiente:** T-12.1 — Crear el campo de búsqueda con sugerencias y
+  control de debounce
+- **Última tarea completada:** TEST-11.3 — Una coordenada devuelta fuera de
+  rango se rechaza
+- **Porcentaje de tareas completadas:** 43 / 150
+- **Pruebas automatizadas:** 115 / 125 casos planificados (103 unitarias + 12 E2E)
 
 ## Historias
 
@@ -30,7 +30,8 @@ sus pruebas han terminado correctamente.
 | US-08 | Consultar gasolineras cercanas | 1 | Completada |
 | US-09 | Consultar el detalle de una estación | 1 | Completada |
 | US-10 | Visualizar el mapa interactivo | 1 | Completada |
-| US-11–US-22 | MVP: descubrir y comparar | 1 | Pendiente |
+| US-11 | Obtener ubicación del dispositivo | 1 | Completada |
+| US-12–US-22 | MVP: descubrir y comparar | 1 | Pendiente |
 | US-23–US-30 | Planificador de rutas sin cuenta | 2 | Pendiente |
 | US-31–US-35 | Personalización con cuenta | 3 | Pendiente |
 | US-36–US-38 | Análisis y administración | 4 | Pendiente |
@@ -103,3 +104,13 @@ sus pruebas han terminado correctamente.
 | 2026-08-17 | TEST-US-10 | Verificación completa de US-10 | Unitarios 78/78, typecheck/lint/build limpios, E2E 8/8 (orden de foco adaptado a Leaflet) |
 | 2026-08-17 | Mantenimiento — aislamiento de tests | `test:backend` usa `docker-compose.test.yml` con `db-test` + `backend-test` y volumen propio `postgres-test-data` | Los tests ya no apagan la BD de desarrollo ni comparten sus datos; verificado con la BD de dev levantada (sigue healthy tras `task test`) |
 | 2026-08-17 | Mantenimiento — parpadeo del selector de tema | Script inline al final del body parchea el botón antes de pintar; `useState` con inicializador perezoso lee `window.__gasolinerasTheme` | Sin parpadeo de "Oscuro" al cargar/volver a la pestaña; sin mismatch de hidratación; 78/78 unitarios y 8/8 E2E pasan |
+| 2026-08-17 | T-11.1 | Geolocalización solo con acción explícita | LocationButton: `getCurrentPosition` solo al pulsar "Usar mi ubicación"; test de no llamada en montaje |
+| 2026-08-17 | T-11.2 | Centrar mapa y consulta de cercanía | Evento `gasolineras:location` → LeafletMap `setView` (zoom 15) y marcadores reordenados por distancia (haversine); coordenadas fuera de rango se ignoran |
+| 2026-08-17 | T-11.3 | Explicación y alternativa manual | Mensajes por estado (denegado/timeout/no disponible/no soportado/inválido) con `role="alert"` y botón que enfoca `#explorer-search` |
+| 2026-08-17 | T-11.4 | Pruebas de estados de geolocalización | 12 tests de LocationButton (concedido, denegado, timeout, no disponible, no soportado, inválido, reintento) + 11 de lib/geolocation + 2 de LeafletMap; 103/103 unitarios |
+| 2026-08-17 | TEST-US-11 | Verificación E2E de geolocalización | E2E 12/12 (concedido y denegado en escritorio y móvil); typecheck/lint/build limpios |
+| 2026-08-17 | Mantenimiento — banner de estado del backend | `z-index: 1100` (por encima de los paneles de Leaflet, que llegan a 1000) y reintento automático cada 5 s en HelloApi | El banner ya no queda oculto tras las teselas del mapa ni muestra "No se pudo conectar" para siempre si el backend aún no estaba listo; 104/104 unitarios y 12/12 E2E |
+| 2026-08-17 | Mantenimiento — cleanup de RTL y flakiness E2E | `afterEach(cleanup)` en setup.ts (con `globals:false` el auto-cleanup no se registra) y espera de hidratación (botón "Acercar mapa") antes de pulsar "Usar mi ubicación" | El DOM ya no se acumula entre tests; el click ya no se pierde si la isla no estaba hidratada (fallaba 1/10); 8/8 repeticiones de geolocalización verdes |
+| 2026-08-17 | Mantenimiento — vista inicial de España completa | `SPAIN_BOUNDS` (península, Baleares y Canarias) en `lib/spainBounds.ts` y prop `bounds` en LeafletMap que usa `fitBounds` al iniciar | El mapa muestra España entera al abrir la web (El Hierro, estaca de Bares, Baleares y Canarias verificados con tests); 108/108 unitarios y 12/12 E2E |
+| 2026-08-17 | Mantenimiento — zoom máximo sobre el territorio | `SPAIN_BOUNDS` ajustado a los extremos reales (El Hierro 27,63/‑18,16; Estaca de Bares/Cabo Favaritx 43,8/4,33) y padding de `fitBounds` reducido de 24 a 8 px | `fitBounds` aplica el máximo zoom que encaja todo el territorio sin huecos fuera de los extremos (tests de límites); 109/109 unitarios y 12/12 E2E |
+| 2026-08-17 | Mantenimiento — encuadre centrado y Canarias justas | `SPAIN_BOUNDS` simétrico respecto al centro de la península (≈39,9ºN, 3,1ºO) extendido justo hasta El Hierro; `fitBounds` con padding 16 y, cuando la altura limita el encuadre, el borde inferior del rectángulo se apoya a 16 px del borde inferior del mapa (`VIEW_PADDING`); `zoomSnap` y `zoomDelta` a 0.25 para zoom fluido | La península queda centrada y Canarias entran justas (sin hueco ni corte bajo El Hierro en escritorio, verificado con sonda de geometría real en Playwright); la rueda y los botones de zoom ya no saltan niveles enteros; en ventanas estrechas el encuadre sigue centrado para no recortar territorio; 111/111 unitarios, 12/12 E2E, lint y typecheck limpios |
