@@ -8,6 +8,7 @@ import {
 	sortStationsByDistance,
 	type UserLocation,
 } from '../lib/geolocation';
+import { PENINSULA_CENTER } from '../lib/spainBounds';
 
 export interface MapStation {
 	id: string;
@@ -28,6 +29,8 @@ export interface LeafletMapProps {
 
 const DEFAULT_TILE_URL = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
 const VIEW_PADDING = 16;
+const BOTTOM_MARGIN = 18;
+const ZOOM_STEP = 0.5;
 const OSM_ATTRIBUTION =
 	'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
 
@@ -83,6 +86,8 @@ export default function LeafletMap({
 
 	useEffect(() => {
 		let disposed = false;
+		let wheelHandler: ((event: WheelEvent) => void) | null = null;
+		let wheelTimer: ReturnType<typeof setTimeout> | undefined;
 
 		async function init() {
 			const imported = (await import('leaflet')) as
@@ -103,21 +108,65 @@ export default function LeafletMap({
 					attributionControl: true,
 					minZoom: 3,
 					maxZoom: 19,
-					zoomSnap: 0.25,
-					zoomDelta: 0.25,
-				});
-				L.tileLayer(configuredTileUrl(), {
-					attribution: OSM_ATTRIBUTION,
-					maxZoom: 19,
-				}).addTo(map);
-				L.control.zoom({ zoomInTitle: 'Acercar mapa', zoomOutTitle: 'Alejar mapa' }).addTo(map);
+zoomSnap: ZOOM_STEP,
+				zoomDelta: ZOOM_STEP,
+			});
+			L.tileLayer(configuredTileUrl(), {
+				attribution: OSM_ATTRIBUTION,
+				maxZoom: 19,
+			}).addTo(map);
+			L.control.zoom({ zoomInTitle: 'Acercar mapa', zoomOutTitle: 'Alejar mapa' }).addTo(map);
+
+			// La rueda nativa de Leaflet acumula el delta del navegador y
+			// redondea hacia arriba a la rejilla de zoomSnap, produciendo
+			// saltos grandes e irregulares. La sustituimos por pasos fijos de
+			// ZOOM_STEP (los mismos que los botones + y -), acumulando el delta
+			// en píxeles enteros para que cada "notch" o gesto continuo de
+			// trackpad cuente un paso.
+			map.scrollWheelZoom.disable();
+			const STEP_PX = 100;
+			let wheelAccumPx = 0;
+			wheelHandler = (event: WheelEvent) => {
+				event.preventDefault();
+				const px =
+					event.deltaY *
+					(event.deltaMode === 1 ? 20 : event.deltaMode === 2 ? 400 : 1);
+				wheelAccumPx += px;
+				clearTimeout(wheelTimer);
+				wheelTimer = setTimeout(() => {
+					wheelAccumPx = 0;
+				}, 120);
+				if (Math.abs(wheelAccumPx) >= STEP_PX) {
+					// Zoom animado y centrado en el puntero: con `animate: false`
+					// las teselas viejas desaparecen al instante y la pantalla
+					// parpadea mientras cargan las nuevas. La animación, en
+					// cambio, mantiene las teselas escaladas hasta el final.
+					// Pero mientras una animación está en curso Leaflet ignora
+					// los nuevos zooms (rueda rápida = un solo paso), así que
+					// antes de cada paso se finaliza la animación en curso
+					// (es lo que hace el manejador nativo con `map._stop()`).
+					const point = map.mouseEventToContainerPoint(event);
+					const nextZoom = map.getZoom() + (wheelAccumPx > 0 ? -ZOOM_STEP : ZOOM_STEP);
+					const zoomAnimation = map as unknown as {
+						_animatingZoom?: boolean;
+						_onZoomTransitionEnd?: () => void;
+					};
+					if (zoomAnimation._animatingZoom) {
+						zoomAnimation._onZoomTransitionEnd?.();
+					}
+					map.setZoomAround(point, nextZoom);
+					wheelAccumPx -= Math.sign(wheelAccumPx) * STEP_PX;
+				}
+			};
+			container.addEventListener('wheel', wheelHandler, { passive: false });
 				if (bounds) {
 					map.fitBounds(bounds, { padding: [VIEW_PADDING, VIEW_PADDING] });
 
-					// fitBounds redondea el zoom y centra el rectángulo, dejando océano
-					// bajo Canarias. Si es la altura lo que limita el encuadre, apoyamos
-					// su borde inferior en el borde inferior del mapa: Canarias entran
-					// justas y la península conserva su centro horizontal.
+					// fitBounds redondea el zoom y centra el rectángulo, dejando
+					// océano bajo Canarias. Si es la altura lo que limita el
+					// encuadre, centramos el mapa en la península y elegimos el
+					// zoom exacto que deja su borde inferior a BOTTOM_MARGIN px
+					// del borde inferior del mapa.
 					const size = map.getSize();
 					const fittedZoom = map.getZoom();
 					const southWest = map.project(bounds[0], fittedZoom);
@@ -125,14 +174,21 @@ export default function LeafletMap({
 					const frameWidth = northEast.x - southWest.x;
 					const frameHeight = southWest.y - northEast.y;
 					if (frameWidth / size.x <= frameHeight / size.y) {
-						// Coordenadas del mundo: centro horizontal del rectángulo y
-						// centro vertical desplazado para que su borde inferior quede
-						// a VIEW_PADDING px del borde inferior del mapa (la y crece hacia abajo).
-						const center = map.unproject(
-							[(southWest.x + northEast.x) / 2, southWest.y + VIEW_PADDING - size.y / 2],
-							fittedZoom,
+						// La distorsión de Mercator desplaza el centro visual de la
+						// península (su punto medio en píxeles está en lat ~41,1º),
+						// por eso el mapa se centra en PENINSULA_CENTER y no en el
+						// centro del rectángulo.
+						const bottomOffset =
+							map.project(bounds[0], 0).y - map.project(PENINSULA_CENTER, 0).y;
+						const targetZoom = Math.min(
+							Math.log2((size.y / 2 - BOTTOM_MARGIN) / bottomOffset),
+							map.getMaxZoom(),
 						);
-						map.setView(center, fittedZoom, { animate: false });
+						// El zoom exacto (p. ej. 4.84) no cae en la rejilla de
+						// zoomSnap; se desactiva el ajuste solo durante esta vista.
+						map.options.zoomSnap = 0;
+						map.setView(PENINSULA_CENTER, targetZoom, { animate: false });
+						map.options.zoomSnap = ZOOM_STEP;
 					}
 				}
 				mapRef.current = map;
@@ -161,6 +217,10 @@ export default function LeafletMap({
 
 		return () => {
 			disposed = true;
+			clearTimeout(wheelTimer);
+			if (wheelHandler && containerRef.current) {
+				containerRef.current.removeEventListener('wheel', wheelHandler);
+			}
 			mapRef.current?.remove();
 			mapRef.current = null;
 			markersRef.current.clear();

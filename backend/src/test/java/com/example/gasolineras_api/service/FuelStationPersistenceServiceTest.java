@@ -21,7 +21,7 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@SpringBootTest
+@SpringBootTest(properties = "app.municipios.import-enabled=false")
 class FuelStationPersistenceServiceTest {
 
 	@Autowired

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { SPAIN_BOUNDS } from './spainBounds';
+import { PENINSULA_CENTER, SPAIN_BOUNDS } from './spainBounds';
 
 const [[south, west], [north, east]] = SPAIN_BOUNDS;
 
@@ -9,6 +9,19 @@ function isInside(lat: number, lon: number): boolean {
 }
 
 describe('SPAIN_BOUNDS', () => {
+	it('define un centro visual para la península dentro del encuadre', () => {
+		expect(PENINSULA_CENTER).toEqual([39.9, -3.1]);
+		expect(isInside(PENINSULA_CENTER[0], PENINSULA_CENTER[1])).toBe(true);
+		// El punto medio del rectángulo en píxeles Mercator queda en lat ~41,1º
+		// (la proyección estira el norte), así que el centro visual debe quedar
+		// por debajo de ese punto medio.
+		const mercY = (lat: number) => Math.log(Math.tan(Math.PI / 4 + (lat * Math.PI) / 360));
+		const midY = (mercY(south) + mercY(north)) / 2;
+		const midLat = (2 * Math.atan(Math.exp(midY)) * 180) / Math.PI - 90;
+		expect(midLat).toBeGreaterThan(39.9);
+		expect(PENINSULA_CENTER[0]).toBeLessThan(midLat);
+	});
+
 	it('queda centrado en la península', () => {
 		const centerLat = (south + north) / 2;
 		const centerLon = (west + east) / 2;

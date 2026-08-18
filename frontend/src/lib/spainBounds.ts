@@ -8,3 +8,10 @@ export const SPAIN_BOUNDS: [[number, number], [number, number]] = [
 	[27.63, -18.16],
 	[52.17, 11.96],
 ];
+
+/**
+ * Centro visual de la España peninsular. El punto medio en píxeles del
+ * rectángulo de SPAIN_BOUNDS queda en lat ~41,1º por la distorsión de
+ * Mercator, así que para centrar la península hay que apuntar a este punto.
+ */
+export const PENINSULA_CENTER: [number, number] = [39.9, -3.1];

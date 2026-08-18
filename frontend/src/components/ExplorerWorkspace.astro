@@ -2,6 +2,7 @@
 import '../styles/explorer.css';
 import LeafletMap from './LeafletMap';
 import LocationButton from './LocationButton';
+import SearchBox from './SearchBox';
 import { SPAIN_BOUNDS } from '../lib/spainBounds';
 
 const stations = [
@@ -66,10 +67,7 @@ const fuelClass: Record<string, string> = {
 		<form class="explorer__filters" aria-label="Filtros de búsqueda">
 			<label class="explorer__field">
 				<span>Ubicación</span>
-				<div class="explorer__input-wrap">
-					<span aria-hidden="true">⌖</span>
-					<input id="explorer-search" type="search" placeholder="Ciudad, dirección o código postal" />
-				</div>
+				<SearchBox client:load />
 			</label>
 
 			<div class="explorer__filter-row">

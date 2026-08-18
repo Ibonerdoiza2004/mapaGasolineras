@@ -12,7 +12,8 @@ export default defineConfig({
 		trace: 'on-first-retry',
 	},
 	webServer: {
-		command: 'npm run build && npm run preview -- --host 127.0.0.1 --port 4322',
+		command:
+			'PUBLIC_API_URL=http://127.0.0.1:4322 npm run build && npm run preview -- --host 127.0.0.1 --port 4322',
 		url: 'http://127.0.0.1:4322',
 		reuseExistingServer: false,
 		timeout: 120_000,

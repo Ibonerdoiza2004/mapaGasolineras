@@ -1,5 +1,48 @@
 import { expect, test } from '@playwright/test';
 
+test.describe('disposición — el mapa llena el alto disponible', () => {
+	test('el mapa llega hasta el borde inferior del viewport (escritorio)', async ({
+		page,
+		isMobile,
+	}) => {
+		test.skip(isMobile, 'disposición de escritorio');
+		await page.goto('/');
+		await expect(page.getByRole('button', { name: 'Acercar mapa' })).toBeVisible();
+
+		const box = await page.locator('.leaflet-map__container').boundingBox();
+		expect(box).not.toBeNull();
+		const viewportHeight = await page.evaluate(() => window.innerHeight);
+		expect(Math.round((box as { y: number; height: number }).y + (box as { y: number; height: number }).height))
+			.toBe(viewportHeight);
+	});
+});
+
+test.describe('rueda del ratón — zoom en pasos de 0.5', () => {
+	test('cada toque de la rueda cuenta un paso, incluso girando rápido', async ({ page, isMobile }) => {
+		test.skip(isMobile, 'rueda de ratón de escritorio');
+		await page.goto('/');
+		await expect(page.getByRole('button', { name: 'Acercar mapa' })).toBeVisible();
+		await expect(page.locator('img.leaflet-tile').first()).toBeVisible();
+
+		const box = await page.locator('.leaflet-map__container').boundingBox();
+		if (!box) throw new Error('sin caja del mapa');
+		await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+
+		// Tres toques seguidos (sin esperas) suben de nivel de tesela (z5 -> z6).
+		for (let i = 0; i < 3; i += 1) {
+			await page.mouse.wheel(0, -100);
+		}
+		// Las teselas llegan de OSM por red; con la suite en paralelo cargan
+		// más lento, así que se espera más que el timeout por defecto.
+		await expect(page.locator('img.leaflet-tile[src*="/6/"]').first()).toBeVisible({ timeout: 15_000 });
+
+		// Dos toques seguidos vuelven al nivel anterior (z6 -> z5).
+		await page.mouse.wheel(0, 100);
+		await page.mouse.wheel(0, 100);
+		await expect(page.locator('img.leaflet-tile[src*="/5/"]').first()).toBeVisible({ timeout: 15_000 });
+	});
+});
+
 test.describe('lector de pantalla — roles y nombres accesibles', () => {
 	test('expone los roles y nombres de los controles principales', async ({ page }) => {
 		await page.goto('/');
@@ -9,7 +52,7 @@ test.describe('lector de pantalla — roles y nombres accesibles', () => {
 		await expect(page.getByRole('main')).toBeVisible();
 		await expect(page.getByRole('region', { name: 'Mapa de gasolineras cercanas' })).toBeVisible();
 
-		await expect(page.getByRole('searchbox', { name: 'Ubicación' })).toBeVisible();
+		await expect(page.getByRole('combobox', { name: 'Ubicación' })).toBeVisible();
 		await expect(page.getByRole('combobox', { name: 'Combustible' })).toBeVisible();
 		await expect(page.getByRole('combobox', { name: 'Radio' })).toBeVisible();
 		await expect(page.getByRole('combobox', { name: 'Ordenar resultados' })).toBeVisible();
@@ -37,7 +80,7 @@ test.describe('teclado — orden de foco y operación', () => {
 			['link', 'Explorar'],
 			['link', 'Rutas'],
 			['button', 'Activar modo oscuro'],
-			['searchbox', 'Ubicación'],
+			['combobox', 'Ubicación'],
 			['combobox', 'Combustible'],
 			['combobox', 'Radio'],
 			['button', 'Usar mi ubicación'],
@@ -144,6 +187,6 @@ test.describe('geolocalización', () => {
 		).toBeVisible();
 
 		await page.getByRole('button', { name: 'Buscar por ciudad o código postal' }).click();
-		await expect(page.getByRole('searchbox', { name: 'Ubicación' })).toBeFocused();
+		await expect(page.getByRole('combobox', { name: 'Ubicación' })).toBeFocused();
 	});
 });

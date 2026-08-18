@@ -184,11 +184,11 @@ código postal **para** consultar otra zona.
 
 **Tareas**
 
-- [ ] T-12.1 Crear el campo de búsqueda con sugerencias y control de debounce.
-- [ ] T-12.2 Integrar un proveedor de geocodificación a través del backend con
+- [x] T-12.1 Crear el campo de búsqueda con sugerencias y control de debounce.
+- [x] T-12.2 Integrar un proveedor de geocodificación a través del backend con
   caché y límites de uso.
-- [ ] T-12.3 Centrar el mapa y actualizar resultados al elegir una sugerencia.
-- [ ] T-12.4 Mostrar mensajes claros para consultas ambiguas o sin coincidencias.
+- [x] T-12.3 Centrar el mapa y actualizar resultados al elegir una sugerencia.
+- [x] T-12.4 Mostrar mensajes claros para consultas ambiguas o sin coincidencias.
 
 ### US-13 — Elegir combustible
 
@@ -622,11 +622,11 @@ pruebas son parte de la aceptación de la historia, no una tarea opcional.
 
 ### US-12 — Búsqueda manual
 
-- [ ] TEST-12.1 Una ciudad, dirección o código postal válido muestra sugerencias
+- [x] TEST-12.1 Una ciudad, dirección o código postal válido muestra sugerencias
   y centra el mapa al seleccionar una.
-- [ ] TEST-12.2 Entrada vacía, demasiado corta o ambigua se valida y comunica
+- [x] TEST-12.2 Entrada vacía, demasiado corta o ambigua se valida y comunica
   correctamente.
-- [ ] TEST-12.3 Un fallo o límite del geocodificador ofrece reintentar sin
+- [x] TEST-12.3 Un fallo o límite del geocodificador ofrece reintentar sin
   perder la ubicación anterior.
 
 ### US-13 — Combustible

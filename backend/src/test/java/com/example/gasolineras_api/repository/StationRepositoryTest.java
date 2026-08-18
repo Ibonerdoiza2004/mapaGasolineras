@@ -21,7 +21,7 @@ import java.time.Instant;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-@SpringBootTest
+@SpringBootTest(properties = "app.municipios.import-enabled=false")
 @Transactional
 class StationRepositoryTest {
 

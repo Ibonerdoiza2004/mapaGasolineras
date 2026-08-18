@@ -39,8 +39,13 @@ const mobileCss = normalize(mediaBlock(explorerCss, '@media (max-width: 48rem)')
 describe('ExplorerWorkspace — vista de escritorio', () => {
 	it('usa una rejilla de dos columnas con el mapa ocupando el resto', () => {
 		expect(desktopCss).toContain(
-			'.explorer { display: grid; grid-template-columns: minmax(20rem, 25rem) minmax(0, 1fr);',
+			'.explorer { display: grid; flex: 1; grid-template-columns: minmax(20rem, 25rem) minmax(0, 1fr);',
 		);
+	});
+
+	it('ocupa el alto restante bajo la cabecera sin dejar hueco inferior', () => {
+		expect(desktopCss).toContain('.explorer { display: grid; flex: 1;');
+		expect(desktopCss).not.toContain('calc(100vh -');
 	});
 
 	it('mantiene el panel lateral siempre visible y oculta el resumen deslizable', () => {

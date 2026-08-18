@@ -1,5 +1,6 @@
 package com.example.gasolineras_api.exception;
 
+import com.example.gasolineras_api.client.GeocodeClientException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -52,6 +53,20 @@ public class GlobalExceptionHandler {
 	public ResponseEntity<ApiError> handleResourceNotFound(ResourceNotFoundException e) {
 		ApiError error = new ApiError("NOT_FOUND", e.getMessage());
 		return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
+	}
+
+	@ExceptionHandler(GeocodeClientException.class)
+	public ResponseEntity<ApiError> handleGeocodeUnavailable(GeocodeClientException e) {
+		log.warn("Geocodificador no disponible: {}", e.getMessage());
+		ApiError error = new ApiError("GEOCODE_UNAVAILABLE",
+				"El servicio de geocodificación no está disponible ahora mismo");
+		return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(error);
+	}
+
+	@ExceptionHandler(GeocodeRateLimitException.class)
+	public ResponseEntity<ApiError> handleGeocodeRateLimit(GeocodeRateLimitException e) {
+		ApiError error = new ApiError("RATE_LIMITED", e.getMessage());
+		return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(error);
 	}
 
 	@ExceptionHandler(Exception.class)

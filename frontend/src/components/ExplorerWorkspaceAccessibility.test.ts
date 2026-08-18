@@ -7,6 +7,7 @@ const workspaceAstro = readFileSync(
 	resolve(process.cwd(), 'src/components/ExplorerWorkspace.astro'),
 	'utf8',
 );
+const searchBoxSource = readFileSync(resolve(process.cwd(), 'src/components/SearchBox.tsx'), 'utf8');
 const leafletMapSource = readFileSync(resolve(process.cwd(), 'src/components/LeafletMap.tsx'), 'utf8');
 const locationButtonSource = readFileSync(
 	resolve(process.cwd(), 'src/components/LocationButton.tsx'),
@@ -25,9 +26,14 @@ const explorerCssNormalized = normalize(explorerCss);
 describe('ExplorerWorkspace — nombres accesibles de controles y filtros', () => {
 	it('etiqueta el campo de búsqueda de ubicación', () => {
 		expect(workspaceAstro).toContain('<span>Ubicación</span>');
-		expect(workspaceAstro).toContain(
-			'<input id="explorer-search" type="search" placeholder="Ciudad, dirección o código postal" />',
+		expect(workspaceAstro).toContain('<SearchBox client:load />');
+		expect(searchBoxSource).toContain("SEARCH_INPUT_ID = 'explorer-search'");
+		expect(searchBoxSource).toContain('type="search"');
+		expect(searchBoxSource).toContain(
+			"const PLACEHOLDER = 'Ciudad, dirección o código postal'",
 		);
+		expect(searchBoxSource).toContain('role="combobox"');
+		expect(searchBoxSource).toContain('aria-controls={LISTBOX_ID}');
 	});
 
 	it('etiqueta los selectores de combustible y radio', () => {
@@ -75,9 +81,9 @@ describe('ExplorerWorkspace — paneles y marcadores alternativos', () => {
 
 describe('ExplorerWorkspace — foco visible', () => {
 	it('muestra un anillo de foco en entradas, selectores, botones y resumen', () => {
-		expect(explorerCssNormalized).toContain(
-			'.explorer input:focus-visible, .explorer select:focus-visible, .explorer button:focus-visible, .explorer__sidebar > summary:focus-visible { box-shadow: var(--focus-ring); outline: none; }',
-		);
+expect(explorerCssNormalized).toContain(
+		'.explorer input:not(.explorer__input-wrap input):focus-visible, .explorer select:focus-visible, .explorer button:focus-visible, .explorer__sidebar > summary:focus-visible { box-shadow: var(--focus-ring); outline: none; }',
+	);
 	});
 
 	it('muestra un anillo de foco en los enlaces de navegación', () => {

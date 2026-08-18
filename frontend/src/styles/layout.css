@@ -6,6 +6,16 @@ body {
 }
 
 .app-shell {
-	min-height: 100vh;
+	display: flex;
+	flex-direction: column;
+	height: 100vh;
+	height: 100dvh;
 	width: 100%;
+}
+
+main {
+	display: flex;
+	flex: 1;
+	flex-direction: column;
+	min-height: 0;
 }

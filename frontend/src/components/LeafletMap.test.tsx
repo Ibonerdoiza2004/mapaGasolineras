@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import LeafletMap, { type MapStation } from './LeafletMap';
 import { dispatchUserLocation, LOCATION_EVENT } from '../lib/geolocation';
-import { SPAIN_BOUNDS } from '../lib/spainBounds';
+import { SPAIN_BOUNDS, PENINSULA_CENTER } from '../lib/spainBounds';
 
 const { leafletMock, markerInstance, mapState } = vi.hoisted(() => {
 	const mapState = {
@@ -12,16 +12,29 @@ const { leafletMock, markerInstance, mapState } = vi.hoisted(() => {
 		southWest: { x: 50, y: 1016 },
 		northEast: { x: 865, y: 133 },
 	};
+	const zeroZoom: Record<string, { x: number; y: number }> = {
+		'27.63': { x: 115.09, y: 107.54 },
+		'39.9': { x: 125.8, y: 96.99 },
+		'52.17': { x: 136.5, y: 84.27 },
+	};
 	const mapInstance = {
 		fitBounds: vi.fn(),
+		getMaxZoom: vi.fn(() => 19),
 		getSize: vi.fn(() => mapState.size),
 		getZoom: vi.fn(() => mapState.zoom),
-		project: vi.fn((latlng: [number, number]) => {
+		options: { zoomSnap: 0.5 },
+		project: vi.fn((latlng: [number, number], zoom?: number) => {
+			if (zoom === 0) return zeroZoom[latlng[0]];
 			return latlng[0] < 30 ? mapState.southWest : mapState.northEast;
 		}),
 		remove: vi.fn(),
+		scrollWheelZoom: { disable: vi.fn() },
 		setView: vi.fn(),
 		unproject: vi.fn(() => ({ lat: 36.5, lng: -6.9 })),
+		mouseEventToContainerPoint: vi.fn(() => ({ x: 100, y: 200 })),
+		setZoomAround: vi.fn(),
+		_animatingZoom: false,
+		_onZoomTransitionEnd: vi.fn(),
 	};
 	const markerInstance = {
 		addTo: vi.fn(() => markerInstance),
@@ -85,8 +98,8 @@ describe('LeafletMap', () => {
 		expect(options.zoomControl).toBe(false);
 		expect(options.minZoom).toBe(3);
 		expect(options.maxZoom).toBe(19);
-		expect(options.zoomSnap).toBe(0.25);
-		expect(options.zoomDelta).toBe(0.25);
+		expect(options.zoomSnap).toBe(0.5);
+		expect(options.zoomDelta).toBe(0.5);
 		expect(leafletMock.tileLayer).toHaveBeenCalledWith(
 			'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
 			expect.objectContaining({
@@ -125,7 +138,7 @@ describe('LeafletMap', () => {
 		expect(region).toBeInTheDocument();
 	});
 
-	it('ajusta la vista a los límites y apoya el borde inferior en el del mapa cuando la altura limita el encuadre', async () => {
+	it('ajusta la vista a los límites y deja 18 px bajo Canarias centrando la península', async () => {
 		render(<LeafletMap stations={stations} center={[40.4168, -3.7038]} zoom={13} bounds={SPAIN_BOUNDS} />);
 
 		await waitFor(() => expect(leafletMock.map).toHaveBeenCalledTimes(1));
@@ -134,12 +147,24 @@ describe('LeafletMap', () => {
 			project: ReturnType<typeof vi.fn>;
 			setView: ReturnType<typeof vi.fn>;
 			unproject: ReturnType<typeof vi.fn>;
+			options: { zoomSnap: number };
 		};
 		expect(mapInstance.fitBounds).toHaveBeenCalledWith(SPAIN_BOUNDS, { padding: [16, 16] });
 		expect(mapInstance.project).toHaveBeenNthCalledWith(1, SPAIN_BOUNDS[0], 5.25);
 		expect(mapInstance.project).toHaveBeenNthCalledWith(2, SPAIN_BOUNDS[1], 5.25);
-		expect(mapInstance.unproject).toHaveBeenCalledWith([457.5, 520], 5.25);
-		expect(mapInstance.setView).toHaveBeenCalledWith({ lat: 36.5, lng: -6.9 }, 5.25, { animate: false });
+		expect(mapInstance.project).toHaveBeenNthCalledWith(3, SPAIN_BOUNDS[0], 0);
+		expect(mapInstance.project).toHaveBeenNthCalledWith(4, PENINSULA_CENTER, 0);
+		// El zoom se calcula para que el borde inferior del encuadre quede a
+		// 18 px del borde inferior del mapa (puede no caer en la rejilla de
+		// zoomSnap) y el centro apunta al centro visual de la península.
+		const bottomOffset = 107.54 - 96.99;
+		const targetZoom = Math.log2((1024 / 2 - 18) / bottomOffset);
+		expect(mapInstance.setView).toHaveBeenCalledWith(PENINSULA_CENTER, targetZoom, {
+			animate: false,
+		});
+		expect(mapInstance.unproject).not.toHaveBeenCalled();
+		// El ajuste a la rejilla se desactiva solo durante la vista inicial.
+		expect(mapInstance.options.zoomSnap).toBe(0.5);
 	});
 
 	it('no desplaza el encuadre cuando es la anchura la que limita el mapa', async () => {
@@ -167,6 +192,73 @@ describe('LeafletMap', () => {
 			fitBounds: ReturnType<typeof vi.fn>;
 		};
 		expect(mapInstance.fitBounds).not.toHaveBeenCalled();
+	});
+
+	it('hace zoom con pasos fijos de 0.5 centrados en el puntero con la rueda', async () => {
+		render(<LeafletMap stations={stations} center={[40.4168, -3.7038]} zoom={13} />);
+
+		await waitFor(() => expect(leafletMock.map).toHaveBeenCalledTimes(1));
+		const mapInstance = leafletMock.map.mock.results[0].value as {
+			scrollWheelZoom: { disable: ReturnType<typeof vi.fn> };
+			mouseEventToContainerPoint: ReturnType<typeof vi.fn>;
+			setZoomAround: ReturnType<typeof vi.fn>;
+			_animatingZoom: boolean;
+			_onZoomTransitionEnd: ReturnType<typeof vi.fn>;
+		};
+		const mapContainer = document.querySelector<HTMLElement>('.leaflet-map__container');
+		expect(mapContainer).not.toBeNull();
+		// La rueda nativa de Leaflet queda desactivada en favor del manejador propio.
+		expect(mapInstance.scrollWheelZoom.disable).toHaveBeenCalled();
+
+		fireEvent.wheel(mapContainer as HTMLElement, { deltaY: 100 });
+		// Zoom animado (sin opciones) centrado en el punto del puntero.
+		expect(mapInstance.setZoomAround).toHaveBeenCalledWith({ x: 100, y: 200 }, 4.75);
+		expect(mapInstance._onZoomTransitionEnd).not.toHaveBeenCalled();
+
+		fireEvent.wheel(mapContainer as HTMLElement, { deltaY: -100 });
+		expect(mapInstance.setZoomAround).toHaveBeenCalledWith({ x: 100, y: 200 }, 5.75);
+	});
+
+	it('finaliza la animación en curso antes de cada paso de la rueda', async () => {
+		render(<LeafletMap stations={stations} center={[40.4168, -3.7038]} zoom={13} />);
+
+		await waitFor(() => expect(leafletMock.map).toHaveBeenCalledTimes(1));
+		const mapInstance = leafletMock.map.mock.results[0].value as {
+			setZoomAround: ReturnType<typeof vi.fn>;
+			_animatingZoom: boolean;
+			_onZoomTransitionEnd: ReturnType<typeof vi.fn>;
+		};
+		const mapContainer = document.querySelector<HTMLElement>('.leaflet-map__container') as HTMLElement;
+		mapInstance._animatingZoom = true;
+
+		// Un paso que llega durante una animación la finaliza antes de empezar
+		// la suya: la rueda rápida no pierde pasos ni deja de animar.
+		fireEvent.wheel(mapContainer, { deltaY: -100 });
+		expect(mapInstance._onZoomTransitionEnd).toHaveBeenCalled();
+		expect(mapInstance.setZoomAround).toHaveBeenCalledWith({ x: 100, y: 200 }, 5.75);
+	});
+
+	it('acumula el delta de la rueda hasta completar un paso de zoom', async () => {
+		render(<LeafletMap stations={stations} center={[40.4168, -3.7038]} zoom={13} />);
+
+		await waitFor(() => expect(leafletMock.map).toHaveBeenCalledTimes(1));
+		const mapInstance = leafletMock.map.mock.results[0].value as {
+			setZoomAround: ReturnType<typeof vi.fn>;
+			_animatingZoom: boolean;
+		};
+		const mapContainer = document.querySelector<HTMLElement>('.leaflet-map__container') as HTMLElement;
+		mapInstance._animatingZoom = false;
+
+		fireEvent.wheel(mapContainer, { deltaY: 30 });
+		fireEvent.wheel(mapContainer, { deltaY: 30 });
+		expect(mapInstance.setZoomAround).not.toHaveBeenCalled();
+
+		fireEvent.wheel(mapContainer, { deltaY: 30 });
+		fireEvent.wheel(mapContainer, { deltaY: 10 });
+		expect(mapInstance.setZoomAround).toHaveBeenCalledWith({ x: 100, y: 200 }, 4.75);
+
+		fireEvent.wheel(mapContainer, { deltaY: 5, deltaMode: 1 });
+		expect(mapInstance.setZoomAround).toHaveBeenCalledWith({ x: 100, y: 200 }, 4.75);
 	});
 
 	it('llama a onSelect al hacer clic en un marcador', async () => {
