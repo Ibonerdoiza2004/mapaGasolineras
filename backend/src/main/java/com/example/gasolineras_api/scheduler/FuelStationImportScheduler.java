@@ -25,7 +25,9 @@ public class FuelStationImportScheduler {
 		this.importService = importService;
 	}
 
-	@Scheduled(initialDelayString = "${app.import.interval-ms:3600000}", fixedDelayString = "${app.import.interval-ms:3600000}")
+	// La primera importación espera 15 minutos por defecto para no martillear
+	// al proveedor en cada reinicio; después se refresca cada hora.
+	@Scheduled(initialDelayString = "${app.import.initial-delay-ms:900000}", fixedDelayString = "${app.import.interval-ms:3600000}")
 	public void importStations() {
 		log.info("Ejecutando importación programada");
 		ImportResult result = importService.runImport();
