@@ -197,22 +197,50 @@ código postal **para** consultar otra zona.
 
 **Tareas**
 
-- [ ] T-13.1 Crear filtros accesibles de selección de combustible.
-- [ ] T-13.2 Sincronizar el filtro con la consulta de estaciones y la URL.
-- [ ] T-13.3 Ocultar o marcar claramente precios no disponibles.
-- [ ] T-13.4 Añadir pruebas de filtrado y restauración de estado desde URL.
+- [x] T-13.1 Crear filtros accesibles de selección de combustible.
+- [x] T-13.2 Sincronizar el filtro con la consulta de estaciones y la URL.
+- [x] T-13.3 Ocultar o marcar claramente precios no disponibles.
+- [x] T-13.4 Añadir pruebas de filtrado y restauración de estado desde URL.
 
 ### US-14 — Ajustar radio de búsqueda
 
 **Como** conductor, **quiero** configurar el radio de búsqueda **para** limitar
 los resultados a una distancia razonable.
 
+**Criterios de producto decididos**
+
+- Al entrar en la web se consultan las estaciones del **área visible en el
+  mapa** (viewport), sin pedir ubicación: las estaciones en pantalla aparecen
+  nada más cargar y mover o alejar el mapa vuelve a consultar.
+- El alcance se elige con un **control segmentado** («Área visible en el mapa»
+  / «Radio de búsqueda», esta opción deshabilitada sin ubicación): el radio
+  aplica 10 km por defecto y muestra los chips 5, 10, 25 y 50 km; el área
+  visible no muestra chips.
+- El aviso «No hay estaciones que mostrar en el mapa» solo aparece tras una
+  consulta que termina sin resultados (nunca mientras el mapa o la consulta
+  cargan) y se pinta por encima del mapa.
+- El selector de **combustible** y el de ordenación viven junto a
+  «Resultados», no entre la ubicación y el alcance.
+- Los resultados se pueden **ordenar** por más barato, más cercano o mejor
+  opción (ahorro); el orden se conserva en la URL.
+- El backend acota el modo **viewport** (`limit`, default 200, máx 500; 400
+  fuera de rango) tras ordenar según el criterio pedido; con **radio** se
+  devuelven todas las estaciones del rango sin límite. El ahorro se calcula
+  sobre todo el rango, no solo sobre los devueltos.
+- Si se comparte la ubicación y luego se busca manualmente (o al revés), gana
+  la **última acción**; el marcador distingue el origen (punto azul del
+  dispositivo frente a cruz de búsqueda).
+- El backend valida radio ≤ 50 km; acepta `minLat/maxLat/minLon/maxLon`
+  (todos juntos o ninguno) para el modo viewport y con ellos `lat/lon` son
+  opcionales (la referencia es el centro del rectángulo); combinar `radio`
+  con `bounds` se rechaza con 400.
+
 **Tareas**
 
-- [ ] T-14.1 Añadir control de radio con valores predefinidos y entrada validada.
-- [ ] T-14.2 Dibujar el área de búsqueda en el mapa cuando sea útil.
-- [ ] T-14.3 Volver a consultar y comunicar el número de resultados al cambiarlo.
-- [ ] T-14.4 Evitar consultas excesivas mediante debounce y cancelación.
+- [x] T-14.1 Añadir control de radio con valores predefinidos y entrada validada.
+- [x] T-14.2 Dibujar el área de búsqueda en el mapa cuando sea útil.
+- [x] T-14.3 Volver a consultar y comunicar el número de resultados al cambiarlo.
+- [x] T-14.4 Evitar consultas excesivas mediante debounce y cancelación.
 
 ### US-15 — Ver marcadores y agrupaciones
 
@@ -221,10 +249,10 @@ los resultados a una distancia razonable.
 
 **Tareas**
 
-- [ ] T-15.1 Diseñar iconos de marcador legibles en ambos temas.
-- [ ] T-15.2 Implementar agrupación y expansión de marcadores por nivel de zoom.
-- [ ] T-15.3 Resaltar en el mapa la estación seleccionada desde el listado.
-- [ ] T-15.4 Mantener sincronizados límites visibles y resultados solicitados.
+- [x] T-15.1 Diseñar iconos de marcador legibles en ambos temas.
+- [x] T-15.2 Implementar agrupación y expansión de marcadores por nivel de zoom.
+- [x] T-15.3 Resaltar en el mapa la estación seleccionada desde el listado.
+- [x] T-15.4 Mantener sincronizados límites visibles y resultados solicitados.
 
 ### US-16 — Consultar una lista de resultados
 
@@ -233,10 +261,10 @@ los resultados a una distancia razonable.
 
 **Tareas**
 
-- [ ] T-16.1 Crear tarjeta de estación con precio, distancia, ahorro y marca.
-- [ ] T-16.2 Mostrar skeleton de carga y paginación o carga progresiva.
-- [ ] T-16.3 Sincronizar selección de tarjeta con marcador y panel de detalle.
-- [ ] T-16.4 Garantizar lectura correcta con teclado y lector de pantalla.
+- [x] T-16.1 Crear tarjeta de estación con precio, distancia, ahorro y marca.
+- [x] T-16.2 Mostrar skeleton de carga y paginación o carga progresiva.
+- [x] T-16.3 Sincronizar selección de tarjeta con marcador y panel de detalle.
+- [x] T-16.4 Garantizar lectura correcta con teclado y lector de pantalla.
 
 ### US-17 — Ordenar y recomendar resultados
 
@@ -245,11 +273,11 @@ recomendación transparente **para** decidir con rapidez.
 
 **Tareas**
 
-- [ ] T-17.1 Definir el cálculo de ahorro frente al precio de referencia de los
+- [x] T-17.1 Definir el cálculo de ahorro frente al precio de referencia de los
   resultados actuales.
-- [ ] T-17.2 Implementar ordenación estable en backend y selector en frontend.
-- [ ] T-17.3 Etiquetar la mejor opción explicando el criterio usado.
-- [ ] T-17.4 Evitar recomendar estaciones con precio caducado o no disponible.
+- [x] T-17.2 Implementar ordenación estable en backend y selector en frontend.
+- [x] T-17.3 Etiquetar la mejor opción explicando el criterio usado.
+- [x] T-17.4 Evitar recomendar estaciones con precio caducado o no disponible.
 
 ### US-18 — Abrir la ficha detallada
 
@@ -258,10 +286,10 @@ contexto del mapa **para** revisar la información antes de desplazarme.
 
 **Tareas**
 
-- [ ] T-18.1 Implementar panel lateral en escritorio y bottom sheet en móvil.
-- [ ] T-18.2 Mostrar precios, horario, servicios, dirección y fecha de datos.
-- [ ] T-18.3 Añadir acciones para cerrar, volver a la lista y obtener indicaciones.
-- [ ] T-18.4 Manejar carga y error del detalle de forma independiente.
+- [x] T-18.1 Implementar panel lateral en escritorio y bottom sheet en móvil.
+- [x] T-18.2 Mostrar precios, horario, servicios, dirección y fecha de datos.
+- [x] T-18.3 Añadir acciones para cerrar, volver a la lista y obtener indicaciones.
+- [x] T-18.4 Manejar carga y error del detalle de forma independiente.
 
 ### US-19 — Informar de la frescura de los datos
 
@@ -270,10 +298,10 @@ interpretar correctamente la comparación.
 
 **Tareas**
 
-- [ ] T-19.1 Exponer fecha de origen e importación en las respuestas de API.
-- [ ] T-19.2 Mostrar la fecha de actualización en lista y ficha con formato local.
-- [ ] T-19.3 Marcar los datos antiguos con un aviso no intrusivo.
-- [ ] T-19.4 Probar los umbrales de frescura y zona horaria.
+- [x] T-19.1 Exponer fecha de origen e importación en las respuestas de API.
+- [x] T-19.2 Mostrar la fecha de actualización en lista y ficha con formato local.
+- [x] T-19.3 Marcar los datos antiguos con un aviso no intrusivo.
+- [x] T-19.4 Probar los umbrales de frescura y zona horaria.
 
 ### US-20 — Gestionar estados vacíos y errores
 
@@ -282,12 +310,12 @@ servicio falla **para** poder continuar la búsqueda.
 
 **Tareas**
 
-- [ ] T-20.1 Diseñar estados para radio sin estaciones, combustible ausente y
+- [x] T-20.1 Diseñar estados para radio sin estaciones, combustible ausente y
   ubicación no válida.
-- [ ] T-20.2 Ofrecer acciones de recuperación: ampliar radio, cambiar filtro o
+- [x] T-20.2 Ofrecer acciones de recuperación: ampliar radio, cambiar filtro o
   buscar manualmente.
-- [ ] T-20.3 Implementar aviso de datos en caché ante caída del proveedor.
-- [ ] T-20.4 Añadir pruebas de componentes para todos los estados.
+- [x] T-20.3 Implementar aviso de datos en caché ante caída del proveedor.
+- [x] T-20.4 Añadir pruebas de componentes para todos los estados.
 
 ### US-21 — Abrir indicaciones hacia una estación
 
@@ -296,9 +324,9 @@ de navegación **para** llegar a ella sin copiar la dirección.
 
 **Tareas**
 
-- [ ] T-21.1 Crear enlace de indicaciones a Google Maps a partir de coordenadas.
-- [ ] T-21.2 Diferenciar comportamiento de navegador móvil y escritorio.
-- [ ] T-21.3 Validar la codificación de URL y los casos sin coordenadas.
+- [x] T-21.1 Crear enlace de indicaciones a Google Maps a partir de coordenadas.
+- [x] T-21.2 Diferenciar comportamiento de navegador móvil y escritorio.
+- [x] T-21.3 Validar la codificación de URL y los casos sin coordenadas.
 
 ### US-22 — Validar el flujo MVP completo
 
@@ -307,11 +335,11 @@ de publicarlo **para** asegurar una experiencia fiable.
 
 **Tareas**
 
-- [ ] T-22.1 Crear prueba E2E: ubicación o búsqueda manual, filtro, ordenación
+- [x] T-22.1 Crear prueba E2E: ubicación o búsqueda manual, filtro, ordenación
   y apertura de ficha.
-- [ ] T-22.2 Ejecutar pruebas visuales responsive en temas claro y oscuro.
-- [ ] T-22.3 Documentar variables de entorno y proceso de desarrollo local.
-- [ ] T-22.4 Verificar rendimiento con un conjunto amplio de estaciones.
+- [x] T-22.2 Ejecutar pruebas visuales responsive en temas claro y oscuro.
+- [x] T-22.3 Documentar variables de entorno y proceso de desarrollo local.
+- [x] T-22.4 Verificar rendimiento con un conjunto amplio de estaciones.
 
 ---
 
@@ -623,7 +651,8 @@ pruebas son parte de la aceptación de la historia, no una tarea opcional.
 ### US-12 — Búsqueda manual
 
 - [x] TEST-12.1 Una ciudad, dirección o código postal válido muestra sugerencias
-  y centra el mapa al seleccionar una.
+  (la primera viene seleccionada por defecto, de modo que Enter elige la más
+  relevante sin navegar) y centra el mapa al seleccionar una.
 - [x] TEST-12.2 Entrada vacía, demasiado corta o ambigua se valida y comunica
   correctamente.
 - [x] TEST-12.3 Un fallo o límite del geocodificador ofrece reintentar sin
@@ -631,81 +660,103 @@ pruebas son parte de la aceptación de la historia, no una tarea opcional.
 
 ### US-13 — Combustible
 
-- [ ] TEST-13.1 Diésel, gasolina 95 y gasolina 98 filtran los resultados y
+- [x] TEST-13.1 Diésel, gasolina 95 y gasolina 98 filtran los resultados y
   actualizan URL y estado visual.
-- [ ] TEST-13.2 Un combustible desconocido se rechaza y no altera la consulta.
-- [ ] TEST-13.3 Una estación sin precio para el combustible seleccionado no se
+- [x] TEST-13.2 Un combustible desconocido se rechaza y no altera la consulta.
+- [x] TEST-13.3 Una estación sin precio para el combustible seleccionado no se
   recomienda como mejor opción.
 
 ### US-14 — Radio
 
-- [ ] TEST-14.1 Los valores mínimo, máximo y los predefinidos generan consultas
+- [x] TEST-14.1 Los valores mínimo, máximo y los predefinidos generan consultas
   válidas.
-- [ ] TEST-14.2 Radio cero, negativo, no numérico o superior al máximo se
+- [x] TEST-14.2 Radio cero, negativo, no numérico o superior al máximo se
   rechaza con mensaje útil.
-- [ ] TEST-14.3 Cambios rápidos se agrupan y solo la última consulta actualiza
+- [x] TEST-14.3 Cambios rápidos se agrupan y solo la última consulta actualiza
   resultados.
+- [x] TEST-14.4 Al entrar se consulta el viewport del mapa (moverse o alejar el
+  mapa vuelve a consultar), sin necesidad de ubicación; el radio acotado usa
+  la ubicación y combinarlo con bounds se rechaza (400).
+- [x] TEST-14.5 Sin ubicación la opción de radio del control segmentado queda
+  deshabilitada; compartir o buscar la habilita y la última acción gana;
+  activarla aplica 10 km y volver al área visible la desactiva.
+- [x] TEST-14.6 Un viewport incompleto o invertido se rechaza y no altera la
+  consulta.
+- [x] TEST-14.7 El marcador de estación señala con la punta inferior el punto
+  exacto (anclaje `iconAnchor` en la base del pin).
+- [x] TEST-14.8 El límite de resultados solo acota el modo viewport (default
+  200, máximo 500; 0, negativo, no numérico o superior al máximo → 400); con
+  radio se devuelven todas las estaciones del rango. El orden pedido se aplica
+  antes del corte, el ahorro usa el mínimo del rango completo y el listado
+  avisa del tope solo en modo viewport.
+- [x] TEST-14.9 Ordenar por más barato, más cercano o mejor opción re-consulta
+  con el criterio (`orden=precio|distancia|ahorro`), se conserva en la URL y
+  la ordenación por ahorro equivale a la de precio en SQL.
+- [x] TEST-14.10 No se puede hacer zoom fuera de los límites de España: el zoom
+  mínimo coincide con la vista inicial (sin margen alrededor) y el
+  desplazamiento está acotado exactamente a `SPAIN_BOUNDS`, de modo que el
+  viewport nunca abarca terreno fuera de ellos.
 
 ### US-15 — Marcadores y agrupaciones
 
-- [ ] TEST-15.1 Muchos marcadores se agrupan y se expanden correctamente al
+- [x] TEST-15.1 Muchos marcadores se agrupan y se expanden correctamente al
   acercar el zoom.
-- [ ] TEST-15.2 Seleccionar una tarjeta resalta su marcador y viceversa.
-- [ ] TEST-15.3 Una estación sin coordenadas no genera un marcador inválido.
+- [x] TEST-15.2 Seleccionar una tarjeta resalta su marcador y viceversa.
+- [x] TEST-15.3 Una estación sin coordenadas no genera un marcador inválido.
 
 ### US-16 — Lista de resultados
 
-- [ ] TEST-16.1 Una respuesta válida muestra tarjetas con precio, distancia,
+- [x] TEST-16.1 Una respuesta válida muestra tarjetas con precio, distancia,
   ahorro y marca.
-- [ ] TEST-16.2 Carga, lista vacía y error muestran estados diferentes y
+- [x] TEST-16.2 Carga, lista vacía y error muestran estados diferentes y
   acciones de recuperación adecuadas.
-- [ ] TEST-16.3 Una lista grande mantiene scroll, foco y rendimiento aceptables.
+- [x] TEST-16.3 Una lista grande mantiene scroll, foco y rendimiento aceptables.
 
 ### US-17 — Orden y recomendación
 
-- [ ] TEST-17.1 Precio, distancia y ahorro producen orden estable y correcto.
-- [ ] TEST-17.2 Empates conservan un desempate determinista.
-- [ ] TEST-17.3 Precios caducados, nulos o negativos no se presentan como mejor
+- [x] TEST-17.1 Precio, distancia y ahorro producen orden estable y correcto.
+- [x] TEST-17.2 Empates conservan un desempate determinista.
+- [x] TEST-17.3 Precios caducados, nulos o negativos no se presentan como mejor
   opción.
 
 ### US-18 — Ficha detallada
 
-- [ ] TEST-18.1 Abrir una tarjeta muestra la ficha correspondiente en panel
+- [x] TEST-18.1 Abrir una tarjeta muestra la ficha correspondiente en panel
   lateral o bottom sheet.
-- [ ] TEST-18.2 Cerrar, volver y cambiar de estación restauran el foco y el
+- [x] TEST-18.2 Cerrar, volver y cambiar de estación restauran el foco y el
   contexto del mapa.
-- [ ] TEST-18.3 Un fallo del detalle muestra error recuperable sin cerrar toda
+- [x] TEST-18.3 Un fallo del detalle muestra error recuperable sin cerrar toda
   la experiencia.
 
 ### US-19 — Frescura de datos
 
-- [ ] TEST-19.1 Fecha válida reciente aparece en lista y ficha en hora local.
-- [ ] TEST-19.2 Fecha antigua muestra aviso y no oculta el precio disponible.
-- [ ] TEST-19.3 Fecha ausente o malformada se trata como dato desconocido, no
+- [x] TEST-19.1 Fecha válida reciente aparece en lista y ficha en hora local.
+- [x] TEST-19.2 Fecha antigua muestra aviso y no oculta el precio disponible.
+- [x] TEST-19.3 Fecha ausente o malformada se trata como dato desconocido, no
   como actualizado.
 
 ### US-20 — Estados vacíos y errores
 
-- [ ] TEST-20.1 Sin resultados permite ampliar radio, cambiar combustible o
+- [x] TEST-20.1 Sin resultados permite ampliar radio, cambiar combustible o
   buscar otra ubicación.
-- [ ] TEST-20.2 Error de red o proveedor muestra mensaje y reintento.
-- [ ] TEST-20.3 Error inesperado no expone stack trace ni deja controles
+- [x] TEST-20.2 Error de red o proveedor muestra mensaje y reintento.
+- [x] TEST-20.3 Error inesperado no expone stack trace ni deja controles
   bloqueados.
 
 ### US-21 — Indicaciones
 
-- [ ] TEST-21.1 Coordenadas válidas generan un enlace de Google Maps correcto.
-- [ ] TEST-21.2 Coordenadas ausentes deshabilitan la acción y explican el motivo.
-- [ ] TEST-21.3 Direcciones con caracteres especiales se codifican sin romper
+- [x] TEST-21.1 Coordenadas válidas generan un enlace de Google Maps correcto.
+- [x] TEST-21.2 Coordenadas ausentes deshabilitan la acción y explican el motivo.
+- [x] TEST-21.3 Direcciones con caracteres especiales se codifican sin romper
   la URL.
 
 ### US-22 — Flujo MVP
 
-- [ ] TEST-22.1 E2E válido: ubicación o búsqueda manual → filtros → ordenar →
+- [x] TEST-22.1 E2E válido: ubicación o búsqueda manual → filtros → ordenar →
   ficha → indicaciones.
-- [ ] TEST-22.2 E2E negativo: permiso denegado, sin resultados y error de API
+- [x] TEST-22.2 E2E negativo: permiso denegado, sin resultados y error de API
   permiten continuar o recuperarse.
-- [ ] TEST-22.3 El flujo funciona en viewport móvil, escritorio, tema claro y
+- [x] TEST-22.3 El flujo funciona en viewport móvil, escritorio, tema claro y
   tema oscuro.
 
 ### US-23 — Datos de viaje

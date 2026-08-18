@@ -5,6 +5,7 @@ import com.example.gasolineras_api.dto.NearbyStationDto;
 import com.example.gasolineras_api.exception.ResourceNotFoundException;
 import com.example.gasolineras_api.repository.CurrentPriceRepository;
 import com.example.gasolineras_api.repository.NearbyStationProjection;
+import com.example.gasolineras_api.repository.PriceRangeProjection;
 import com.example.gasolineras_api.repository.StationRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -17,6 +18,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -36,15 +38,19 @@ class StationServiceTest {
 	@Test
 	@DisplayName("Devuelve estaciones ordenadas por precio con distancia y ahorro")
 	void returnsStationsOrderedByPriceWithDistanceAndSavings() {
-		when(stationRepository.findNearby(eq(40.4168), eq(-3.7038), eq(10000.0), eq("GASOLINA_95")))
+		when(stationRepository.findNearby(eq(40.4168), eq(-3.7038), eq(10000.0),
+				eq("GASOLINA_95"), eq("precio"), eq(200), isNull(), isNull()))
 				.thenReturn(List.of(
 						projection("1", "REPSOL", 1.799, 5.0),
 						projection("2", "CEPSA", 1.650, 8.0),
 						projection("3", "BP", 1.700, 12.0)
 				));
+		when(stationRepository.findMinPriceNearby(eq(40.4168), eq(-3.7038),
+				eq(10000.0), eq("GASOLINA_95")))
+				.thenReturn(new BigDecimal("1.650"));
 
 		List<NearbyStationDto> result = service.findNearby(
-				40.4168, -3.7038, 10.0, FuelType.GASOLINA_95, StationService.OrderBy.PRECIO);
+				40.4168, -3.7038, 10.0, null, FuelType.GASOLINA_95, StationService.OrderBy.PRECIO, 200);
 
 		assertThat(result).hasSize(3);
 		assertThat(result.get(0).id()).isEqualTo("2");
@@ -57,17 +63,43 @@ class StationServiceTest {
 	}
 
 	@Test
+	@DisplayName("Empates de precio se desempatan de forma determinista por distancia")
+	void priceTiesBreakDeterministically() {
+		when(stationRepository.findNearby(eq(40.4168), eq(-3.7038), eq(10000.0),
+				eq("GASOLINA_95"), eq("precio"), eq(200), isNull(), isNull()))
+				.thenReturn(List.of(
+						projection("1", "REPSOL", 1.650, 9.0),
+						projection("2", "CEPSA", 1.650, 3.0),
+						projection("3", "BP", 1.700, 1.0)
+				));
+		when(stationRepository.findMinPriceNearby(eq(40.4168), eq(-3.7038),
+				eq(10000.0), eq("GASOLINA_95")))
+				.thenReturn(new BigDecimal("1.650"));
+
+		List<NearbyStationDto> result = service.findNearby(
+				40.4168, -3.7038, 10.0, null, FuelType.GASOLINA_95,
+				StationService.OrderBy.PRECIO, 200);
+
+		// Mismo precio: el más cercano va primero; el orden es estable.
+		assertThat(result).extracting("id").containsExactly("2", "1", "3");
+	}
+
+	@Test
 	@DisplayName("Ordena por distancia cuando se solicita")
 	void ordersByDistance() {
-		when(stationRepository.findNearby(eq(40.4168), eq(-3.7038), eq(10000.0), eq("DIESEL")))
+		when(stationRepository.findNearby(eq(40.4168), eq(-3.7038), eq(10000.0),
+				eq("DIESEL"), eq("distancia"), eq(200), isNull(), isNull()))
 				.thenReturn(List.of(
 						projection("1", "REPSOL", 1.799, 5.0),
 						projection("2", "CEPSA", 1.650, 8.0),
 						projection("3", "BP", 1.700, 1.0)
 				));
+		when(stationRepository.findMinPriceNearby(eq(40.4168), eq(-3.7038),
+				eq(10000.0), eq("DIESEL")))
+				.thenReturn(new BigDecimal("1.650"));
 
 		List<NearbyStationDto> result = service.findNearby(
-				40.4168, -3.7038, 10.0, FuelType.DIESEL, StationService.OrderBy.DISTANCIA);
+				40.4168, -3.7038, 10.0, null, FuelType.DIESEL, StationService.OrderBy.DISTANCIA, 200);
 
 		assertThat(result).hasSize(3);
 		assertThat(result.get(0).id()).isEqualTo("3");
@@ -77,15 +109,19 @@ class StationServiceTest {
 	@Test
 	@DisplayName("Ordena por ahorro cuando se solicita")
 	void ordersBySavings() {
-		when(stationRepository.findNearby(eq(40.4168), eq(-3.7038), eq(10000.0), eq("GASOLINA_98")))
+		when(stationRepository.findNearby(eq(40.4168), eq(-3.7038), eq(10000.0),
+				eq("GASOLINA_98"), eq("precio"), eq(200), isNull(), isNull()))
 				.thenReturn(List.of(
 						projection("1", "REPSOL", 1.799, 5.0),
 						projection("2", "CEPSA", 1.650, 8.0),
 						projection("3", "BP", 1.700, 1.0)
 				));
+		when(stationRepository.findMinPriceNearby(eq(40.4168), eq(-3.7038),
+				eq(10000.0), eq("GASOLINA_98")))
+				.thenReturn(new BigDecimal("1.650"));
 
 		List<NearbyStationDto> result = service.findNearby(
-				40.4168, -3.7038, 10.0, FuelType.GASOLINA_98, StationService.OrderBy.AHORRO);
+				40.4168, -3.7038, 10.0, null, FuelType.GASOLINA_98, StationService.OrderBy.AHORRO, 200);
 
 		assertThat(result).hasSize(3);
 		assertThat(result.get(0).id()).isEqualTo("2");
@@ -96,14 +132,18 @@ class StationServiceTest {
 	@Test
 	@DisplayName("Una estación sin precio no se recomienda como mejor opción")
 	void stationWithoutPriceHasNullSavings() {
-		when(stationRepository.findNearby(eq(40.4168), eq(-3.7038), eq(10000.0), eq("GASOLINA_95")))
+		when(stationRepository.findNearby(eq(40.4168), eq(-3.7038), eq(10000.0),
+				eq("GASOLINA_95"), eq("precio"), eq(200), isNull(), isNull()))
 				.thenReturn(List.of(
 						projection("1", "REPSOL", 1.799, 5.0),
 						projectionWithoutPrice("2", "CEPSA", 8.0)
 				));
+		when(stationRepository.findMinPriceNearby(eq(40.4168), eq(-3.7038),
+				eq(10000.0), eq("GASOLINA_95")))
+				.thenReturn(new BigDecimal("1.799"));
 
 		List<NearbyStationDto> result = service.findNearby(
-				40.4168, -3.7038, 10.0, FuelType.GASOLINA_95, StationService.OrderBy.PRECIO);
+				40.4168, -3.7038, 10.0, null, FuelType.GASOLINA_95, StationService.OrderBy.PRECIO, 200);
 
 		assertThat(result).hasSize(2);
 		NearbyStationDto noPrice = result.stream()
@@ -117,14 +157,179 @@ class StationServiceTest {
 	@Test
 	@DisplayName("Convierte los metros a kilómetros correctamente")
 	void convertsRadiusToMeters() {
-		when(stationRepository.findNearby(eq(40.4168), eq(-3.7038), eq(5000.0), eq("DIESEL")))
+		when(stationRepository.findNearby(eq(40.4168), eq(-3.7038), eq(5000.0),
+				eq("DIESEL"), eq("precio"), eq(200), isNull(), isNull()))
 				.thenReturn(List.of());
 
-		service.findNearby(40.4168, -3.7038, 5.0, FuelType.DIESEL, StationService.OrderBy.PRECIO);
+		service.findNearby(40.4168, -3.7038, 5.0, null, FuelType.DIESEL, StationService.OrderBy.PRECIO, 200);
 
 		// Verifica que se llamó con 5000 metros
 		org.mockito.Mockito.verify(stationRepository)
-				.findNearby(40.4168, -3.7038, 5000.0, "DIESEL");
+				.findNearby(40.4168, -3.7038, 5000.0, "DIESEL", "precio", 200, null, null);
+	}
+
+	@Test
+	@DisplayName("Pasa el límite y el criterio de orden al repositorio")
+	void forwardsLimitAndOrderModeToRepository() {
+		when(stationRepository.findNearby(eq(40.4168), eq(-3.7038), eq(10000.0),
+				eq("GASOLINA_95"), eq("precio"), eq(2), isNull(), isNull()))
+				.thenReturn(List.of());
+		when(stationRepository.findMinPriceNearby(eq(40.4168), eq(-3.7038),
+				eq(10000.0), eq("GASOLINA_95")))
+				.thenReturn(new BigDecimal("1.650"));
+
+		service.findNearby(40.4168, -3.7038, 10.0, null, FuelType.GASOLINA_95,
+				StationService.OrderBy.PRECIO, 2);
+
+		org.mockito.Mockito.verify(stationRepository)
+				.findNearby(40.4168, -3.7038, 10000.0, "GASOLINA_95", "precio", 2, null, null);
+	}
+
+	@Test
+	@DisplayName("Sin límite pide todas las estaciones del rango al repositorio")
+	void nullLimitRequestsFullRange() {
+		when(stationRepository.findNearby(eq(40.4168), eq(-3.7038), eq(10000.0),
+				eq("GASOLINA_95"), eq("precio"), eq(Integer.MAX_VALUE), isNull(), isNull()))
+				.thenReturn(List.of());
+		when(stationRepository.findMinPriceNearby(eq(40.4168), eq(-3.7038),
+				eq(10000.0), eq("GASOLINA_95")))
+				.thenReturn(new BigDecimal("1.599"));
+
+		service.findNearby(40.4168, -3.7038, 10.0, null, FuelType.GASOLINA_95,
+				StationService.OrderBy.PRECIO, null);
+
+		org.mockito.Mockito.verify(stationRepository)
+				.findNearby(40.4168, -3.7038, 10000.0, "GASOLINA_95", "precio", Integer.MAX_VALUE, null, null);
+	}
+
+	@Test
+	@DisplayName("El ahorro usa el mínimo del rango completo aunque el resultado esté acotado")
+	void savingsUseFullRangeMinEvenWithLimit() {
+		// El repositorio acota en SQL (distancia, límite 1) y devuelve solo la
+		// más cercana (BP); su ahorro se calcula frente al mínimo del rango
+		// completo (CEPSA, que queda fuera del resultado).
+		when(stationRepository.findNearby(eq(40.4168), eq(-3.7038), eq(10000.0),
+				eq("DIESEL"), eq("distancia"), eq(1), isNull(), isNull()))
+				.thenReturn(List.of(projection("3", "BP", 1.700, 1.0)));
+		when(stationRepository.findMinPriceNearby(eq(40.4168), eq(-3.7038),
+				eq(10000.0), eq("DIESEL")))
+				.thenReturn(new BigDecimal("1.650"));
+
+		List<NearbyStationDto> result = service.findNearby(
+				40.4168, -3.7038, 10.0, null, FuelType.DIESEL,
+				StationService.OrderBy.DISTANCIA, 1);
+
+		assertThat(result).hasSize(1);
+		assertThat(result.getFirst().id()).isEqualTo("3");
+		assertThat(result.getFirst().ahorro()).isEqualByComparingTo(new BigDecimal("0.050"));
+	}
+
+	@Test
+	@DisplayName("Sin radio consulta todas las estaciones")
+	void nullRadiusQueriesAllStations() {
+		when(stationRepository.findNearbyAll(eq(40.4168), eq(-3.7038),
+				eq("GASOLINA_95"), eq("precio"), eq(200), isNull(), isNull()))
+				.thenReturn(List.of(
+						projection("1", "REPSOL", 1.799, 350.0),
+						projection("2", "CEPSA", 1.650, 420.0)
+				));
+		when(stationRepository.findMinPriceAll(eq("GASOLINA_95")))
+				.thenReturn(new BigDecimal("1.650"));
+
+		List<NearbyStationDto> result = service.findNearby(
+				40.4168, -3.7038, null, null, FuelType.GASOLINA_95, StationService.OrderBy.PRECIO, 200);
+
+		assertThat(result).hasSize(2);
+		assertThat(result.get(0).id()).isEqualTo("2");
+		org.mockito.Mockito.verify(stationRepository)
+				.findNearbyAll(40.4168, -3.7038, "GASOLINA_95", "precio", 200, null, null);
+	}
+
+	@Test
+	@DisplayName("Sin radio pero con viewport consulta las estaciones del rectángulo")
+	void boundsQueryStationsInViewport() {
+		StationService.Bounds bounds = new StationService.Bounds(36.0, 44.0, -10.0, 3.0);
+		when(stationRepository.findInBounds(eq(36.0), eq(44.0), eq(-10.0), eq(3.0),
+				eq(40.0), eq(-3.5), eq("DIESEL"), eq("precio"), eq(200), eq(0), isNull(), isNull()))
+				.thenReturn(List.of(
+						projection("1", "REPSOL", 1.799, 120.0)
+				));
+		when(stationRepository.findMinPriceInBounds(eq(36.0), eq(44.0), eq(-10.0), eq(3.0),
+				eq("DIESEL")))
+				.thenReturn(new BigDecimal("1.799"));
+
+		List<NearbyStationDto> result = service.findNearby(
+				40.0, -3.5, null, bounds, FuelType.DIESEL, StationService.OrderBy.PRECIO, 200);
+
+		assertThat(result).hasSize(1);
+		assertThat(result.getFirst().id()).isEqualTo("1");
+		org.mockito.Mockito.verify(stationRepository)
+				.findInBounds(36.0, 44.0, -10.0, 3.0, 40.0, -3.5, "DIESEL", "precio", 200, 0, null, null);
+	}
+
+	@Test
+	@DisplayName("El viewport con offset pide la siguiente página al repositorio")
+	void boundsQueryForwardsOffset() {
+		StationService.Bounds bounds = new StationService.Bounds(36.0, 44.0, -10.0, 3.0);
+		when(stationRepository.findInBounds(eq(36.0), eq(44.0), eq(-10.0), eq(3.0),
+				eq(40.0), eq(-3.5), eq("DIESEL"), eq("precio"), eq(200), eq(200), isNull(), isNull()))
+				.thenReturn(List.of(
+						projection("2", "CEPSA", 1.805, 150.0)
+				));
+		when(stationRepository.findMinPriceInBounds(eq(36.0), eq(44.0), eq(-10.0), eq(3.0),
+				eq("DIESEL")))
+				.thenReturn(new BigDecimal("1.799"));
+
+		List<NearbyStationDto> result = service.findNearby(
+				40.0, -3.5, null, bounds, FuelType.DIESEL, StationService.OrderBy.PRECIO,
+				200, 200);
+
+		assertThat(result).hasSize(1);
+		assertThat(result.getFirst().id()).isEqualTo("2");
+	}
+
+	@Test
+	@DisplayName("Un rango de precio se aplica en la consulta del viewport")
+	void priceRangeFilterIsForwardedToRepository() {
+		StationService.Bounds bounds = new StationService.Bounds(36.0, 44.0, -10.0, 3.0);
+		when(stationRepository.findInBounds(eq(36.0), eq(44.0), eq(-10.0), eq(3.0),
+				eq(40.0), eq(-3.5), eq("DIESEL"), eq("precio"), eq(200), eq(0),
+				eq(1.4), eq(1.8)))
+				.thenReturn(List.of(projection("1", "REPSOL", 1.5, 5.0)));
+		when(stationRepository.findMinPriceInBounds(eq(36.0), eq(44.0), eq(-10.0), eq(3.0),
+				eq("DIESEL")))
+				.thenReturn(new BigDecimal("1.4"));
+
+		List<NearbyStationDto> result = service.findNearby(
+				40.0, -3.5, null, bounds, FuelType.DIESEL, StationService.OrderBy.PRECIO,
+				200, 0, 1.4, 1.8);
+
+		assertThat(result).hasSize(1);
+		org.mockito.Mockito.verify(stationRepository)
+				.findInBounds(36.0, 44.0, -10.0, 3.0, 40.0, -3.5, "DIESEL", "precio", 200, 0, 1.4, 1.8);
+	}
+
+	@Test
+	@DisplayName("El rango de precios del slider es el global de toda la base de datos")
+	void priceRangeOverallIsGlobal() {
+		when(stationRepository.findPriceRangeOverall())
+				.thenReturn(new PriceRangeProjection() {
+					@Override
+					public java.math.BigDecimal getMinPrice() {
+						return new java.math.BigDecimal("1.300");
+					}
+
+					@Override
+					public java.math.BigDecimal getMaxPrice() {
+						return new java.math.BigDecimal("2.299");
+					}
+				});
+
+		var result = service.priceRangeOverall();
+
+		assertThat(result.min()).isEqualByComparingTo(new java.math.BigDecimal("1.300"));
+		assertThat(result.max()).isEqualByComparingTo(new java.math.BigDecimal("2.299"));
+		org.mockito.Mockito.verify(stationRepository).findPriceRangeOverall();
 	}
 
 	@Test

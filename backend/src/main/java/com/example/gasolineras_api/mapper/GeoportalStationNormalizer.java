@@ -26,6 +26,21 @@ public class GeoportalStationNormalizer {
 	private static final double LON_MIN = -180.0;
 	private static final double LON_MAX = 180.0;
 
+	// El Geoportal/MITECO solo publica estaciones en territorio español
+	// (península, Canarias, Baleares, Ceuta y Melilla). Un rectángulo generoso
+	// con margen descarta coordenadas corruptas del origen —como (0, 0) en el
+	// golfo de Guinea o latitudes/longitudes intercambiadas que caerían en el
+	// océano Índico— sin rechazar datos legítimos.
+	private static final double SPAIN_LAT_MIN = 27.0;
+	private static final double SPAIN_LAT_MAX = 44.5;
+	private static final double SPAIN_LON_MIN = -18.5;
+	private static final double SPAIN_LON_MAX = 5.0;
+
+	private static boolean isWithinSpain(double lat, double lon) {
+		return lat >= SPAIN_LAT_MIN && lat <= SPAIN_LAT_MAX
+				&& lon >= SPAIN_LON_MIN && lon <= SPAIN_LON_MAX;
+	}
+
 	/**
 	 * Normaliza una lista de estaciones crudas del Geoportal.
 	 *
@@ -69,6 +84,12 @@ public class GeoportalStationNormalizer {
 
 		Double lon = parseCoordinate(raw.longitud(), "longitud", raw.id());
 		if (lon == null) {
+			return java.util.Optional.empty();
+		}
+
+		if (!isWithinSpain(lat, lon)) {
+			log.warn("Estación {}: coordenadas ({}, {}) fuera del área de España, se descarta",
+					raw.id(), lat, lon);
 			return java.util.Optional.empty();
 		}
 

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 
 import { apiUrl } from '../config/runtime';
-import { dispatchUserLocation } from '../lib/geolocation';
+import { dispatchUserLocation, LOCATION_CLEAR_EVENT } from '../lib/geolocation';
 
 interface GeocodeSuggestion {
 	id: string;
@@ -74,7 +74,9 @@ export default function SearchBox() {
 				setStatus('no-results');
 			} else {
 				setSuggestions(data);
-				setActiveIndex(-1);
+				// La primera recomendación queda seleccionada por defecto para
+				// que Enter elija la opción más relevante sin navegar.
+				setActiveIndex(0);
 				setStatus('open');
 			}
 		} catch (error) {
@@ -91,8 +93,20 @@ export default function SearchBox() {
 		}
 	}
 
+	useEffect(() => {
+		function onLocationClear() {
+			setQuery('');
+			setSuggestions([]);
+			setSelectedLabel('');
+			setStatus('idle');
+			setActiveIndex(-1);
+		}
+		window.addEventListener(LOCATION_CLEAR_EVENT, onLocationClear);
+		return () => window.removeEventListener(LOCATION_CLEAR_EVENT, onLocationClear);
+	}, []);
+
 	function select(suggestion: GeocodeSuggestion) {
-		dispatchUserLocation(suggestion.latitud, suggestion.longitud);
+		dispatchUserLocation(suggestion.latitud, suggestion.longitud, 'search');
 		setSelectedLabel(suggestion.label);
 		setSuggestions([]);
 		setActiveIndex(-1);
@@ -113,9 +127,11 @@ export default function SearchBox() {
 				setStatus('open');
 			}
 		} else if (event.key === 'Enter') {
-			if (isOpen && activeIndex >= 0 && suggestions[activeIndex]) {
+			if (isOpen && suggestions.length > 0) {
 				event.preventDefault();
-				select(suggestions[activeIndex]);
+				// Con la primera recomendación seleccionada por defecto, Enter
+				// elige la opción activa (o la primera si se acaba de escribir).
+				select(suggestions[activeIndex >= 0 ? activeIndex : 0]);
 			}
 		} else if (event.key === 'Escape') {
 			setActiveIndex(-1);

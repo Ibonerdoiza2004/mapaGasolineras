@@ -311,7 +311,7 @@ Configúralos en *Settings → Secrets and variables → Actions*:
 | `POSTGRES_PASSWORD` | Contraseña de la base de datos de producción. |
 | `DOMAIN` | `api.tudominio.com` (subdominio de la API). |
 | `PUBLIC_API_URL` *(variable)* | `https://api.tudominio.com`. |
-| `PUBLIC_MAP_LIBRARY` *(variable)* | `leaflet`. |
+| `PUBLIC_MAP_TILE_URL` *(variable)* | URL del proveedor de teselas; por defecto OpenStreetMap (`https://tile.openstreetmap.org/{z}/{x}/{y}.png`). |
 
 ### Preparación del servidor de Oracle
 
@@ -367,7 +367,8 @@ frontend deberán añadirse en `frontend/.env.local` usando el prefijo `PUBLIC_`
 
 ```bash
 PUBLIC_API_URL=https://api.example.com
-PUBLIC_MAP_LIBRARY=leaflet
+# Proveedor de teselas (opcional; por defecto OpenStreetMap)
+PUBLIC_MAP_TILE_URL=https://tile.openstreetmap.org/{z}/{x}/{y}.png
 ```
 
 Las variables de base de datos y del backend pertenecen a la configuración del

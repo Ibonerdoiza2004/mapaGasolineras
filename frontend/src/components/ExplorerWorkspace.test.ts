@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const explorerCss = readFileSync(resolve(process.cwd(), 'src/styles/explorer.css'), 'utf8');
+const leafletMapCss = readFileSync(resolve(process.cwd(), 'src/styles/leaflet-map.css'), 'utf8');
 const workspaceAstro = readFileSync(
 	resolve(process.cwd(), 'src/components/ExplorerWorkspace.astro'),
 	'utf8',
@@ -35,12 +36,17 @@ const firstMediaQuery = explorerCss.indexOf('@media');
 const desktopCss = normalize(explorerCss.slice(0, firstMediaQuery));
 const tabletCss = normalize(mediaBlock(explorerCss, '@media (max-width: 64rem)'));
 const mobileCss = normalize(mediaBlock(explorerCss, '@media (max-width: 48rem)'));
+const leafletCss = normalize(leafletMapCss);
 
 describe('ExplorerWorkspace — vista de escritorio', () => {
-	it('usa una rejilla de dos columnas con el mapa ocupando el resto', () => {
+	it('usa una rejilla de panel, mapa y columna de comparación', () => {
 		expect(desktopCss).toContain(
-			'.explorer { display: grid; flex: 1; grid-template-columns: minmax(20rem, 25rem) minmax(0, 1fr);',
+			'.explorer { display: grid; flex: 1; grid-template-columns: minmax(20rem, 25rem) minmax(0, 1fr) auto;',
 		);
+	});
+
+	it('coloca el panel de comparar en la tercera columna', () => {
+		expect(desktopCss).toContain('grid-column: 3;');
 	});
 
 	it('ocupa el alto restante bajo la cabecera sin dejar hueco inferior', () => {
@@ -95,7 +101,8 @@ describe('ExplorerWorkspace — áreas táctiles y límites', () => {
 		expect(desktopCss).toContain('.explorer input, .explorer select { background: var(--color-surface);');
 		expect(desktopCss).toContain('min-height: 2.75rem;');
 		expect(desktopCss).toContain('.explorer__input-wrap input { background: transparent; border: 0; min-height: 2.75rem;');
-		expect(desktopCss).toContain('.explorer__list-heading select { background-color: var(--color-surface-muted);');
+		expect(desktopCss).toContain('.explorer__segment { background: transparent; border: 0;');
+		expect(desktopCss).toContain('.explorer__chips { display: flex; flex-wrap: wrap;');
 		expect(desktopCss).toContain('.map-controls button { background: var(--color-surface);');
 		expect(desktopCss).toContain('height: 2.75rem;');
 	});
@@ -112,11 +119,40 @@ describe('ExplorerWorkspace — contrato de marcado responsive', () => {
 		expect(workspaceAstro).toContain('<summary>');
 	});
 
-	it('incluye mapa, filtros, resultados y la isla de mapa Leaflet', () => {
+	it('incluye mapa, filtros, resultados y las islas React', () => {
 		expect(workspaceAstro).toContain('class="explorer__map"');
 		expect(workspaceAstro).toContain('explorer__filters');
-		expect(workspaceAstro).toContain('station-card');
 		expect(workspaceAstro).toContain('<LeafletMap');
+		expect(workspaceAstro).toContain('<FuelFilter client:load />');
+		expect(workspaceAstro).toContain('<StationList client:load />');
 		expect(workspaceAstro).toContain('client:load');
+	});
+});
+
+describe('ExplorerWorkspace — feedback de acciones', () => {
+	it('da al popup del mapa una superficie propia y un hover discreto', () => {
+		expect(leafletCss).toContain('.leaflet-popup-content-wrapper { background: var(--color-surface);');
+		expect(leafletCss).toContain('.station-popup { display: grid; gap: var(--space-2);');
+		expect(leafletCss).toContain('.station-popup button:hover { background: var(--color-surface-emphasis);');
+		expect(leafletCss).toContain(
+			'.station-popup .station-popup__primary:hover { background: color-mix(in srgb, var(--color-brand-700) 88%, var(--color-surface));',
+		);
+		expect(leafletCss).toContain('.station-popup button:focus-visible { box-shadow: var(--focus-ring); outline: none; }');
+	});
+
+	it('separa el hover sutil del anillo reservado al foco de teclado en las tarjetas', () => {
+		expect(desktopCss).toContain('.station-card__action:hover { background: var(--color-surface-emphasis);');
+		expect(desktopCss).toContain('.station-card__action:focus-visible { box-shadow: var(--focus-ring);');
+		expect(desktopCss).not.toContain('.station-card__action:hover, .station-card__action:focus-visible');
+	});
+
+	it('usa el mismo hover contenido para los botones primarios del panel y el popup', () => {
+		const hover = 'background: color-mix(in srgb, var(--color-brand-700) 88%, var(--color-surface));';
+		expect(desktopCss).toContain('.station-card__action--primary:hover { ' + hover);
+		expect(desktopCss).toContain('color: var(--color-text-on-brand);');
+		expect(normalize(explorerCss)).toContain('.compare-panel__detail:hover { ' + hover);
+		expect(leafletCss).toContain(
+			'.station-popup .station-popup__primary:hover { ' + hover,
+		);
 	});
 });

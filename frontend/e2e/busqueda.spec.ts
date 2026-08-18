@@ -1,5 +1,21 @@
 import { expect, test, type Page } from '@playwright/test';
 
+// Las teselas de OSM son dependencia de red y se limitan con la suite en
+// paralelo; se simulan para que el zoom se verifique de forma determinista
+// por la URL de la tesela (el nivel lo genera Leaflet, no la respuesta).
+async function stubTiles(page: Page) {
+	await page.route('**/tile.openstreetmap.org/**', (route) =>
+		route.fulfill({
+			status: 200,
+			contentType: 'image/png',
+			body: Buffer.from(
+				'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
+				'base64',
+			),
+		}),
+	);
+}
+
 const SUGGESTIONS = [
 	{
 		id: '230445241',
@@ -25,6 +41,15 @@ function stubGeocode(page: Page, body: unknown) {
 	);
 }
 
+// El listado consulta el área visible del mapa al cargar; se simula el
+// backend para que la página quede limpia.
+test.beforeEach(async ({ page }) => {
+	await stubTiles(page);
+	await page.route('**/api/stations/nearby*', (route) =>
+		route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }),
+	);
+});
+
 test.describe('búsqueda manual — sugerencias y centrado del mapa', () => {
 	test('escribir muestra sugerencias y elegir una centra el mapa (escritorio)', async ({
 		page,
@@ -43,10 +68,12 @@ test.describe('búsqueda manual — sugerencias y centrado del mapa', () => {
 		await expect(page.getByRole('option', { name: /Madrid, Comunidad de Madrid, España/ })).toBeVisible();
 		await expect(page.getByRole('option', { name: /Madrid Centro/ })).toBeVisible();
 
-		await page.keyboard.press('ArrowDown');
+		// La primera recomendación está seleccionada por defecto: Enter la elige.
 		await page.keyboard.press('Enter');
 
-		await expect(page.getByRole('status')).toHaveText('Gasolineras actualizadas a Madrid.');
+		await expect(
+			page.getByRole('status').filter({ hasText: 'Gasolineras actualizadas a Madrid.' }),
+		).toHaveText('Gasolineras actualizadas a Madrid.');
 		await expect(listbox).not.toBeVisible();
 		await expect(page.locator('img.leaflet-tile[src*="/15/"]').first()).toBeVisible();
 	});
@@ -61,6 +88,7 @@ test.describe('búsqueda manual — sugerencias y centrado del mapa', () => {
 		await page.keyboard.press('Tab'); // Explorar
 		await page.keyboard.press('Tab'); // Rutas
 		await page.keyboard.press('Tab'); // selector de tema
+		await page.keyboard.press('Tab'); // usar mi ubicación
 		await page.keyboard.press('Tab'); // búsqueda
 
 		const search = page.getByRole('combobox', { name: 'Ubicación' });
@@ -81,7 +109,9 @@ test.describe('búsqueda manual — sugerencias y centrado del mapa', () => {
 		await expect(page.getByRole('button', { name: 'Acercar mapa' })).toBeVisible();
 
 		await page.getByRole('combobox', { name: 'Ubicación' }).fill('zzz');
-		await expect(page.getByRole('status')).toHaveText('Sin resultados para «zzz»');
+		await expect(
+			page.getByRole('status').filter({ hasText: 'Sin resultados para «zzz»' }),
+		).toHaveText('Sin resultados para «zzz»');
 	});
 
 	test('un fallo del geocodificador ofrece reintentar sin perder el campo', async ({ page }) => {
@@ -126,9 +156,9 @@ test.describe('búsqueda manual — sugerencias y centrado del mapa', () => {
 
 		await page.getByRole('combobox', { name: 'Ubicación' }).fill('ma');
 
-		await expect(page.getByRole('status')).toHaveText(
-			'Escribe al menos 3 caracteres para ver sugerencias.',
-		);
+		await expect(
+			page.getByRole('status').filter({ hasText: 'Escribe al menos 3 caracteres' }),
+		).toHaveText('Escribe al menos 3 caracteres para ver sugerencias.');
 		await page.waitForTimeout(700);
 		expect(requests).toHaveLength(0);
 	});

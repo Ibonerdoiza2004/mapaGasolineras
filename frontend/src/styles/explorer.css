@@ -1,7 +1,7 @@
 .explorer {
 	display: grid;
 	flex: 1;
-	grid-template-columns: minmax(20rem, 25rem) minmax(0, 1fr);
+	grid-template-columns: minmax(20rem, 25rem) minmax(0, 1fr) auto;
 	grid-template-rows: minmax(0, 1fr);
 	min-height: 38rem;
 	overflow: hidden;
@@ -216,10 +216,98 @@
 	outline: none;
 }
 
-.explorer__filter-row {
+.explorer__fuel-group {
 	display: grid;
-	gap: var(--space-3);
+	gap: var(--space-2);
+}
+
+.explorer__fuel-group .explorer__field-label {
+	color: var(--color-text-muted);
+	font-size: var(--font-size-xs);
+	font-weight: 700;
+	margin: 0;
+}
+
+.explorer__segmented {
+	background: var(--color-surface-muted);
+	border: 1px solid var(--color-border);
+	border-radius: var(--radius-pill);
+	display: grid;
+	gap: var(--space-1);
 	grid-template-columns: 1fr 1fr;
+	padding: var(--space-1);
+}
+
+.explorer__segment {
+	background: transparent;
+	border: 0;
+	border-radius: var(--radius-pill);
+	color: var(--color-text-muted);
+	cursor: pointer;
+	font: inherit;
+	font-size: var(--font-size-sm);
+	font-weight: 600;
+	line-height: 1.25;
+	min-height: 2.25rem;
+	padding: var(--space-1) var(--space-2);
+	text-align: center;
+	transition: background-color 150ms ease, color 150ms ease, box-shadow 150ms ease;
+}
+
+.explorer__segment[aria-checked='true'] {
+	background: var(--color-surface);
+	box-shadow: var(--shadow-sm);
+	color: var(--color-text);
+}
+
+.explorer__segment:disabled {
+	cursor: not-allowed;
+	opacity: 0.55;
+}
+
+.explorer__chips {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--space-2);
+}
+
+.explorer__chip {
+	align-items: center;
+	background: var(--color-surface);
+	border: 1px solid var(--color-border-strong);
+	border-radius: var(--radius-pill);
+	color: var(--color-text);
+	cursor: pointer;
+	display: inline-flex;
+	font: inherit;
+	font-size: var(--font-size-sm);
+	font-weight: 600;
+	gap: var(--space-2);
+	min-height: 2.75rem;
+	padding: var(--space-2) var(--space-3);
+}
+
+.explorer__chip[aria-checked='true'] {
+	background: var(--color-brand-700);
+	border-color: var(--color-brand-700);
+	color: var(--color-text-on-brand);
+}
+
+.explorer__chip .station-card__fuel-dot {
+	height: 0.625rem;
+	width: 0.625rem;
+}
+
+.explorer__chip[data-fuel='DIESEL'] .station-card__fuel-dot {
+	background: var(--color-diesel);
+}
+
+.explorer__chip[data-fuel='GASOLINA_95'] .station-card__fuel-dot {
+	background: var(--color-gasoline-95);
+}
+
+.explorer__chip[data-fuel='GASOLINA_98'] .station-card__fuel-dot {
+	background: var(--color-gasoline-98);
 }
 
 .explorer__location-group {
@@ -279,17 +367,35 @@
 }
 
 .explorer__list-heading {
-	align-items: center;
+	align-items: flex-start;
+	display: flex;
+	flex-wrap: wrap;
 	gap: var(--space-3);
+	justify-content: space-between;
 	padding: var(--space-5) 0 var(--space-3);
 }
 
-.explorer__list-heading select {
-	background-color: var(--color-surface-muted);
-	font-size: var(--font-size-xs);
-	min-height: 2.75rem;
-	padding-block: var(--space-1);
-	width: auto;
+.explorer__list-title {
+	align-items: center;
+	display: flex;
+	gap: var(--space-2);
+	min-height: 2rem;
+}
+
+.explorer__list-actions {
+	align-items: flex-start;
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--space-2) var(--space-3);
+	justify-content: flex-end;
+}
+
+.explorer__list-actions .explorer__chips {
+	flex-wrap: nowrap;
+}
+
+.explorer__list-heading .explorer__field-label {
+	margin-bottom: var(--space-1);
 }
 
 .explorer__stations {
@@ -300,17 +406,453 @@
 	padding: 0;
 }
 
+.explorer__stations--refreshing {
+	opacity: 0.6;
+	transition: opacity var(--transition-fast);
+}
+
+/* Esqueleto de carga: tarjetas decorativas con barras en movimiento. */
+.station-card--skeleton {
+	cursor: default;
+	display: grid;
+	gap: var(--space-3);
+}
+
+.skeleton-line {
+	background: var(--color-surface-emphasis);
+	border-radius: var(--radius-sm);
+	height: 0.875rem;
+	overflow: hidden;
+	position: relative;
+}
+
+.skeleton-line::after {
+	animation: skeleton-shimmer 1.2s ease-in-out infinite;
+	background: linear-gradient(
+		90deg,
+		transparent,
+		color-mix(in srgb, var(--color-surface) 60%, transparent),
+		transparent
+	);
+	content: '';
+	inset: 0;
+	position: absolute;
+	transform: translateX(-100%);
+}
+
+.skeleton-line--title {
+	height: 1.25rem;
+	width: 45%;
+}
+
+.skeleton-line--price {
+	height: 1.25rem;
+	width: 30%;
+	justify-self: end;
+}
+
+.skeleton-line--short {
+	width: 70%;
+}
+
+@keyframes skeleton-shimmer {
+	100% {
+		transform: translateX(100%);
+	}
+}
+
+.price-filter {
+	display: grid;
+	gap: var(--space-2);
+}
+
+.price-filter__label {
+	align-items: baseline;
+	display: flex;
+	justify-content: space-between;
+}
+
+.price-filter__title {
+	color: var(--color-text-muted);
+	font-size: var(--font-size-sm);
+}
+
+.price-filter__value {
+	color: var(--color-text);
+	font-size: var(--font-size-sm);
+	font-weight: 700;
+}
+
+.price-filter__track {
+	height: 1.75rem;
+	position: relative;
+}
+
+/* La línea se dibuja con un degradado que pinta en azul el tramo seleccionado
+   (entre --price-start y --price-end) y en gris el resto. Está sangrada medio
+   ancho de asa a cada lado para que, con la asa en el extremo, no quede un
+   trozo de línea sobresaliendo por detrás del círculo. */
+.price-filter__track::before {
+	background: linear-gradient(
+		to right,
+		var(--color-border-strong) 0%,
+		var(--color-border-strong) var(--price-start),
+		var(--color-brand-700) var(--price-start),
+		var(--color-brand-700) var(--price-end),
+		var(--color-border-strong) var(--price-end),
+		var(--color-border-strong) 100%
+	);
+	border-radius: var(--radius-pill);
+	content: '';
+	height: 4px;
+	left: 0.3125rem;
+	position: absolute;
+	right: 0.3125rem;
+	top: 50%;
+	transform: translateY(-50%);
+}
+
+.price-filter__track input[type="range"] {
+	appearance: none;
+	-webkit-appearance: none;
+	background: transparent;
+	border: 0;
+	height: 1.25rem;
+	left: -0.3125rem;
+	margin: 0;
+	padding: 0;
+	pointer-events: none;
+	position: absolute;
+	top: 50%;
+	transform: translateY(-50%);
+	width: calc(100% + 0.625rem);
+}
+
+/* La pista nativa se oculta por completo para que solo se vea la línea del
+   contenedor; el input y la pista comparten la altura de la asa, de modo que
+   la asa queda centrada exactamente sobre la línea. El input se extiende un
+   poco más allá del widget para que el centro de la asa quede junto al borde
+   de la barra sin reducir el tamaño del círculo. */
+.price-filter__track input[type="range"]::-webkit-slider-runnable-track {
+	background: transparent;
+	border: 0;
+	height: 1.25rem;
+}
+
+.price-filter__track input[type="range"]::-moz-range-track {
+	background: transparent;
+	border: 0;
+	height: 1.25rem;
+}
+
+.price-filter__track input[type="range"]:first-child {
+	z-index: 3;
+}
+
+.price-filter__track input[type="range"]::-webkit-slider-thumb {
+	appearance: none;
+	-webkit-appearance: none;
+	background: var(--color-brand-700);
+	border: 2px solid var(--color-surface);
+	border-radius: 50%;
+	box-shadow: var(--shadow-sm);
+	cursor: pointer;
+	height: 1.25rem;
+	margin-top: 0;
+	pointer-events: auto;
+	width: 1.25rem;
+}
+
+.price-filter__track input[type="range"]::-moz-range-thumb {
+	background: var(--color-brand-700);
+	border: 2px solid var(--color-surface);
+	border-radius: 50%;
+	box-shadow: var(--shadow-sm);
+	cursor: pointer;
+	height: 1.25rem;
+	margin-top: 0;
+	pointer-events: auto;
+	width: 1.25rem;
+}
+
+.station-detail__overlay {
+	align-items: center;
+	display: flex;
+	inset: 0;
+	justify-content: center;
+	position: fixed;
+	z-index: 900;
+}
+
+.station-detail__scrim {
+	background: rgb(0 0 0 / 0.45);
+	inset: 0;
+	position: absolute;
+}
+
+.station-detail {
+	background: var(--color-surface);
+	border: 1px solid var(--color-border);
+	border-radius: var(--radius-lg);
+	box-shadow: var(--shadow-lg);
+	display: flex;
+	flex-direction: column;
+	max-height: 82vh;
+	overflow: hidden;
+	position: relative;
+	width: min(26rem, 92vw);
+}
+
+.station-detail:focus {
+	outline: none;
+}
+
+.station-detail__header {
+	align-items: flex-start;
+	border-bottom: 1px solid var(--color-border);
+	display: flex;
+	gap: var(--space-3);
+	justify-content: space-between;
+	padding: var(--space-4);
+}
+
+.station-detail__brand {
+	align-items: center;
+	background: var(--color-brand-700);
+	border-radius: var(--radius-md);
+	color: var(--color-text-on-brand);
+	display: inline-flex;
+	flex: 0 0 auto;
+	font-size: var(--font-size-lg);
+	font-weight: 700;
+	height: 2.75rem;
+	justify-content: center;
+	width: 2.75rem;
+}
+
+.station-detail__heading {
+	min-width: 0;
+}
+
+.station-detail__title {
+	font-size: var(--font-size-lg);
+	line-height: var(--line-height-tight);
+	margin: 0;
+}
+
+.station-detail__subtitle {
+	color: var(--color-text-muted);
+	font-size: var(--font-size-sm);
+	margin: var(--space-1) 0 0;
+}
+
+.station-detail__close {
+	background: transparent;
+	border: 0;
+	border-radius: var(--radius-sm);
+	color: var(--color-text);
+	cursor: pointer;
+	font-size: 1.5rem;
+	line-height: 1;
+	min-height: 2.5rem;
+	min-width: 2.5rem;
+}
+
+.station-detail__close:hover,
+.station-detail__close:focus-visible {
+	background: var(--color-surface-muted);
+}
+
+.station-detail__body {
+	display: grid;
+	flex: 1 1 auto;
+	gap: var(--space-4);
+	min-height: 0;
+	overflow-y: auto;
+	padding: var(--space-4);
+}
+
+.station-detail__footer {
+	border-top: 1px solid var(--color-border);
+	padding: var(--space-4);
+}
+
+.station-detail__prices {
+	display: grid;
+	gap: var(--space-2);
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+
+.station-detail__price {
+	align-items: center;
+	background: var(--color-surface-muted);
+	border-radius: var(--radius-md);
+	display: flex;
+	justify-content: space-between;
+	padding: var(--space-2) var(--space-3);
+}
+
+.station-detail__price--active {
+	background: color-mix(in srgb, var(--color-focus) 8%, var(--color-surface));
+	border: 1px solid var(--color-brand-700);
+}
+
+.station-detail__price--active .station-card__fuel {
+	color: var(--color-text);
+	font-weight: 700;
+}
+
+.station-detail__price strong {
+	color: var(--color-success);
+	font-size: var(--font-size-md);
+}
+
+.station-detail__facts {
+	display: grid;
+	gap: var(--space-2);
+	margin: 0;
+}
+
+.station-detail__fact {
+	display: flex;
+	justify-content: space-between;
+	gap: var(--space-3);
+}
+
+.station-detail__fact dt {
+	color: var(--color-text-muted);
+	font-size: var(--font-size-sm);
+}
+
+.station-detail__fact dd {
+	font-size: var(--font-size-sm);
+	margin: 0;
+	text-align: right;
+}
+
+.station-detail__directions {
+	background: var(--color-brand-700);
+	border-radius: var(--radius-md);
+	color: var(--color-text-on-brand);
+	display: block;
+	font-weight: 600;
+	min-height: 44px;
+	padding: var(--space-2) var(--space-4);
+	text-align: center;
+	text-decoration: none;
+}
+
+.station-detail__directions:hover,
+.station-detail__directions:focus-visible {
+	background: var(--color-brand-500);
+	box-shadow: var(--focus-ring);
+	outline: none;
+}
+
+.station-detail__empty {
+	color: var(--color-text-muted);
+	font-size: var(--font-size-sm);
+	margin: 0;
+}
+
+.station-detail__skeleton {
+	background: var(--color-surface-emphasis);
+	border-radius: var(--radius-sm);
+	height: 1rem;
+}
+
+.station-detail__skeleton--short {
+	width: 60%;
+}
+
 .station-card {
 	background: var(--color-surface);
 	border: 1px solid var(--color-border);
 	border-radius: var(--radius-md);
 	box-shadow: var(--shadow-sm);
+	cursor: pointer;
 	padding: var(--space-4);
+}
+
+.station-card:focus-visible {
+	box-shadow: var(--focus-ring);
+	outline: none;
+}
+
+.station-card--selected {
+	background: color-mix(in srgb, var(--color-focus) 10%, var(--color-surface));
+	border-color: var(--color-focus);
+	box-shadow: 0 0 0 3px var(--color-focus), var(--shadow-md);
+}
+
+/* Estación resaltada en el mapa desde el listado: anillo azul suave que no
+   entra en conflicto con el marcado del comparador. */
+.station-card--focused {
+	border-color: var(--color-brand-700);
+	box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-brand-700) 40%, transparent), var(--shadow-md);
+}
+
+.station-card__actions {
+	border-top: 1px solid var(--color-border);
+	display: grid;
+	gap: var(--space-2);
+	margin-top: var(--space-3);
+	padding-top: var(--space-3);
+}
+
+.station-card__action {
+	background: var(--color-surface-muted);
+	border: 1px solid var(--color-border-strong);
+	border-radius: var(--radius-md);
+	color: var(--color-text);
+	cursor: pointer;
+	font: inherit;
+	font-size: var(--font-size-sm);
+	font-weight: 600;
+	min-height: 44px;
+	padding: var(--space-2) var(--space-3);
+	transition: background-color var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+}
+
+.station-card__action--primary {
+	background: var(--color-brand-700);
+	border-color: var(--color-brand-700);
+	color: var(--color-text-on-brand);
+}
+
+.station-card__action:hover {
+	background: var(--color-surface-emphasis);
+	border-color: var(--color-brand-700);
+	color: var(--color-text);
+	outline: none;
+}
+
+.station-card__action:focus-visible {
+	box-shadow: var(--focus-ring);
+	outline: none;
+}
+
+.station-card__action--primary:hover {
+	background: color-mix(in srgb, var(--color-brand-700) 88%, var(--color-surface));
+	border-color: var(--color-brand-700);
+	color: var(--color-text-on-brand);
+}
+
+.station-card__action--primary:focus-visible {
+	box-shadow: var(--focus-ring);
 }
 
 .station-card--featured {
 	border-color: var(--color-success);
 	box-shadow: inset 3px 0 0 var(--color-success), var(--shadow-sm);
+}
+
+.station-card--featured.station-card--selected {
+	background: color-mix(in srgb, var(--color-focus) 10%, var(--color-surface));
+	border-color: var(--color-focus);
+	box-shadow: inset 3px 0 0 var(--color-success), 0 0 0 3px var(--color-focus), var(--shadow-md);
 }
 
 .station-card__topline {
@@ -363,6 +905,27 @@
 
 .station-card__fuel--gasolina-98 .station-card__fuel-dot {
 	background: var(--color-gasoline-98);
+}
+
+.station-card__stale,
+.station-detail__stale,
+.compare-panel__stale {
+	color: var(--color-warning);
+	font-weight: 600;
+}
+
+.station-card__price-missing {
+	color: var(--color-text-muted);
+	font-size: var(--font-size-sm);
+	font-weight: 600;
+	text-align: right;
+}
+
+.station-card__savings {
+	color: var(--color-success);
+	font-size: var(--font-size-sm);
+	font-weight: 600;
+	margin-bottom: var(--space-1);
 }
 
 .station-card__tag {
@@ -527,6 +1090,24 @@
 	width: 1px;
 }
 
+.compare-panel {
+	border-left: 1px solid var(--color-border);
+	display: flex;
+	flex-direction: column;
+	grid-column: 3;
+	min-width: 0;
+	overflow-y: auto;
+	padding: var(--space-4);
+	width: 21rem;
+}
+
+.compare-panel__list {
+	display: grid;
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+
 @media (max-width: 64rem) {
 	.explorer {
 		grid-template-columns: minmax(18rem, 21rem) minmax(0, 1fr);
@@ -632,6 +1213,11 @@
 		padding-top: var(--space-3);
 	}
 
+	.explorer__chips,
+	.explorer__list-actions .explorer__chips {
+		flex-wrap: wrap;
+	}
+
 	.map-controls {
 		right: var(--space-4);
 		top: var(--space-4);
@@ -640,4 +1226,151 @@
 	.map-attribution {
 		font-size: 0.625rem;
 	}
+}
+
+@media (max-width: 48rem) {
+	.station-detail__overlay {
+		align-items: flex-end;
+	}
+
+	.station-detail {
+		border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+		max-height: 72%;
+		width: 100%;
+	}
+}
+
+@media (min-width: 48rem) {
+	.compare-panel__list {
+		gap: var(--space-4);
+	}
+}
+
+@media (max-width: 48rem) {
+	.compare-panel {
+		background: var(--color-surface);
+		border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+		border-top: 1px solid var(--color-border);
+		bottom: 0;
+		box-shadow: var(--shadow-lg);
+		left: 0;
+		max-height: 55%;
+		overflow-y: auto;
+		padding: var(--space-4);
+		position: fixed;
+		right: 0;
+		z-index: 400;
+	}
+
+	.compare-panel__list {
+		gap: var(--space-3);
+	}
+}
+
+.compare-panel__header {
+	align-items: baseline;
+	display: flex;
+	gap: var(--space-3);
+	justify-content: space-between;
+	padding-bottom: var(--space-3);
+}
+
+.compare-panel__title {
+	font-size: var(--font-size-lg);
+	margin: 0;
+}
+
+.compare-panel__count {
+	color: var(--color-text-muted);
+	font-size: var(--font-size-sm);
+}
+
+.compare-panel__entry {
+	border: 1px solid var(--color-border);
+	border-radius: var(--radius-md);
+	padding: var(--space-3);
+}
+
+.compare-panel__entry-head {
+	align-items: flex-start;
+	display: flex;
+	gap: var(--space-2);
+	justify-content: space-between;
+}
+
+.compare-panel__entry-title {
+	font-size: var(--font-size-md);
+	margin: 0;
+}
+
+.compare-panel__remove {
+	background: transparent;
+	border: 0;
+	border-radius: var(--radius-sm);
+	color: var(--color-text-muted);
+	cursor: pointer;
+	font-size: 1.25rem;
+	line-height: 1;
+	min-height: 2rem;
+	min-width: 2rem;
+}
+
+.compare-panel__remove:hover,
+.compare-panel__remove:focus-visible {
+	background: var(--color-surface-muted);
+	color: var(--color-text);
+}
+
+.compare-panel__entry-address {
+	color: var(--color-text-muted);
+	font-size: var(--font-size-sm);
+	margin: var(--space-1) 0 0;
+}
+
+.compare-panel__entry-data {
+	display: grid;
+	gap: var(--space-1);
+	margin: var(--space-3) 0 0;
+}
+
+.compare-panel__fact {
+	display: flex;
+	justify-content: space-between;
+	gap: var(--space-3);
+}
+
+.compare-panel__fact dt {
+	color: var(--color-text-muted);
+	font-size: var(--font-size-sm);
+}
+
+.compare-panel__fact dd {
+	font-size: var(--font-size-sm);
+	font-weight: 600;
+	margin: 0;
+	text-align: right;
+}
+
+.compare-panel__detail {
+	background: var(--color-brand-700);
+	border: 0;
+	border-radius: var(--radius-md);
+	color: var(--color-text-on-brand);
+	cursor: pointer;
+	font-weight: 600;
+	margin-top: var(--space-3);
+	min-height: 44px;
+	padding: var(--space-2) var(--space-3);
+	transition: background-color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
+	width: 100%;
+}
+
+.compare-panel__detail:hover {
+	background: color-mix(in srgb, var(--color-brand-700) 88%, var(--color-surface));
+	border-color: var(--color-brand-700);
+}
+
+.compare-panel__detail:focus-visible {
+	box-shadow: var(--focus-ring);
+	outline: none;
 }

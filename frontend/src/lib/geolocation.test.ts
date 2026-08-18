@@ -51,16 +51,35 @@ describe('describeLocationError', () => {
 });
 
 describe('dispatchUserLocation', () => {
-	it('emite el evento de ubicación con las coordenadas', () => {
+	it('emite el evento de ubicación con las coordenadas y origen por defecto', () => {
 		const listener = vi.fn();
 		window.addEventListener(LOCATION_EVENT, listener);
 
 		dispatchUserLocation(40.4168, -3.7038);
 
 		expect(listener).toHaveBeenCalledTimes(1);
-		const event = listener.mock.calls[0][0] as CustomEvent<{ lat: number; lon: number }>;
+		const event = listener.mock.calls[0][0] as CustomEvent<{
+			lat: number;
+			lon: number;
+			source: string;
+		}>;
 		expect(event.type).toBe(LOCATION_EVENT);
-		expect(event.detail).toEqual({ lat: 40.4168, lon: -3.7038 });
+		expect(event.detail).toEqual({ lat: 40.4168, lon: -3.7038, source: 'search' });
+		window.removeEventListener(LOCATION_EVENT, listener);
+	});
+
+	it('distingue la ubicación del dispositivo de la búsqueda manual', () => {
+		const listener = vi.fn();
+		window.addEventListener(LOCATION_EVENT, listener);
+
+		dispatchUserLocation(40.4168, -3.7038, 'device');
+		dispatchUserLocation(40.4168, -3.7038, 'search');
+
+		const details = listener.mock.calls.map(
+			([event]) => (event as CustomEvent<{ source: string }>).detail.source,
+		);
+		expect(details).toEqual(['device', 'search']);
+		window.removeEventListener(LOCATION_EVENT, listener);
 	});
 });
 

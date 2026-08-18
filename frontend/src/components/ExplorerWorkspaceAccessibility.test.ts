@@ -8,6 +8,10 @@ const workspaceAstro = readFileSync(
 	'utf8',
 );
 const searchBoxSource = readFileSync(resolve(process.cwd(), 'src/components/SearchBox.tsx'), 'utf8');
+const fuelFilterSource = readFileSync(resolve(process.cwd(), 'src/components/FuelFilter.tsx'), 'utf8');
+const radioFilterSource = readFileSync(resolve(process.cwd(), 'src/components/RadioFilter.tsx'), 'utf8');
+const sortFilterSource = readFileSync(resolve(process.cwd(), 'src/components/SortFilter.tsx'), 'utf8');
+const stationListSource = readFileSync(resolve(process.cwd(), 'src/components/StationList.tsx'), 'utf8');
 const leafletMapSource = readFileSync(resolve(process.cwd(), 'src/components/LeafletMap.tsx'), 'utf8');
 const locationButtonSource = readFileSync(
 	resolve(process.cwd(), 'src/components/LocationButton.tsx'),
@@ -25,7 +29,7 @@ const explorerCssNormalized = normalize(explorerCss);
 
 describe('ExplorerWorkspace — nombres accesibles de controles y filtros', () => {
 	it('etiqueta el campo de búsqueda de ubicación', () => {
-		expect(workspaceAstro).toContain('<span>Ubicación</span>');
+		expect(workspaceAstro).toContain('<label class="visually-hidden" for="explorer-search">Ubicación</label>');
 		expect(workspaceAstro).toContain('<SearchBox client:load />');
 		expect(searchBoxSource).toContain("SEARCH_INPUT_ID = 'explorer-search'");
 		expect(searchBoxSource).toContain('type="search"');
@@ -36,13 +40,55 @@ describe('ExplorerWorkspace — nombres accesibles de controles y filtros', () =
 		expect(searchBoxSource).toContain('aria-controls={LISTBOX_ID}');
 	});
 
-	it('etiqueta los selectores de combustible y radio', () => {
-		expect(workspaceAstro).toContain('<span>Combustible</span>');
-		expect(workspaceAstro).toContain('<span>Radio</span>');
+	it('integra el filtro de combustible como grupo de chips accesible', () => {
+		expect(workspaceAstro).toContain('<FuelFilter client:load />');
+		expect(fuelFilterSource).toContain('role="radiogroup"');
+		expect(fuelFilterSource).toContain('aria-labelledby');
+		expect(fuelFilterSource).toContain('role="radio"');
+		expect(fuelFilterSource).toContain('aria-checked');
+	});
+
+	it('etiqueta el selector de radio', () => {
+		expect(workspaceAstro).toContain('<RadioFilter client:load />');
+		expect(radioFilterSource).toContain('role="radiogroup"');
+		expect(radioFilterSource).toContain('aria-labelledby');
+		expect(radioFilterSource).toContain('role="radio"');
+		expect(radioFilterSource).toContain('aria-checked');
+	});
+
+	it('coloca el botón de ubicación justo encima del cuadro de búsqueda', () => {
+		const locationIndex = workspaceAstro.indexOf('<LocationButton client:load />');
+		const searchIndex = workspaceAstro.indexOf('<SearchBox client:load />');
+		expect(locationIndex).toBeGreaterThan(-1);
+		expect(searchIndex).toBeGreaterThan(locationIndex);
+	});
+
+	it('mantiene el selector de radio junto a la ubicación y el combustible después, dentro del formulario', () => {
+		const formEnd = workspaceAstro.indexOf('</form>');
+		const radioIndex = workspaceAstro.indexOf('<RadioFilter client:load />');
+		const fuelIndex = workspaceAstro.indexOf('<FuelFilter client:load />');
+		expect(radioIndex).toBeGreaterThan(-1);
+		expect(radioIndex).toBeLessThan(formEnd);
+		expect(fuelIndex).toBeGreaterThan(radioIndex);
+		expect(fuelIndex).toBeLessThan(formEnd);
+	});
+
+	it('el combustible vive en el formulario y el orden junto a «Resultados»', () => {
+		const formEnd = workspaceAstro.indexOf('</form>');
+		const fuelIndex = workspaceAstro.indexOf('<FuelFilter client:load />');
+		const sortIndex = workspaceAstro.indexOf('<SortFilter client:load />');
+		expect(fuelIndex).toBeGreaterThan(-1);
+		expect(fuelIndex).toBeLessThan(formEnd);
+		expect(sortIndex).toBeGreaterThan(formEnd);
+		expect(workspaceAstro).toContain('class="explorer__list-actions"');
 	});
 
 	it('da un nombre accesible al selector de ordenación', () => {
-		expect(workspaceAstro).toContain('<span class="visually-hidden">Ordenar resultados</span>');
+		expect(workspaceAstro).toContain('<SortFilter client:load />');
+		expect(sortFilterSource).toContain('role="radiogroup"');
+		expect(sortFilterSource).toContain('aria-labelledby');
+		expect(sortFilterSource).toContain('role="radio"');
+		expect(sortFilterSource).toContain('aria-checked');
 	});
 
 	it('da un nombre visible al botón de usar la ubicación', () => {
@@ -74,8 +120,17 @@ describe('ExplorerWorkspace — paneles y marcadores alternativos', () => {
 	});
 
 	it('ofrece una lista ordenada como alternativa a los marcadores numerados', () => {
-		expect(workspaceAstro).toContain('<ol class="explorer__stations" aria-label="Lista de gasolineras cercanas">');
-		expect(workspaceAstro).toContain('<li class:list={["station-card"');
+		expect(workspaceAstro).toContain('<StationList client:load />');
+		expect(stationListSource).toContain("'explorer__stations'");
+		expect(stationListSource).toContain('aria-label="Lista de gasolineras cercanas"');
+		expect(stationListSource).toContain('station-card');
+	});
+
+	it('permite desplegar las acciones de una tarjeta con teclado y anunciar el estado', () => {
+		expect(stationListSource).toContain('tabIndex={0}');
+		expect(stationListSource).toContain('aria-expanded={isExpanded}');
+		expect(stationListSource).toContain('Añadir al comparador');
+		expect(stationListSource).toContain('Ver ficha');
 	});
 });
 

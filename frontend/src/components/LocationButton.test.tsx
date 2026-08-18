@@ -57,8 +57,12 @@ describe('LocationButton', () => {
 		act(() => success(position(40.4168, -3.7038)));
 
 		expect(listener).toHaveBeenCalledTimes(1);
-		const event = listener.mock.calls[0][0] as CustomEvent<{ lat: number; lon: number }>;
-		expect(event.detail).toEqual({ lat: 40.4168, lon: -3.7038 });
+		const event = listener.mock.calls[0][0] as CustomEvent<{
+			lat: number;
+			lon: number;
+			source: string;
+		}>;
+		expect(event.detail).toEqual({ lat: 40.4168, lon: -3.7038, source: 'device' });
 		expect(screen.getByRole('status')).toHaveTextContent(
 			'Gasolineras actualizadas a tu ubicación.',
 		);

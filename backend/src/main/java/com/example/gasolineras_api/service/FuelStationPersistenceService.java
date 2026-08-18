@@ -1,124 +1,145 @@
 package com.example.gasolineras_api.service;
 
-import com.example.gasolineras_api.domain.CurrentPrice;
 import com.example.gasolineras_api.domain.FuelType;
 import com.example.gasolineras_api.domain.NormalizedStation;
-import com.example.gasolineras_api.domain.PriceSnapshot;
-import com.example.gasolineras_api.domain.Station;
 import com.example.gasolineras_api.mapper.NormalizationResult;
-import com.example.gasolineras_api.repository.CurrentPriceRepository;
-import com.example.gasolineras_api.repository.PriceSnapshotRepository;
-import com.example.gasolineras_api.repository.StationRepository;
-import org.locationtech.jts.geom.Coordinate;
-import org.locationtech.jts.geom.GeometryFactory;
-import org.locationtech.jts.geom.Point;
-import org.locationtech.jts.geom.PrecisionModel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.sql.Timestamp;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
- * Persiste datos normalizados en la base de datos.
- * Reglas de idempotencia:
- * - Estaciones: upsert por official_id.
- * - Precios actuales: upsert por (station, fuel_type).
- * - Snapshots históricos: solo inserta si no existe uno igual para la misma
- *   estación, combustible y fecha de datos.
+ * Persiste datos normalizados en la base de datos mediante upserts masivos
+ * (JDBC por lotes) para que una importación completa del Geoportal (~11.400
+ * estaciones) termine en segundos. Reglas de idempotencia equivalentes al
+ * modelo anterior:
+ * - Estaciones: upsert por official_id; los campos de texto solo se
+ *   sobrescriben si el nuevo valor no es nulo.
+ * - Precios actuales: upsert por (station_id, fuel_type).
+ * - Snapshots históricos: solo se inserta si no existe ya uno con la misma
+ *   estación, combustible y fecha de datos (se precarga el conjunto existente).
+ *
+ * <p>El normalizador ya descarta coordenadas fuera de rango antes de llegar
+ * aquí, por lo que no es necesario repetir esa validación por fila.</p>
  */
 @Service
 public class FuelStationPersistenceService {
 
 	private static final Logger log = LoggerFactory.getLogger(FuelStationPersistenceService.class);
-	private static final GeometryFactory GEOMETRY_FACTORY = new GeometryFactory(new PrecisionModel(), 4326);
+	private static final int BATCH_SIZE = 1000;
 
-	private final StationRepository stationRepository;
-	private final CurrentPriceRepository currentPriceRepository;
-	private final PriceSnapshotRepository priceSnapshotRepository;
+	private static final String UPSERT_STATION = """
+			INSERT INTO stations (official_id, rotulo, direccion, codigo_postal, localidad, municipio,
+				provincia, location, horario, tipo_venta, margen, data_date, updated_at)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ST_SetSRID(ST_MakePoint(?, ?), 4326), ?, ?, ?, ?, ?)
+			ON CONFLICT (official_id) DO UPDATE SET
+				rotulo = COALESCE(EXCLUDED.rotulo, stations.rotulo),
+				direccion = COALESCE(EXCLUDED.direccion, stations.direccion),
+				localidad = COALESCE(EXCLUDED.localidad, stations.localidad),
+				municipio = COALESCE(EXCLUDED.municipio, stations.municipio),
+				provincia = COALESCE(EXCLUDED.provincia, stations.provincia),
+				location = EXCLUDED.location,
+				horario = EXCLUDED.horario,
+				tipo_venta = EXCLUDED.tipo_venta,
+				margen = EXCLUDED.margen,
+				data_date = EXCLUDED.data_date,
+				updated_at = EXCLUDED.updated_at
+			""";
 
-	public FuelStationPersistenceService(StationRepository stationRepository,
-			CurrentPriceRepository currentPriceRepository,
-			PriceSnapshotRepository priceSnapshotRepository) {
-		this.stationRepository = stationRepository;
-		this.currentPriceRepository = currentPriceRepository;
-		this.priceSnapshotRepository = priceSnapshotRepository;
+	private static final String UPSERT_CURRENT_PRICE = """
+			INSERT INTO current_prices (station_id, fuel_type, price, updated_at)
+			VALUES (?, ?, ?, ?)
+			ON CONFLICT (station_id, fuel_type) DO UPDATE SET
+				price = EXCLUDED.price,
+				updated_at = EXCLUDED.updated_at
+			""";
+
+	private static final String INSERT_SNAPSHOT = """
+			INSERT INTO price_snapshots (station_id, fuel_type, price, data_date, recorded_at)
+			VALUES (?, ?, ?, ?, ?)
+			""";
+
+	private final JdbcTemplate jdbcTemplate;
+
+	public FuelStationPersistenceService(JdbcTemplate jdbcTemplate) {
+		this.jdbcTemplate = jdbcTemplate;
 	}
 
 	/**
-	 * Persiste el resultado normalizado de una importación.
+	 * Persiste el resultado normalizado de una importación en una única
+	 * transacción, con inserciones por lotes.
 	 *
 	 * @param normalized resultado de la normalización
 	 * @param importTime timestamp de la importación
 	 */
 	@Transactional
 	public void persist(NormalizationResult normalized, Instant importTime) {
-		for (NormalizedStation ns : normalized.validStations()) {
-			Station station = upsertStation(ns, normalized.fechaActualizacion(), importTime);
+		List<NormalizedStation> valid = normalized.validStations();
+		if (valid.isEmpty()) {
+			return;
+		}
+		String dataDate = normalized.fechaActualizacion();
+		Timestamp timestamp = Timestamp.from(importTime);
 
+		Set<String> existingStationIds = new HashSet<>(
+				jdbcTemplate.queryForList("SELECT official_id FROM stations", String.class));
+		Set<String> existingSnapshotKeys = new HashSet<>(jdbcTemplate.query(
+				"SELECT station_id || '|' || fuel_type || '|' || data_date FROM price_snapshots",
+				(rs, rowNum) -> rs.getString(1)));
+
+		List<Object[]> stationArgs = new ArrayList<>(valid.size());
+		List<Object[]> priceArgs = new ArrayList<>(valid.size() * 3);
+		List<Object[]> snapshotArgs = new ArrayList<>(valid.size() * 3);
+
+		for (NormalizedStation ns : valid) {
+			stationArgs.add(new Object[] {
+					ns.id(), ns.rotulo(), ns.direccion(), ns.codigoPostal(),
+					ns.localidad(), ns.municipio(), ns.provincia(),
+					ns.longitud(), ns.latitud(),
+					ns.horario(), ns.tipoVenta(), ns.margen(),
+					dataDate, timestamp
+			});
 			for (Map.Entry<FuelType, BigDecimal> entry : ns.precios().entrySet()) {
-				upsertCurrentPrice(station, entry.getKey(), entry.getValue(), importTime);
-				insertSnapshotIfAbsent(station, entry.getKey(), entry.getValue(),
-						normalized.fechaActualizacion(), importTime);
+				FuelType fuelType = entry.getKey();
+				BigDecimal price = entry.getValue();
+				priceArgs.add(new Object[] { ns.id(), fuelType.name(), price, timestamp });
+				String snapshotKey = ns.id() + '|' + fuelType.name() + '|' + dataDate;
+				if (existingSnapshotKeys.add(snapshotKey)) {
+					snapshotArgs.add(new Object[] {
+							ns.id(), fuelType.name(), price, dataDate, timestamp
+					});
+				}
 			}
 		}
+
+		batchUpdate(UPSERT_STATION, stationArgs);
+		batchUpdate(UPSERT_CURRENT_PRICE, priceArgs);
+		batchUpdate(INSERT_SNAPSHOT, snapshotArgs);
+
+		int newStations = (int) stationArgs.stream()
+				.filter(args -> !existingStationIds.contains(args[0]))
+				.count();
+		log.info("Persistidas {} estaciones ({} nuevas), {} precios, {} snapshots",
+				valid.size(), newStations, priceArgs.size(), snapshotArgs.size());
 	}
 
-	private Station upsertStation(NormalizedStation ns, String dataDate, Instant importTime) {
-		Station station = stationRepository.findByOfficialId(ns.id())
-				.map(existing -> {
-					updateStationFields(existing, ns, dataDate, importTime);
-					return existing;
-				})
-				.orElseGet(() -> createStation(ns, dataDate, importTime));
-		return stationRepository.save(station);
-	}
-
-	private Station createStation(NormalizedStation ns, String dataDate, Instant importTime) {
-		Point location = GEOMETRY_FACTORY.createPoint(new Coordinate(ns.longitud(), ns.latitud()));
-		return new Station(
-				ns.id(), ns.rotulo(), ns.direccion(), ns.codigoPostal(),
-				ns.localidad(), ns.municipio(), ns.provincia(), location,
-				ns.horario(), ns.tipoVenta(), ns.margen(), dataDate, importTime);
-	}
-
-	private void updateStationFields(Station existing, NormalizedStation ns,
-			String dataDate, Instant importTime) {
-		// Los campos se actualizan solo si el nuevo dato no es nulo
-		if (ns.rotulo() != null) existing.setRotulo(ns.rotulo());
-		if (ns.direccion() != null) existing.setDireccion(ns.direccion());
-		if (ns.localidad() != null) existing.setLocalidad(ns.localidad());
-		if (ns.municipio() != null) existing.setMunicipio(ns.municipio());
-		if (ns.provincia() != null) existing.setProvincia(ns.provincia());
-		Point location = GEOMETRY_FACTORY.createPoint(new Coordinate(ns.longitud(), ns.latitud()));
-		existing.setLocation(location);
-		existing.setHorario(ns.horario());
-		existing.setTipoVenta(ns.tipoVenta());
-		existing.setMargen(ns.margen());
-		existing.setDataDate(dataDate);
-		existing.setUpdatedAt(importTime);
-	}
-
-	private void upsertCurrentPrice(Station station, FuelType fuelType,
-			BigDecimal price, Instant importTime) {
-		CurrentPrice cp = currentPriceRepository
-				.findByStationAndFuelType(station, fuelType)
-				.map(existing -> {
-					existing.setPrice(price);
-					existing.setUpdatedAt(importTime);
-					return existing;
-				})
-				.orElseGet(() -> new CurrentPrice(station, fuelType, price, importTime));
-		currentPriceRepository.save(cp);
-	}
-
-	private void insertSnapshotIfAbsent(Station station, FuelType fuelType,
-			BigDecimal price, String dataDate, Instant importTime) {
-		if (!priceSnapshotRepository.existsByStationAndFuelTypeAndDataDate(station, fuelType, dataDate)) {
-			priceSnapshotRepository.save(new PriceSnapshot(station, fuelType, price, dataDate, importTime));
+	private void batchUpdate(String sql, List<Object[]> args) {
+		if (args.isEmpty()) {
+			return;
+		}
+		for (int i = 0; i < args.size(); i += BATCH_SIZE) {
+			List<Object[]> chunk = args.subList(i, Math.min(i + BATCH_SIZE, args.size()));
+			jdbcTemplate.batchUpdate(sql, chunk);
 		}
 	}
 }

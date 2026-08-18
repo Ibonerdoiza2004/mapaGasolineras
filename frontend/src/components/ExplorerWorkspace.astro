@@ -1,146 +1,74 @@
 ---
 import '../styles/explorer.css';
+import ComparePanel from './ComparePanel';
+import FuelFilter from './FuelFilter';
 import LeafletMap from './LeafletMap';
 import LocationButton from './LocationButton';
+import PriceFilter from './PriceFilter';
+import RadioFilter from './RadioFilter';
 import SearchBox from './SearchBox';
+import SortFilter from './SortFilter';
+import StationDetail from './StationDetail';
+import StationList from './StationList';
 import { SPAIN_BOUNDS } from '../lib/spainBounds';
-
-const stations = [
-	{
-		name: 'Estación Norte',
-		brand: 'Marca independiente',
-		address: 'Av. de la Industria, 24',
-		price: '1,459 €/l',
-		fuel: 'Gasolina 95',
-		distance: '1,2 km',
-		tag: 'Mejor precio',
-	},
-	{
-		name: 'Gasolinera Centro',
-		brand: 'Red nacional',
-		address: 'Calle Mayor, 108',
-		price: '1,479 €/l',
-		fuel: 'Diésel',
-		distance: '2,4 km',
-		tag: '',
-	},
-	{
-		name: 'Área de servicio Este',
-		brand: 'Red nacional',
-		address: 'Carretera M-30, km 12',
-		price: '1,489 €/l',
-		fuel: 'Gasolina 98',
-		distance: '3,8 km',
-		tag: '',
-	},
-];
-
-const mapStations = [
-	{ id: 'norte', lat: 40.426, lon: -3.7038, rotulo: 'Estación Norte', price: 1.459, isBest: true },
-	{ id: 'centro', lat: 40.4168, lon: -3.6938, rotulo: 'Gasolinera Centro', price: 1.479 },
-	{ id: 'este', lat: 40.406, lon: -3.6838, rotulo: 'Área de servicio Este', price: 1.489 },
-];
-
-const fuelClass: Record<string, string> = {
-	Diésel: 'station-card__fuel--diesel',
-	'Gasolina 95': 'station-card__fuel--gasolina-95',
-	'Gasolina 98': 'station-card__fuel--gasolina-98',
-};
 ---
 
 <section class="explorer" aria-label="Explorador de gasolineras">
 	<details class="explorer__sidebar" open>
 		<summary>
 			<span class="explorer__grabber" aria-hidden="true"></span>
-			<span><strong>Gasolineras cercanas</strong><small>12 resultados</small></span>
+			<span><strong>Gasolineras cercanas</strong><small>0 resultados</small></span>
 			<span class="explorer__summary-icon" aria-hidden="true">⌃</span>
 		</summary>
 		<div class="explorer__sidebar-content">
-			<div class="explorer__sidebar-heading">
-				<div>
-					<p class="eyebrow">Explorar</p>
-					<h1>Gasolineras cercanas</h1>
-				</div>
-				<span class="explorer__result-count" aria-label="12 resultados">12</span>
+		<div class="explorer__sidebar-heading">
+			<div>
+				<p class="eyebrow">Explorar</p>
+				<h1>Gasolineras cercanas</h1>
 			</div>
+		</div>
 
 		<form class="explorer__filters" aria-label="Filtros de búsqueda">
-			<label class="explorer__field">
-				<span>Ubicación</span>
-				<SearchBox client:load />
-			</label>
+			<LocationButton client:load />
 
-			<div class="explorer__filter-row">
-				<label class="explorer__field">
-					<span>Combustible</span>
-					<select>
-						<option>Diésel</option>
-						<option>Gasolina 95</option>
-						<option>Gasolina 98</option>
-					</select>
-				</label>
-				<label class="explorer__field">
-					<span>Radio</span>
-					<select>
-						<option>5 km</option>
-						<option>10 km</option>
-						<option>25 km</option>
-					</select>
-				</label>
+			<div class="explorer__field">
+				<label class="visually-hidden" for="explorer-search">Ubicación</label>
+				<SearchBox client:load />
 			</div>
 
-			<LocationButton client:load />
+			<RadioFilter client:load />
+
+			<FuelFilter client:load />
+
+			<PriceFilter client:load />
 		</form>
 
 		<div class="explorer__list-heading">
-			<h2>Resultados</h2>
-			<label>
-				<span class="visually-hidden">Ordenar resultados</span>
-				<select>
-					<option>Mejor opción</option>
-					<option>Menor precio</option>
-					<option>Menor distancia</option>
-				</select>
-			</label>
+			<div class="explorer__list-title">
+				<h2>Resultados</h2>
+				<span class="explorer__result-count" aria-label="0 resultados">0</span>
+			</div>
+			<div class="explorer__list-actions">
+				<SortFilter client:load />
+			</div>
 		</div>
 
-		<ol class="explorer__stations" aria-label="Lista de gasolineras cercanas">
-			{stations.map((station, index) => (
-				<li class:list={["station-card", { "station-card--featured": index === 0 }]}>
-					<div class="station-card__topline">
-						<div>
-							{station.tag && <span class="station-card__tag">{station.tag}</span>}
-							<h3>{station.name}</h3>
-						</div>
-						<div class="station-card__price">
-							<strong>{station.price}</strong>
-							<span class:list={['station-card__fuel', fuelClass[station.fuel]]}>
-								<span class="station-card__fuel-dot" aria-hidden="true"></span>
-								{station.fuel}
-							</span>
-						</div>
-					</div>
-					<p class="station-card__brand">{station.brand}</p>
-					<p class="station-card__address">{station.address}</p>
-					<div class="station-card__meta">
-						<span>{station.distance}</span>
-						<span>Actualizado hoy</span>
-					</div>
-				</li>
-			))}
-		</ol>
+		<StationList client:load />
 		</div>
 	</details>
 
 	<div class="explorer__map">
 		<LeafletMap
 			client:load
-			stations={mapStations}
+			stations={[]}
 			center={[40.4168, -3.7038]}
 			zoom={13}
 			bounds={SPAIN_BOUNDS}
 		/>
+		<StationDetail client:load />
 	</div>
+
+	<ComparePanel client:load />
 </section>
 
 <script>

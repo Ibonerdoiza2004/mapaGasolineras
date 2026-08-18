@@ -10,14 +10,120 @@
 	width: 100%;
 }
 
+.leaflet-popup-content-wrapper {
+	background: var(--color-surface);
+	border: 1px solid var(--color-border);
+	border-radius: var(--radius-md);
+	box-shadow: var(--shadow-lg);
+	color: var(--color-text);
+	padding: 0;
+}
+
+.leaflet-popup-tip {
+	background: var(--color-surface);
+	box-shadow: 1px 1px 0 var(--color-border);
+}
+
+.leaflet-popup-content {
+	line-height: var(--line-height-tight);
+	margin: 0;
+}
+
+.leaflet-popup-close-button {
+	border-radius: var(--radius-sm);
+	color: var(--color-text-muted) !important;
+	font-size: 1.25rem;
+	height: 2rem;
+	line-height: 2rem;
+	right: 0.375rem !important;
+	text-align: center;
+	top: 0.375rem !important;
+	transition: background-color var(--transition-fast), color var(--transition-fast);
+	width: 2rem;
+}
+
+.leaflet-popup-close-button:hover,
+.leaflet-popup-close-button:focus-visible {
+	background: var(--color-surface-emphasis);
+	color: var(--color-text) !important;
+}
+
+.leaflet-popup-close-button:focus-visible {
+	box-shadow: var(--focus-ring);
+	outline: none;
+}
+
+.station-popup {
+	display: grid;
+	gap: var(--space-2);
+	min-width: 200px;
+	padding: var(--space-4);
+}
+
+.station-popup__title {
+	font-size: var(--font-size-sm);
+	font-weight: 700;
+	line-height: var(--line-height-tight);
+	margin: 0 var(--space-8) var(--space-2) 0;
+}
+
+.station-popup button {
+	background: var(--color-surface-muted);
+	border: 1px solid var(--color-border-strong);
+	border-radius: var(--radius-md);
+	color: var(--color-text);
+	cursor: pointer;
+	font: inherit;
+	font-size: var(--font-size-sm);
+	font-weight: 600;
+	min-height: 2.75rem;
+	padding: var(--space-2) var(--space-3);
+	transition: background-color var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+}
+
+.station-popup button:hover {
+	background: var(--color-surface-emphasis);
+	border-color: var(--color-brand-700);
+}
+
+.station-popup button:focus-visible {
+	box-shadow: var(--focus-ring);
+	outline: none;
+}
+
+.station-popup .station-popup__primary {
+	background: var(--color-brand-700);
+	border-color: var(--color-brand-700);
+	color: var(--color-text-on-brand);
+}
+
+.station-popup .station-popup__primary:hover {
+	background: color-mix(in srgb, var(--color-brand-700) 88%, var(--color-surface));
+	border-color: var(--color-brand-700);
+}
+
+.station-popup .station-popup__primary:focus-visible {
+	box-shadow: var(--focus-ring);
+	outline: none;
+}
+
 .leaflet-map__empty {
 	background: var(--color-surface);
-	border-radius: var(--radius-md);
+	border: 1px solid var(--color-border);
+	border-radius: var(--radius-pill);
 	box-shadow: var(--shadow-md);
-	inset: var(--space-4);
-	padding: var(--space-4);
+	color: var(--color-text);
+	left: 50%;
+	max-width: min(calc(100% - var(--space-8)), 28rem);
+	padding: var(--space-2) var(--space-4);
+	pointer-events: none;
 	position: absolute;
 	text-align: center;
+	top: var(--space-4);
+	transform: translateX(-50%);
+	/* Por encima de los paneles de Leaflet (llegan a z-index 1000 en los
+	   controles); sin z-index el aviso quedaba oculto tras el mapa. */
+	z-index: 1000;
 }
 
 .station-marker {
@@ -25,25 +131,137 @@
 	border: 0;
 }
 
+/* Pin con la punta inferior anclada a la coordenada de la estación: el
+   cuerpo redondeado lleva el precio y una cola triangular señala el punto. */
 .station-marker__pin {
 	align-items: center;
 	background: var(--color-brand-700);
 	border: 2px solid var(--color-surface);
-	border-radius: 50% 50% 50% 0;
+	border-radius: var(--radius-pill);
 	box-shadow: var(--shadow-md);
 	color: var(--color-text-on-brand);
 	display: flex;
 	font-size: 0.6875rem;
 	font-weight: 700;
-	height: 100%;
+	height: 30px;
 	justify-content: center;
 	line-height: 1;
-	transform: rotate(-45deg);
-	width: 100%;
+	min-width: 36px;
+	padding: 0 var(--space-2);
+	position: relative;
+}
+
+.station-marker__pin::before,
+.station-marker__pin::after {
+	border-left: 6px solid transparent;
+	border-right: 6px solid transparent;
+	border-top: 8px solid var(--color-surface);
+	content: '';
+	left: 50%;
+	position: absolute;
+	top: 100%;
+	transform: translateX(-50%);
+}
+
+.station-marker__pin::after {
+	border-top: 6px solid var(--color-brand-700);
+	top: calc(100% - 2px);
 }
 
 .station-marker--best .station-marker__pin {
 	background: var(--color-success);
+}
+
+.station-marker--best .station-marker__pin::after {
+	border-top-color: var(--color-success);
+}
+
+.station-marker--selected .station-marker__pin {
+	box-shadow:
+		0 0 0 3px var(--color-surface),
+		0 0 0 7px var(--color-focus),
+		0 4px 18px color-mix(in srgb, var(--color-focus) 55%, transparent);
+	transform: scale(1.18);
+	transform-origin: bottom center;
+}
+
+/* Clúster de estaciones: insignia circular con el número de pines agrupados. */
+.station-cluster {
+	background: transparent;
+	border: 0;
+}
+
+.station-cluster__count {
+	align-items: center;
+	background: var(--color-brand-700);
+	border: 2px solid var(--color-surface);
+	border-radius: 50%;
+	box-shadow: var(--shadow-md);
+	color: var(--color-text-on-brand);
+	display: flex;
+	font-size: 0.75rem;
+	font-weight: 700;
+	height: 34px;
+	justify-content: center;
+	line-height: 1;
+	width: 34px;
+}
+
+/* Marcador del punto de referencia (centro del radio). La ubicación
+   compartida por el dispositivo se distingue del punto buscado. */
+.location-marker {
+	align-items: center;
+	background: transparent;
+	border: 0;
+	display: flex;
+	justify-content: center;
+}
+
+.location-marker__glyph {
+	border: 3px solid var(--color-brand-700);
+	border-radius: 50%;
+	height: 100%;
+	position: relative;
+	width: 100%;
+}
+
+.location-marker__glyph::before,
+.location-marker__glyph::after {
+	background: var(--color-brand-700);
+	content: '';
+	left: 50%;
+	position: absolute;
+	top: 50%;
+	transform: translate(-50%, -50%);
+}
+
+.location-marker__glyph::before {
+	height: 3px;
+	width: 40%;
+}
+
+.location-marker__glyph::after {
+	height: 40%;
+	width: 3px;
+}
+
+.location-marker--device .location-marker__glyph {
+	background: var(--color-brand-700);
+	border: 3px solid var(--color-surface);
+	box-shadow: var(--shadow-md);
+}
+
+.location-marker--device .location-marker__glyph::before,
+.location-marker--device .location-marker__glyph::after {
+	background: var(--color-surface);
+}
+
+/* Circunferencia del radio de búsqueda alrededor del punto de referencia. */
+.radius-circle {
+	fill: color-mix(in srgb, var(--color-brand-700) 12%, transparent);
+	stroke: var(--color-brand-700);
+	stroke-dasharray: 6 4;
+	stroke-width: 2;
 }
 
 .leaflet-map__fallback {

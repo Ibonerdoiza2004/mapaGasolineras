@@ -125,25 +125,43 @@ describe('SearchBox — sugerencias con debounce', () => {
 		});
 		window.addEventListener(LOCATION_EVENT, listener);
 
+		// Desde la primera recomendación, una flecha y Enter eligen la segunda.
 		fireEvent.keyDown(screen.getByRole('combobox'), { key: 'ArrowDown' });
 		fireEvent.keyDown(screen.getByRole('combobox'), { key: 'Enter' });
 
 		expect(listener).toHaveBeenCalledTimes(1);
 		const detail = vi.mocked(listener).mock.calls[0][0] as CustomEvent<UserLocation>;
-		expect(detail.detail).toEqual({ lat: 40.4168, lon: -3.7038 });
-		expect(screen.getByRole('status')).toHaveTextContent('Gasolineras actualizadas a Madrid.');
+		expect(detail.detail).toEqual({ lat: 40.42, lon: -3.705, source: 'search' });
+		expect(screen.getByRole('status')).toHaveTextContent('Gasolineras actualizadas a Madrid Centro.');
 		expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
 		window.removeEventListener(LOCATION_EVENT, listener);
 	});
 
-	it('al pulsar Enter sin opción activa no notifica ninguna ubicación', async () => {
-		const listener = vi.fn();
+	it('al pulsar Enter se selecciona la primera recomendación por defecto', async () => {
+		const listener = vi.fn((event: Event) => {
+			void (event as CustomEvent<UserLocation>).detail;
+		});
 		vi.mocked(fetch).mockResolvedValue(jsonResponse(SUGGESTIONS));
 		window.addEventListener(LOCATION_EVENT, listener);
 
 		render(<SearchBox />);
 		typeInSearchbox('madrid');
 		await flushDebounce();
+
+		fireEvent.keyDown(screen.getByRole('combobox'), { key: 'Enter' });
+
+		expect(listener).toHaveBeenCalledTimes(1);
+		const detail = vi.mocked(listener).mock.calls[0][0] as CustomEvent<UserLocation>;
+		expect(detail.detail).toEqual({ lat: 40.4168, lon: -3.7038, source: 'search' });
+		window.removeEventListener(LOCATION_EVENT, listener);
+	});
+
+	it('al pulsar Enter sin sugerencias abiertas no notifica ninguna ubicación', async () => {
+		const listener = vi.fn();
+		vi.mocked(fetch).mockResolvedValue(jsonResponse(SUGGESTIONS));
+		window.addEventListener(LOCATION_EVENT, listener);
+
+		render(<SearchBox />);
 
 		fireEvent.keyDown(screen.getByRole('combobox'), { key: 'Enter' });
 

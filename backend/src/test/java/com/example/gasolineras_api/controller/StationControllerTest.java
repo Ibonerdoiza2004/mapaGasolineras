@@ -2,6 +2,7 @@ package com.example.gasolineras_api.controller;
 
 import com.example.gasolineras_api.domain.FuelType;
 import com.example.gasolineras_api.dto.NearbyStationDto;
+import com.example.gasolineras_api.dto.PriceRangeDto;
 import com.example.gasolineras_api.exception.GlobalExceptionHandler;
 import com.example.gasolineras_api.service.StationService;
 import org.junit.jupiter.api.BeforeEach;
@@ -16,7 +17,9 @@ import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyDouble;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -41,7 +44,7 @@ class StationControllerTest {
 	@DisplayName("Una petición válida devuelve las estaciones cercanas")
 	void validRequestReturnsNearbyStations() throws Exception {
 		when(stationService.findNearby(anyDouble(), anyDouble(), anyDouble(),
-				eq(FuelType.GASOLINA_95), any()))
+				eq(null), eq(FuelType.GASOLINA_95), any(), isNull(), isNull(), isNull(), isNull()))
 				.thenReturn(List.of(
 						new NearbyStationDto("1", "REPSOL", "DIR", "Madrid", "Madrid",
 								40.4168, -3.7038, 2.5, new BigDecimal("1.599"),
@@ -86,13 +89,345 @@ class StationControllerTest {
 	}
 
 	@Test
-	@DisplayName("Radio superior al máximo devuelve 400")
+	@DisplayName("Radio superior al máximo (50 km) devuelve 400")
 	void radiusOverMaxReturns400() throws Exception {
 		mockMvc.perform(get("/api/stations/nearby")
 						.param("lat", "40.4168")
 						.param("lon", "-3.7038")
-						.param("radio", "100")
+						.param("radio", "51")
 						.param("combustible", "GASOLINA_95"))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.code").value("INVALID_PARAMETER"));
+	}
+
+	@Test
+	@DisplayName("Radio cero devuelve 400")
+	void zeroRadiusReturns400() throws Exception {
+		mockMvc.perform(get("/api/stations/nearby")
+						.param("lat", "40.4168")
+						.param("lon", "-3.7038")
+						.param("radio", "0")
+						.param("combustible", "GASOLINA_95"))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.code").value("INVALID_PARAMETER"));
+	}
+
+	@Test
+	@DisplayName("Radio en el límite máximo (50 km) es válido")
+	void maxRadiusIsValid() throws Exception {
+		when(stationService.findNearby(anyDouble(), anyDouble(), eq(50.0),
+				eq(null), eq(FuelType.GASOLINA_95), any(), isNull(), isNull(), isNull(), isNull()))
+				.thenReturn(List.of());
+
+		mockMvc.perform(get("/api/stations/nearby")
+						.param("lat", "40.4168")
+						.param("lon", "-3.7038")
+						.param("radio", "50")
+						.param("combustible", "GASOLINA_95"))
+				.andExpect(status().isOk());
+	}
+
+	@Test
+	@DisplayName("Sin radio se consulta con el viewport del mapa cuando se envía")
+	void missingRadioUsesViewportBounds() throws Exception {
+		when(stationService.findNearby(eq(40.4168), eq(-3.7038), eq(null),
+				org.mockito.ArgumentMatchers.argThat((StationService.Bounds b) ->
+						b != null && b.minLat() == 36.0 && b.maxLat() == 44.0
+								&& b.minLon() == -10.0 && b.maxLon() == 3.0),
+				eq(FuelType.GASOLINA_95), any(), anyInt(), isNull(), isNull(), isNull()))
+				.thenReturn(List.of(
+						new NearbyStationDto("9", "BALLENOIL", "DIR", "Madrid", "Madrid",
+								40.0, -3.0, 350.0, new BigDecimal("1.599"),
+								new BigDecimal("0.000"), "17/08/2026")
+				));
+
+		mockMvc.perform(get("/api/stations/nearby")
+						.param("lat", "40.4168")
+						.param("lon", "-3.7038")
+						.param("combustible", "GASOLINA_95")
+						.param("minLat", "36")
+						.param("maxLat", "44")
+						.param("minLon", "-10")
+						.param("maxLon", "3"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$[0].id").value("9"));
+	}
+
+	@Test
+	@DisplayName("Límites de viewport incompletos devuelven 400")
+	void partialBoundsReturn400() throws Exception {
+		mockMvc.perform(get("/api/stations/nearby")
+						.param("lat", "40.4168")
+						.param("lon", "-3.7038")
+						.param("combustible", "GASOLINA_95")
+						.param("minLat", "36"))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.code").value("INVALID_PARAMETER"));
+	}
+
+	@Test
+	@DisplayName("Límites de viewport invertidos devuelven 400")
+	void invertedBoundsReturn400() throws Exception {
+		mockMvc.perform(get("/api/stations/nearby")
+						.param("lat", "40.4168")
+						.param("lon", "-3.7038")
+						.param("combustible", "GASOLINA_95")
+						.param("minLat", "44")
+						.param("maxLat", "36")
+						.param("minLon", "-10")
+						.param("maxLon", "3"))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.code").value("INVALID_PARAMETER"));
+	}
+
+	@Test
+	@DisplayName("Sin radio ni viewport se devuelven todas las estaciones")
+	void missingRadioWithoutBoundsReturnsAllStations() throws Exception {
+		when(stationService.findNearby(eq(40.4168), eq(-3.7038), eq(null),
+				eq(null), eq(FuelType.GASOLINA_95), any(), anyInt(), isNull(), isNull(), isNull()))
+				.thenReturn(List.of(
+						new NearbyStationDto("9", "BALLENOIL", "DIR", "Madrid", "Madrid",
+								41.0, -2.0, 350.0, new BigDecimal("1.599"),
+								new BigDecimal("0.000"), "17/08/2026")
+				));
+
+		mockMvc.perform(get("/api/stations/nearby")
+						.param("lat", "40.4168")
+						.param("lon", "-3.7038")
+						.param("combustible", "GASOLINA_95"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$[0].id").value("9"))
+				.andExpect(jsonPath("$[0].distanciaKm").value(350.0));
+	}
+
+	@Test
+	@DisplayName("Con viewport no hace falta latitud ni longitud (se usa el centro del rectángulo)")
+	void viewportWithoutCoordinatesUsesBoundsCenter() throws Exception {
+		// Centro del rectángulo: lat 40, lon -3.5.
+		when(stationService.findNearby(eq(40.0), eq(-3.5), eq(null),
+				org.mockito.ArgumentMatchers.argThat((StationService.Bounds b) ->
+						b != null && b.minLat() == 36.0 && b.maxLat() == 44.0
+								&& b.minLon() == -10.0 && b.maxLon() == 3.0),
+				eq(FuelType.GASOLINA_95), any(), anyInt(), isNull(), isNull(), isNull()))
+				.thenReturn(List.of());
+
+		mockMvc.perform(get("/api/stations/nearby")
+						.param("combustible", "GASOLINA_95")
+						.param("minLat", "36")
+						.param("maxLat", "44")
+						.param("minLon", "-10")
+						.param("maxLon", "3"))
+				.andExpect(status().isOk());
+	}
+
+	@Test
+	@DisplayName("Combinar radio y viewport devuelve 400")
+	void radioWithBoundsReturns400() throws Exception {
+		mockMvc.perform(get("/api/stations/nearby")
+						.param("lat", "40.4168")
+						.param("lon", "-3.7038")
+						.param("radio", "10")
+						.param("combustible", "GASOLINA_95")
+						.param("minLat", "36")
+						.param("maxLat", "44")
+						.param("minLon", "-10")
+						.param("maxLon", "3"))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.code").value("INVALID_PARAMETER"));
+	}
+
+	@Test
+	@DisplayName("Límite cero devuelve 400")
+	void zeroLimitReturns400() throws Exception {
+		mockMvc.perform(get("/api/stations/nearby")
+						.param("lat", "40.4168")
+						.param("lon", "-3.7038")
+						.param("radio", "10")
+						.param("combustible", "GASOLINA_95")
+						.param("limit", "0"))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.code").value("INVALID_PARAMETER"));
+	}
+
+	@Test
+	@DisplayName("Límite negativo devuelve 400")
+	void negativeLimitReturns400() throws Exception {
+		mockMvc.perform(get("/api/stations/nearby")
+						.param("lat", "40.4168")
+						.param("lon", "-3.7038")
+						.param("radio", "10")
+						.param("combustible", "GASOLINA_95")
+						.param("limit", "-3"))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.code").value("INVALID_PARAMETER"));
+	}
+
+	@Test
+	@DisplayName("Límite superior al máximo (500) devuelve 400")
+	void limitOverMaxReturns400() throws Exception {
+		mockMvc.perform(get("/api/stations/nearby")
+						.param("lat", "40.4168")
+						.param("lon", "-3.7038")
+						.param("radio", "10")
+						.param("combustible", "GASOLINA_95")
+						.param("limit", "501"))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.code").value("INVALID_PARAMETER"));
+	}
+
+	@Test
+	@DisplayName("Límite no numérico devuelve 400")
+	void nonNumericLimitReturns400() throws Exception {
+		mockMvc.perform(get("/api/stations/nearby")
+						.param("lat", "40.4168")
+						.param("lon", "-3.7038")
+						.param("radio", "10")
+						.param("combustible", "GASOLINA_95")
+						.param("limit", "muchos"))
+				.andExpect(status().isBadRequest());
+	}
+
+	@Test
+	@DisplayName("Un límite válido llega al servicio y acota el resultado")
+	void validLimitReachesService() throws Exception {
+		when(stationService.findNearby(eq(40.4168), eq(-3.7038), eq(10.0),
+				eq(null), eq(FuelType.GASOLINA_95), any(), eq(2), isNull(), isNull(), isNull()))
+				.thenReturn(List.of());
+
+		mockMvc.perform(get("/api/stations/nearby")
+						.param("lat", "40.4168")
+						.param("lon", "-3.7038")
+						.param("radio", "10")
+						.param("combustible", "GASOLINA_95")
+						.param("limit", "2"))
+				.andExpect(status().isOk());
+
+		org.mockito.Mockito.verify(stationService).findNearby(
+				eq(40.4168), eq(-3.7038), eq(10.0), eq(null),
+				eq(FuelType.GASOLINA_95), any(), eq(2), isNull(), isNull(), isNull());
+	}
+
+	@Test
+	@DisplayName("Con radio y sin límite se piden todas las estaciones del rango")
+	void radioWithoutLimitPassesNullToService() throws Exception {
+		when(stationService.findNearby(eq(40.4168), eq(-3.7038), eq(10.0),
+				isNull(), eq(FuelType.GASOLINA_95), any(), isNull(), isNull(), isNull(), isNull()))
+				.thenReturn(List.of());
+
+		mockMvc.perform(get("/api/stations/nearby")
+						.param("lat", "40.4168")
+						.param("lon", "-3.7038")
+						.param("radio", "10")
+						.param("combustible", "GASOLINA_95"))
+				.andExpect(status().isOk());
+
+		org.mockito.Mockito.verify(stationService).findNearby(
+				eq(40.4168), eq(-3.7038), eq(10.0), isNull(),
+				eq(FuelType.GASOLINA_95), any(), isNull(), isNull(), isNull(), isNull());
+	}
+
+	@Test
+	@DisplayName("Con viewport y sin límite se aplica el límite por defecto de 500")
+	void boundsWithoutLimitAppliesDefaultLimit() throws Exception {
+		when(stationService.findNearby(eq(40.4168), eq(-3.7038), isNull(),
+				any(), eq(FuelType.GASOLINA_95), any(), eq(500), isNull(), isNull(), isNull()))
+				.thenReturn(List.of());
+
+		mockMvc.perform(get("/api/stations/nearby")
+						.param("lat", "40.4168")
+						.param("lon", "-3.7038")
+						.param("minLat", "40.0")
+						.param("maxLat", "41.0")
+						.param("minLon", "-4.0")
+						.param("maxLon", "-3.5")
+						.param("combustible", "GASOLINA_95"))
+				.andExpect(status().isOk());
+
+		org.mockito.Mockito.verify(stationService).findNearby(
+				eq(40.4168), eq(-3.7038), isNull(), any(),
+				eq(FuelType.GASOLINA_95), any(), eq(500), isNull(), isNull(), isNull());
+	}
+
+	@Test
+	@DisplayName("Un offset válido llega al servicio para paginar el viewport")
+	void validOffsetReachesService() throws Exception {
+		when(stationService.findNearby(eq(40.4168), eq(-3.7038), isNull(),
+				any(), eq(FuelType.GASOLINA_95), any(), eq(500), eq(500), isNull(), isNull()))
+				.thenReturn(List.of());
+
+		mockMvc.perform(get("/api/stations/nearby")
+						.param("lat", "40.4168")
+						.param("lon", "-3.7038")
+						.param("combustible", "GASOLINA_95")
+						.param("minLat", "40.0")
+						.param("maxLat", "41.0")
+						.param("minLon", "-4.0")
+						.param("maxLon", "-3.5")
+						.param("offset", "500"))
+				.andExpect(status().isOk());
+
+		org.mockito.Mockito.verify(stationService).findNearby(
+				eq(40.4168), eq(-3.7038), isNull(), any(),
+				eq(FuelType.GASOLINA_95), any(), eq(500), eq(500), isNull(), isNull());
+	}
+
+	@Test
+	@DisplayName("Un rango de precio llega al servicio para filtrar")
+	void priceRangeReachesService() throws Exception {
+		when(stationService.findNearby(eq(40.4168), eq(-3.7038), isNull(),
+				any(), eq(FuelType.GASOLINA_95), any(), eq(500), isNull(), eq(1.4), eq(1.8)))
+				.thenReturn(List.of());
+
+		mockMvc.perform(get("/api/stations/nearby")
+						.param("lat", "40.4168")
+						.param("lon", "-3.7038")
+						.param("combustible", "GASOLINA_95")
+						.param("minLat", "40.0")
+						.param("maxLat", "41.0")
+						.param("minLon", "-4.0")
+						.param("maxLon", "-3.5")
+						.param("minPrecio", "1.4")
+						.param("maxPrecio", "1.8"))
+				.andExpect(status().isOk());
+
+		org.mockito.Mockito.verify(stationService).findNearby(
+				eq(40.4168), eq(-3.7038), isNull(), any(),
+				eq(FuelType.GASOLINA_95), any(), eq(500), isNull(), eq(1.4), eq(1.8));
+	}
+
+	@Test
+	@DisplayName("Un rango de precio invertido devuelve 400")
+	void invertedPriceRangeReturns400() throws Exception {
+		mockMvc.perform(get("/api/stations/nearby")
+						.param("lat", "40.4168")
+						.param("lon", "-3.7038")
+						.param("combustible", "GASOLINA_95")
+						.param("minPrecio", "1.8")
+						.param("maxPrecio", "1.4"))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.code").value("INVALID_PARAMETER"));
+	}
+
+	@Test
+	@DisplayName("El endpoint de rango de precios devuelve el mínimo y máximo globales")
+	void priceRangeEndpointReturnsRange() throws Exception {
+		when(stationService.priceRangeOverall())
+				.thenReturn(new PriceRangeDto(new BigDecimal("1.400"), new BigDecimal("1.900")));
+
+		mockMvc.perform(get("/api/stations/nearby/price-range"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.min").value(1.4))
+				.andExpect(jsonPath("$.max").value(1.9));
+	}
+
+	@Test
+	@DisplayName("Un offset negativo devuelve 400")
+	void negativeOffsetReturns400() throws Exception {
+		mockMvc.perform(get("/api/stations/nearby")
+						.param("lat", "40.4168")
+						.param("lon", "-3.7038")
+						.param("combustible", "GASOLINA_95")
+						.param("offset", "-1"))
 				.andExpect(status().isBadRequest())
 				.andExpect(jsonPath("$.code").value("INVALID_PARAMETER"));
 	}

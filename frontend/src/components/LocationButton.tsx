@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import {
 	describeLocationError,
 	dispatchUserLocation,
 	isValidCoordinates,
+	LOCATION_CLEAR_EVENT,
 	type GeolocationErrorKind,
 } from '../lib/geolocation';
 
@@ -38,6 +39,14 @@ export default function LocationButton() {
 		status === 'unsupported' ||
 		status === 'invalid';
 
+	useEffect(() => {
+		function onLocationClear() {
+			setStatus('idle');
+		}
+		window.addEventListener(LOCATION_CLEAR_EVENT, onLocationClear);
+		return () => window.removeEventListener(LOCATION_CLEAR_EVENT, onLocationClear);
+	}, []);
+
 	function requestLocation() {
 		if (isLocating) return;
 		if (typeof navigator === 'undefined' || !navigator.geolocation) {
@@ -52,7 +61,7 @@ export default function LocationButton() {
 					setStatus('invalid');
 					return;
 				}
-				dispatchUserLocation(latitude, longitude);
+				dispatchUserLocation(latitude, longitude, 'device');
 				setStatus('located');
 			},
 			(error) => {

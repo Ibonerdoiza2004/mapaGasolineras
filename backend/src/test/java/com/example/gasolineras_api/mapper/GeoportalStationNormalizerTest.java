@@ -98,6 +98,40 @@ class GeoportalStationNormalizerTest {
 	}
 
 	@Test
+	@DisplayName("Coordenadas (0, 0) del golfo de Guinea se rechazan (no son de España)")
+	void zeroCoordinatesAreRejected() {
+		var raw = station("1", "REPSOL", "1,599", "1,749", "1,699", "0,0", "0,0");
+
+		NormalizationResult result = normalizer.normalize(List.of(raw), "17/08/2026");
+
+		assertThat(result.validStations()).isEmpty();
+		assertThat(result.rejectedRecords()).hasSize(1);
+	}
+
+	@Test
+	@DisplayName("Coordenadas en el océano Índico (latitud/longitud intercambiadas) se rechazan")
+	void swappedCoordinatesAreRejected() {
+		// Una estación gallega con lat/lon intercambiadas cae junto a Comoras.
+		var raw = station("1", "GUAY", "1,599", "1,749", "1,699", "-8,659", "42,037");
+
+		NormalizationResult result = normalizer.normalize(List.of(raw), "17/08/2026");
+
+		assertThat(result.validStations()).isEmpty();
+		assertThat(result.rejectedRecords()).hasSize(1);
+	}
+
+	@Test
+	@DisplayName("Coordenadas de Canarias se aceptan")
+	void canariasCoordinatesAreAccepted() {
+		var raw = station("1", "REPSOL", "1,599", "1,749", "1,699", "27,8", "-17,5");
+
+		NormalizationResult result = normalizer.normalize(List.of(raw), "17/08/2026");
+
+		assertThat(result.validStations()).hasSize(1);
+		assertThat(result.rejectedRecords()).isEmpty();
+	}
+
+	@Test
 	@DisplayName("Un precio negativo se ignora pero la estación es válida")
 	void negativePriceIsIgnored() {
 		var raw = station("1", "REPSOL", "-1,500", "1,749", "1,699", "40,4168", "-3,7038");
