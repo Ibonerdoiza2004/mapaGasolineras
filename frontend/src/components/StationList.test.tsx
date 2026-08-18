@@ -528,6 +528,41 @@ describe('StationList — listado de estaciones cercanas', () => {
 		);
 	});
 
+	it('al mover el mapa con estado vacío conserva el mensaje sin mostrar el esqueleto', async () => {
+		const fetchMock = vi.fn().mockResolvedValue(jsonResponse([]));
+		vi.stubGlobal('fetch', fetchMock);
+
+		render(<StationList />);
+		emitLocation(40.4168, -3.7038);
+		emitViewport();
+		await waitFor(() =>
+			expect(screen.getByText(/No hay gasolineras con precios de Diésel/)).toBeInTheDocument(),
+		);
+
+		// La siguiente consulta (por el cambio de viewport) queda pendiente:
+		// mientras tanto el panel debe conservar el mensaje de vacío, sin
+		// mostrar el esqueleto de carga que provocaba el parpadeo.
+		let resolveSecond!: (value: Response) => void;
+		fetchMock.mockImplementationOnce(
+			() => new Promise<Response>((resolve) => { resolveSecond = resolve; }),
+		);
+
+		act(() => {
+			window.dispatchEvent(
+				new CustomEvent(VIEWPORT_EVENT, {
+					detail: { bounds: { minLat: 39.0, maxLat: 41.0, minLon: -4.0, maxLon: -3.0 } },
+				}),
+			);
+		});
+
+		expect(document.querySelectorAll('.station-card--skeleton')).toHaveLength(0);
+		expect(screen.getByText(/No hay gasolineras con precios de Diésel/)).toBeInTheDocument();
+
+		await act(async () => {
+			resolveSecond(jsonResponse([]) as Response);
+		});
+	});
+
 	it('el estado vacío menciona el radio cuando está acotado', async () => {
 		const fetchMock = vi.fn().mockResolvedValue(jsonResponse([]));
 		vi.stubGlobal('fetch', fetchMock);
