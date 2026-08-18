@@ -28,9 +28,16 @@ const {
 		<script is:inline>
 			try {
 				const savedTheme = localStorage.getItem('gasolineras-theme');
-				if (savedTheme === 'light' || savedTheme === 'dark') {
-					document.documentElement.dataset.theme = savedTheme;
-				}
+				const theme =
+					savedTheme === 'light' || savedTheme === 'dark'
+						? savedTheme
+						: window.matchMedia('(prefers-color-scheme: dark)').matches
+							? 'dark'
+							: 'light';
+				document.documentElement.dataset.theme = theme;
+				// El selector de tema lee este valor en su inicializador de estado
+				// para que la hidratación coincida con el DOM corregido.
+				window.__gasolinerasTheme = theme;
 			} catch {
 				// El tema del sistema se aplica mediante CSS si el almacenamiento no está disponible.
 			}
@@ -41,5 +48,23 @@ const {
 		<div class="app-shell">
 			<slot />
 		</div>
+		<script is:inline>
+			// Corrige la etiqueta del selector de tema antes de la primera pintura
+			// para evitar el parpadeo de "Oscuro" al cargar o volver a la pestaña.
+			(() => {
+				const theme = window.__gasolinerasTheme;
+				if (theme !== 'light' && theme !== 'dark') return;
+				const button = document.getElementById('theme-toggle');
+				if (!button) return;
+				const dark = theme === 'dark';
+				const label = dark ? 'Activar modo claro' : 'Activar modo oscuro';
+				button.setAttribute('aria-label', label);
+				button.setAttribute('title', label);
+				button.setAttribute('aria-pressed', String(dark));
+				const [icon, text] = button.querySelectorAll('span');
+				if (icon) icon.textContent = dark ? '☀' : '☾';
+				if (text) text.textContent = dark ? 'Claro' : 'Oscuro';
+			})();
+		</script>
 	</body>
 </html>

@@ -2,8 +2,6 @@
 import BaseLayout from '../layouts/BaseLayout.astro';
 import SiteHeader from '../components/SiteHeader.astro';
 import ExplorerWorkspace from '../components/ExplorerWorkspace.astro';
-import HelloApi from '../components/HelloApi';
-import '../styles/api-status.css';
 import { seo } from '../config/seo';
 ---
 
@@ -15,7 +13,4 @@ import { seo } from '../config/seo';
 	<main id="explorar">
 		<ExplorerWorkspace />
 	</main>
-	<aside class="api-status-banner" aria-label="Estado de conexión con el backend">
-		<HelloApi client:load />
-	</aside>
 </BaseLayout>

@@ -61,7 +61,7 @@ jobs:
 
     services:
       postgres:
-        image: postgres:15-bookworm
+        image: postgis/postgis:15-3.5
         env:
           POSTGRES_DB: gasolineras_ci
           POSTGRES_USER: gasolineras_ci
