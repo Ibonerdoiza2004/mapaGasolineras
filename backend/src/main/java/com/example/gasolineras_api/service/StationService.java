@@ -3,10 +3,13 @@ package com.example.gasolineras_api.service;
 import com.example.gasolineras_api.domain.CurrentPrice;
 import com.example.gasolineras_api.domain.FuelType;
 import com.example.gasolineras_api.domain.Station;
+import com.example.gasolineras_api.dto.BrandDto;
 import com.example.gasolineras_api.dto.NearbyStationDto;
 import com.example.gasolineras_api.dto.PriceRangeDto;
 import com.example.gasolineras_api.dto.StationDetailDto;
 import com.example.gasolineras_api.exception.ResourceNotFoundException;
+import com.example.gasolineras_api.mapper.BrandCatalog;
+import com.example.gasolineras_api.repository.BrandCountProjection;
 import com.example.gasolineras_api.repository.CurrentPriceRepository;
 import com.example.gasolineras_api.repository.NearbyStationProjection;
 import com.example.gasolineras_api.repository.PriceRangeProjection;
@@ -108,7 +111,7 @@ public class StationService {
 	 */
 	public List<NearbyStationDto> findNearby(double lat, double lon, Double radioKm,
 			Bounds bounds, FuelType fuelType, OrderBy orderBy, Integer limit) {
-		return findNearby(lat, lon, radioKm, bounds, fuelType, orderBy, limit, null, null, null);
+		return findNearby(lat, lon, radioKm, bounds, fuelType, orderBy, limit, null, null, null, null);
 	}
 
 	/**
@@ -118,47 +121,69 @@ public class StationService {
 	 */
 	public List<NearbyStationDto> findNearby(double lat, double lon, Double radioKm,
 			Bounds bounds, FuelType fuelType, OrderBy orderBy, Integer limit, Integer offset) {
-		return findNearby(lat, lon, radioKm, bounds, fuelType, orderBy, limit, offset, null, null);
+		return findNearby(lat, lon, radioKm, bounds, fuelType, orderBy, limit, offset, null, null, null);
 	}
 
 	/**
 	 * Consulta estaciones cercanas, opcionalmente acotadas por rango de precio
 	 * (minPrecio/maxPrecio en euros por litro, aplicados en SQL antes del
-	 * límite, para que el tope de resultados no recorte antes de filtrar).
+	 * límite, para que el tope de resultados no recorte antes de filtrar) y por
+	 * marcas (códigos del catálogo, incluyendo "otras").
 	 */
 	public List<NearbyStationDto> findNearby(double lat, double lon, Double radioKm,
 			Bounds bounds, FuelType fuelType, OrderBy orderBy, Integer limit, Integer offset,
-			Double minPrecio, Double maxPrecio) {
+			Double minPrecio, Double maxPrecio, List<String> marcas) {
 		int resolvedLimit = limit != null ? limit : Integer.MAX_VALUE;
 		int resolvedOffset = offset != null ? offset : 0;
 		String orderMode = orderBy == OrderBy.DISTANCIA ? "distancia" : "precio";
+		String marcasCsv = marcas == null || marcas.isEmpty() ? null : String.join(",", marcas);
 		List<NearbyStationProjection> projections;
 		BigDecimal bestPrice;
 		if (radioKm != null) {
 			double radiusMeters = radioKm * 1000.0;
 			projections = stationRepository.findNearby(
 					lat, lon, radiusMeters, fuelType.name(), orderMode, resolvedLimit,
-					minPrecio, maxPrecio);
+					minPrecio, maxPrecio, marcasCsv);
 			bestPrice = stationRepository.findMinPriceNearby(
-					lat, lon, radiusMeters, fuelType.name());
+					lat, lon, radiusMeters, fuelType.name(), marcasCsv);
 		} else if (bounds != null) {
 			projections = stationRepository.findInBounds(
 					bounds.minLat(), bounds.maxLat(), bounds.minLon(), bounds.maxLon(),
 					bounds.centerLat(), bounds.centerLon(), fuelType.name(), orderMode,
-					resolvedLimit, resolvedOffset, minPrecio, maxPrecio);
+					resolvedLimit, resolvedOffset, minPrecio, maxPrecio, marcasCsv);
 			bestPrice = stationRepository.findMinPriceInBounds(
 					bounds.minLat(), bounds.maxLat(), bounds.minLon(), bounds.maxLon(),
-					fuelType.name());
+					fuelType.name(), marcasCsv);
 		} else {
 			projections = stationRepository.findNearbyAll(
-					lat, lon, fuelType.name(), orderMode, resolvedLimit, minPrecio, maxPrecio);
-			bestPrice = stationRepository.findMinPriceAll(fuelType.name());
+					lat, lon, fuelType.name(), orderMode, resolvedLimit, minPrecio, maxPrecio, marcasCsv);
+			bestPrice = stationRepository.findMinPriceAll(fuelType.name(), marcasCsv);
 		}
 
 		return projections.stream()
 				.map(p -> toDto(p, bestPrice))
 				.sorted(comparator(orderBy))
 				.toList();
+	}
+
+	/**
+	 * Catálogo de marcas con el número de estaciones que las usan. Incluye las
+	 * marcas conocidas (con su etiqueta) y, al final, la marca de reserva
+	 * "otras" que agrupa los rótulos no reconocidos.
+	 */
+	public List<BrandDto> listBrands() {
+		Map<String, Long> counts = stationRepository.countByBrand().stream()
+				.collect(java.util.stream.Collectors.toMap(
+						BrandCountProjection::getMarca,
+						BrandCountProjection::getCount,
+						Long::sum));
+		List<BrandDto> brands = new java.util.ArrayList<>();
+		for (BrandCatalog.BrandEntry entry : BrandCatalog.catalog()) {
+			brands.add(new BrandDto(entry.code(), entry.label(), counts.getOrDefault(entry.code(), 0L)));
+		}
+		brands.add(new BrandDto(BrandCatalog.OTHER, "Otras marcas",
+				counts.getOrDefault(BrandCatalog.OTHER, 0L)));
+		return brands;
 	}
 
 	/**

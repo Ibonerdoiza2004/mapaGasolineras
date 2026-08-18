@@ -39,11 +39,12 @@ public class FuelStationPersistenceService {
 	private static final int BATCH_SIZE = 1000;
 
 	private static final String UPSERT_STATION = """
-			INSERT INTO stations (official_id, rotulo, direccion, codigo_postal, localidad, municipio,
+			INSERT INTO stations (official_id, rotulo, marca, direccion, codigo_postal, localidad, municipio,
 				provincia, location, horario, tipo_venta, margen, data_date, updated_at)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ST_SetSRID(ST_MakePoint(?, ?), 4326), ?, ?, ?, ?, ?)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ST_SetSRID(ST_MakePoint(?, ?), 4326), ?, ?, ?, ?, ?)
 			ON CONFLICT (official_id) DO UPDATE SET
 				rotulo = COALESCE(EXCLUDED.rotulo, stations.rotulo),
+				marca = COALESCE(EXCLUDED.marca, stations.marca),
 				direccion = COALESCE(EXCLUDED.direccion, stations.direccion),
 				localidad = COALESCE(EXCLUDED.localidad, stations.localidad),
 				municipio = COALESCE(EXCLUDED.municipio, stations.municipio),
@@ -103,7 +104,7 @@ public class FuelStationPersistenceService {
 
 		for (NormalizedStation ns : valid) {
 			stationArgs.add(new Object[] {
-					ns.id(), ns.rotulo(), ns.direccion(), ns.codigoPostal(),
+					ns.id(), ns.rotulo(), ns.marca(), ns.direccion(), ns.codigoPostal(),
 					ns.localidad(), ns.municipio(), ns.provincia(),
 					ns.longitud(), ns.latitud(),
 					ns.horario(), ns.tipoVenta(), ns.margen(),

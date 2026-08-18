@@ -1,11 +1,15 @@
 package com.example.gasolineras_api.controller;
 
 import com.example.gasolineras_api.domain.FuelType;
+import com.example.gasolineras_api.dto.BrandDto;
 import com.example.gasolineras_api.dto.NearbyStationDto;
 import com.example.gasolineras_api.dto.PriceRangeDto;
 import com.example.gasolineras_api.dto.StationDetailDto;
 import com.example.gasolineras_api.exception.InvalidParameterException;
+import com.example.gasolineras_api.mapper.BrandCatalog;
 import com.example.gasolineras_api.service.StationService;
+import org.springframework.http.CacheControl;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -46,7 +50,8 @@ public class StationController {
 			@RequestParam(value = "limit", required = false) Integer limit,
 			@RequestParam(value = "offset", required = false) Integer offset,
 			@RequestParam(value = "minPrecio", required = false) Double minPrecio,
-			@RequestParam(value = "maxPrecio", required = false) Double maxPrecio
+			@RequestParam(value = "maxPrecio", required = false) Double maxPrecio,
+			@RequestParam(value = "marcas", required = false) List<String> marcas
 	) {
 		QueryContext context = resolveQueryContext(lat, lon, radio, minLat, maxLat, minLon, maxLon);
 		// El límite acota el viewport (sin él se devolverían miles de
@@ -63,9 +68,11 @@ public class StationController {
 			throw new InvalidParameterException("offset", "El desplazamiento no puede ser negativo");
 		}
 		validatePriceRange(minPrecio, maxPrecio);
+		List<String> validMarcas = validateMarcas(marcas);
 		StationService.OrderBy orderBy = parseOrder(orden);
 		return stationService.findNearby(context.lat(), context.lon(), context.radioKm(),
-				context.bounds(), combustible, orderBy, effectiveLimit, offset, minPrecio, maxPrecio);
+				context.bounds(), combustible, orderBy, effectiveLimit, offset, minPrecio, maxPrecio,
+				validMarcas);
 	}
 
 	/**
@@ -76,6 +83,16 @@ public class StationController {
 	@GetMapping("/nearby/price-range")
 	public PriceRangeDto priceRange() {
 		return stationService.priceRangeOverall();
+	}
+
+	/** Catálogo de marcas con el número de estaciones que las usan. */
+	@GetMapping("/brands")
+	public ResponseEntity<List<BrandDto>> brands() {
+		// Sin caché: los conteos cambian tras cada importación o re-etiquetado
+		// de estaciones, y el frontend los refresca al abrir el filtro.
+		return ResponseEntity.ok()
+				.cacheControl(CacheControl.noCache())
+				.body(stationService.listBrands());
 	}
 
 	@GetMapping("/{id}")
@@ -108,6 +125,27 @@ public class StationController {
 		}
 		validateRadio(radio);
 		return new QueryContext(lat, lon, radio, bounds);
+	}
+
+	/**
+	 * Valida el filtro por marcas: cada valor debe ser una marca conocida del
+	 * catálogo o la marca de reserva "otras". Devuelve la lista deduplicada.
+	 */
+	private List<String> validateMarcas(List<String> marcas) {
+		if (marcas == null || marcas.isEmpty()) {
+			return List.of();
+		}
+		List<String> valid = marcas.stream()
+				.map(String::trim)
+				.filter(value -> !value.isEmpty())
+				.distinct()
+				.toList();
+		for (String marca : valid) {
+			if (!BrandCatalog.OTHER.equals(marca) && !BrandCatalog.isKnown(marca)) {
+				throw new InvalidParameterException("marcas", "Marca desconocida: " + marca);
+			}
+		}
+		return valid;
 	}
 
 	private void validatePriceRange(Double minPrecio, Double maxPrecio) {

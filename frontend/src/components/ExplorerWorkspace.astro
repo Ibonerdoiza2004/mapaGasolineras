@@ -1,5 +1,6 @@
 ---
 import '../styles/explorer.css';
+import BrandFilter from './BrandFilter';
 import ComparePanel from './ComparePanel';
 import FuelFilter from './FuelFilter';
 import LeafletMap from './LeafletMap';
@@ -37,6 +38,8 @@ import { SPAIN_BOUNDS } from '../lib/spainBounds';
 			</div>
 
 			<RadioFilter client:load />
+
+			<BrandFilter client:load />
 
 			<FuelFilter client:load />
 

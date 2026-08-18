@@ -29,6 +29,9 @@ public class Station {
 	@Column(length = 200)
 	private String rotulo;
 
+	@Column(length = 50)
+	private String marca;
+
 	@Column(length = 500)
 	private String direccion;
 
@@ -65,11 +68,12 @@ public class Station {
 	protected Station() {
 	}
 
-	public Station(String officialId, String rotulo, String direccion, String codigoPostal,
+	public Station(String officialId, String rotulo, String marca, String direccion, String codigoPostal,
 			String localidad, String municipio, String provincia, Point location,
 			String horario, String tipoVenta, String margen, String dataDate, Instant updatedAt) {
 		this.officialId = officialId;
 		this.rotulo = rotulo;
+		this.marca = marca;
 		this.direccion = direccion;
 		this.codigoPostal = codigoPostal;
 		this.localidad = localidad;
@@ -89,6 +93,10 @@ public class Station {
 
 	public String getRotulo() {
 		return rotulo;
+	}
+
+	public String getMarca() {
+		return marca;
 	}
 
 	public String getDireccion() {
@@ -137,6 +145,10 @@ public class Station {
 
 	public void setRotulo(String rotulo) {
 		this.rotulo = rotulo;
+	}
+
+	public void setMarca(String marca) {
+		this.marca = marca;
 	}
 
 	public void setDireccion(String direccion) {

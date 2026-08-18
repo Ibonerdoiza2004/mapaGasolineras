@@ -34,6 +34,9 @@ export const PRICE_RANGE_EVENT = 'gasolineras:precio-rango';
 /** Filtro de precio elegido por el usuario (detail: { min: number; max: number }). */
 export const PRICE_FILTER_EVENT = 'gasolineras:precio';
 
+/** Marcas seleccionadas para filtrar (detail: { marcas: string[] }). */
+export const MARCAS_EVENT = 'gasolineras:marcas';
+
 /** Solicitud del rango completo por parte del slider. */
 export const PRICE_RANGE_REQUEST_EVENT = 'gasolineras:solicitar-rango-precio';
 
@@ -137,6 +140,13 @@ export function dispatchPriceRange(range: PriceRange | null): void {
 export function dispatchPriceFilter(min: number, max: number): void {
 	window.dispatchEvent(
 		new CustomEvent<{ min: number; max: number }>(PRICE_FILTER_EVENT, { detail: { min, max } }),
+	);
+}
+
+/** Notifica el conjunto de marcas seleccionadas; vacío equivale a sin filtro. */
+export function dispatchMarcasChange(marcas: string[]): void {
+	window.dispatchEvent(
+		new CustomEvent<{ marcas: string[] }>(MARCAS_EVENT, { detail: { marcas } }),
 	);
 }
 

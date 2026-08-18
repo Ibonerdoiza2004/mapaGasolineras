@@ -10,6 +10,7 @@ import java.util.Map;
 public record NormalizedStation(
 		String id,
 		String rotulo,
+		String marca,
 		String direccion,
 		String codigoPostal,
 		String localidad,

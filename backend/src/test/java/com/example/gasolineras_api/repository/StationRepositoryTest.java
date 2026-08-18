@@ -39,7 +39,7 @@ class StationRepositoryTest {
 	void stationWithPostGisLocationIsPersisted() {
 		Point location = createPoint(-3.7038, 40.4168);
 		Station station = new Station(
-				"4375", "REPSOL", "AVENIDA CASTILLA LA MANCHA, 26",
+				"4375", "REPSOL", "repsol", "AVENIDA CASTILLA LA MANCHA, 26",
 				"02250", "ABENGIBRE", "Abengibre", "ALBACETE",
 				location, "L-D: 07:00-22:00", "P", "D",
 				"17/08/2026 15:43:34", Instant.now());
@@ -59,7 +59,7 @@ class StationRepositoryTest {
 	void currentPriceIsPersisted() {
 		Point location = createPoint(-3.7038, 40.4168);
 		Station station = new Station(
-				"4376", "CEPSA", "CALLE MAYOR 1",
+				"4376", "CEPSA", "cepsa", "CALLE MAYOR 1",
 				"28001", "Madrid", "Madrid", "Madrid",
 				location, "L-D: 06:00-22:00", "P", "D",
 				"17/08/2026", Instant.now());
@@ -82,7 +82,7 @@ class StationRepositoryTest {
 	void priceSnapshotIsPersisted() {
 		Point location = createPoint(-3.7038, 40.4168);
 		Station station = new Station(
-				"4377", "BP", "CALLE REAL 5",
+				"4377", "BP", "bp", "CALLE REAL 5",
 				"28002", "Madrid", "Madrid", "Madrid",
 				location, "L-D: 00:00-23:59", "P", "I",
 				"17/08/2026", Instant.now());
@@ -106,7 +106,7 @@ class StationRepositoryTest {
 	void stationWithOutOfRangeLatitudeIsRejected() {
 		Point location = createPoint(-3.7038, 95.0);
 		Station station = new Station(
-				"4000", "REPSOL", "DIR", "28001",
+				"4000", "REPSOL", "repsol", "DIR", "28001",
 				"Madrid", "Madrid", "Madrid", location,
 				"L-D: 06:00-22:00", "P", "D", "17/08/2026", Instant.now());
 
@@ -121,7 +121,7 @@ class StationRepositoryTest {
 	void stationWithOutOfRangeLongitudeIsRejected() {
 		Point location = createPoint(200.0, 40.4168);
 		Station station = new Station(
-				"4001", "REPSOL", "DIR", "28001",
+				"4001", "REPSOL", "repsol", "DIR", "28001",
 				"Madrid", "Madrid", "Madrid", location,
 				"L-D: 06:00-22:00", "P", "D", "17/08/2026", Instant.now());
 
@@ -136,7 +136,7 @@ class StationRepositoryTest {
 	void currentPriceWithNullFuelTypeIsRejected() {
 		Point location = createPoint(-3.7038, 40.4168);
 		Station station = new Station(
-				"4002", "CEPSA", "DIR", "28001",
+				"4002", "CEPSA", "cepsa", "DIR", "28001",
 				"Madrid", "Madrid", "Madrid", location,
 				"L-D: 06:00-22:00", "P", "D", "17/08/2026", Instant.now());
 		stationRepository.save(station);

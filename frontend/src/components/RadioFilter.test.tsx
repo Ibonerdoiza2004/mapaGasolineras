@@ -63,27 +63,27 @@ describe('RadioFilter — alcance de la búsqueda (mapa o radio)', () => {
 		).not.toBeInTheDocument();
 	});
 
-	it('al recibir una ubicación se activa el radio con 10 km por defecto', () => {
+	it('al recibir una ubicación activa el radio con el valor por defecto', () => {
 		const listener = vi.fn();
 		window.addEventListener(RADIO_EVENT, listener);
 		render(<RadioFilter />);
 
 		emitLocation();
 
+		// Compartir o buscar proporciona el punto de referencia y activa el
+		// radio automáticamente (10 km por defecto).
+		expect(scopeRadio()).toBeEnabled();
 		expect(scopeRadio()).toHaveAttribute('aria-checked', 'true');
-		const kmChips = screen.getAllByRole('radio', { name: /km/ });
-		expect(kmChips.map((radio) => radio.textContent)).toEqual(['5 km', '10 km', '25 km', '50 km']);
-		expect(screen.getByRole('radio', { name: '10 km' })).toHaveAttribute(
-			'aria-checked',
-			'true',
-		);
+		expect(mapScopeRadio()).toHaveAttribute('aria-checked', 'false');
+		expect(screen.getByRole('radiogroup', { name: 'Radio en kilómetros' })).toBeInTheDocument();
+		expect(screen.getByRole('radio', { name: '10 km' })).toHaveAttribute('aria-checked', 'true');
 		expect(new URL(window.location.href).searchParams.get('radio')).toBe('10');
 		expect(listener).toHaveBeenCalledWith(expect.objectContaining({ detail: { radio: 10 } }));
 		expect(screen.getByRole('status')).toHaveTextContent('Radio de búsqueda activado: 10 km');
 		window.removeEventListener(RADIO_EVENT, listener);
 	});
 
-	it('recibir la ubicación en el modo radio mantiene el radio elegido', () => {
+	it('recibir una ubicación en el modo radio mantiene el radio elegido', () => {
 		window.history.replaceState(null, '', '/explorar?radio=50');
 		const listener = vi.fn();
 		window.addEventListener(RADIO_EVENT, listener);
@@ -95,7 +95,9 @@ describe('RadioFilter — alcance de la búsqueda (mapa o radio)', () => {
 			'aria-checked',
 			'true',
 		);
-		// El radio ya estaba activo: la ubicación no añade otro evento de radio.
+		// El radio ya estaba activo desde la URL: la ubicación no lo cambia,
+		// solo confirma el valor ya seleccionado.
+		expect(listener).toHaveBeenCalledWith(expect.objectContaining({ detail: { radio: 50 } }));
 		expect(listener).not.toHaveBeenCalledWith(expect.objectContaining({ detail: { radio: 10 } }));
 		window.removeEventListener(RADIO_EVENT, listener);
 	});
@@ -105,6 +107,9 @@ describe('RadioFilter — alcance de la búsqueda (mapa o radio)', () => {
 		window.addEventListener(RADIO_EVENT, listener);
 		render(<RadioFilter />);
 		emitLocation();
+		act(() => {
+			scopeRadio().click();
+		});
 
 		act(() => {
 			screen.getByRole('radio', { name: '50 km' }).click();
@@ -190,6 +195,9 @@ describe('RadioFilter — alcance de la búsqueda (mapa o radio)', () => {
 	it('navega los kilómetros con las flechas y Home/End como radiogroup', () => {
 		render(<RadioFilter />);
 		emitLocation();
+		act(() => {
+			scopeRadio().click();
+		});
 		const group = screen.getByRole('radiogroup', { name: 'Radio en kilómetros' });
 
 		act(() => {
@@ -211,6 +219,9 @@ describe('RadioFilter — alcance de la búsqueda (mapa o radio)', () => {
 	it('rechaza seleccionar dos veces el mismo valor sin duplicar eventos', () => {
 		render(<RadioFilter />);
 		emitLocation();
+		act(() => {
+			scopeRadio().click();
+		});
 		const listener = vi.fn();
 		window.addEventListener(RADIO_EVENT, listener);
 

@@ -92,16 +92,14 @@ test.describe('filtro de combustible — buscar, comparar y ver detalle', () => 
 		await page.goto('/');
 		await expect(page.getByRole('button', { name: 'Acercar mapa' })).toBeVisible();
 
-		// Con "Todas" se consulta el área visible: la carga inicial consulta el
-		// viewport, y el re-encuadre al centrar la ubicación consulta dos veces
-		// (el zoom animado emite el viewport intermedio y el final).
+		// Compartir la ubicación activa el radio (10 km por defecto) y consulta
+		// con el radio; el re-encuadre al centrar el mapa consulta dos veces.
 		await page.getByRole('button', { name: 'Usar mi ubicación' }).click();
 		await expect(page.getByRole('listitem')).toHaveCount(3);
 		await expect.poll(() => requests.length).toBe(3);
+		expect(requests[1]).toContain('radio=10');
 		expect(requests[1]).toContain('combustible=DIESEL');
-		expect(requests[1]).toContain('minLat=');
-		expect(requests[1]).toContain('maxLat=');
-		expect(requests[2]).toContain('minLat=');
+		expect(requests[2]).toContain('radio=10');
 
 		await page.getByRole('radio', { name: 'Gasolina 98' }).click();
 
@@ -136,7 +134,7 @@ test.describe('filtro de combustible — buscar, comparar y ver detalle', () => 
 		);
 	});
 
-	test('cambiar el radio con el interruptor: activar, elegir km y desactivar', async ({
+	test('compartir la ubicación activa el radio: elegir km y volver al área visible', async ({
 		page,
 	}) => {
 		const requests: string[] = [];
@@ -155,21 +153,12 @@ test.describe('filtro de combustible — buscar, comparar y ver detalle', () => 
 		expect(requests[0]).toContain('minLat=');
 		expect(requests[0]).toContain('maxLat=');
 
-		// Sin ubicación el interruptor está deshabilitado; la ubicación lo
-		// habilita y el re-encuadre consulta el viewport dos veces.
+		// Sin ubicación el interruptor está deshabilitado.
 		await expect(page.getByRole('radio', { name: 'Radio de búsqueda' })).toBeDisabled();
-		await page.getByRole('button', { name: 'Usar mi ubicación' }).click();
-		await expect(page.getByRole('radio', { name: 'Radio de búsqueda' })).toBeEnabled();
-		await expect.poll(() => requests.length).toBe(3);
-		expect(requests[1]).not.toContain('radio=');
-		expect(requests[1]).toContain('minLat=');
-		expect(requests[2]).not.toContain('radio=');
-		// La ubicación compartida se marca en el mapa sin circunferencia.
-		await expect(page.locator('.location-marker--device')).toBeVisible();
-		await expect(page.locator('.radius-circle')).not.toBeVisible();
 
-		// Activar el interruptor aplica 10 km por defecto y dibuja el círculo.
-		await page.getByRole('radio', { name: 'Radio de búsqueda' }).click();
+		// Compartir la ubicación habilita y activa el radio (10 km por defecto),
+		// que ya marca la circunferencia y consulta con el radio.
+		await page.getByRole('button', { name: 'Usar mi ubicación' }).click();
 		await expect(page.getByRole('radio', { name: 'Radio de búsqueda' })).toHaveAttribute(
 			'aria-checked',
 			'true',
@@ -179,8 +168,9 @@ test.describe('filtro de combustible — buscar, comparar y ver detalle', () => 
 			'true',
 		);
 		await expect(page.getByRole('listitem')).toHaveCount(3);
-		await expect.poll(() => requests.length).toBe(4);
-		expect(requests[3]).toContain('radio=10');
+		await expect.poll(() => requests.length).toBe(3);
+		expect(requests[1]).toContain('radio=10');
+		expect(requests[2]).toContain('radio=10');
 		expect(new URL(page.url()).searchParams.get('radio')).toBe('10');
 		await expect(page.locator('.radius-circle')).toBeVisible();
 
@@ -190,8 +180,8 @@ test.describe('filtro de combustible — buscar, comparar y ver detalle', () => 
 			'aria-checked',
 			'true',
 		);
-		await expect.poll(() => requests.length).toBe(5);
-		expect(requests[4]).toContain('radio=50');
+		await expect.poll(() => requests.length).toBe(4);
+		expect(requests[3]).toContain('radio=50');
 		expect(new URL(page.url()).searchParams.get('radio')).toBe('50');
 		await expect(page.locator('.radius-circle')).toBeVisible();
 
@@ -203,9 +193,9 @@ test.describe('filtro de combustible — buscar, comparar y ver detalle', () => 
 			'true',
 		);
 		await expect(page.getByRole('radio', { name: '10 km' })).toHaveCount(0);
-		await expect.poll(() => requests.length).toBe(6);
-		expect(requests[5]).not.toContain('radio=');
-		expect(requests[5]).toContain('minLat=');
+		await expect.poll(() => requests.length).toBe(5);
+		expect(requests[4]).not.toContain('radio=');
+		expect(requests[4]).toContain('minLat=');
 		expect(new URL(page.url()).searchParams.get('radio')).toBeNull();
 		await expect(page.locator('.radius-circle')).not.toBeVisible();
 	});
@@ -268,7 +258,9 @@ test.describe('filtro de combustible — buscar, comparar y ver detalle', () => 
 		await page.keyboard.press('ArrowDown');
 		await page.keyboard.press('Enter');
 
-		await expect(page.getByRole('status')).toHaveText('Gasolineras actualizadas a Madrid.');
+		await expect(
+			page.getByRole('status').filter({ hasText: 'Gasolineras actualizadas a Madrid.' }),
+		).toHaveText('Gasolineras actualizadas a Madrid.');
 		await expect(page.locator('.location-marker:not(.location-marker--device)')).toBeVisible();
 		await expect(page.locator('.location-marker--device')).not.toBeVisible();
 	});
@@ -357,13 +349,16 @@ test.describe('filtro de combustible — buscar, comparar y ver detalle', () => 
 	test('sin ubicación, recargar con orden por cercanía fuerza el precio', async ({ page }) => {
 		stubNearby(page, NEARBY);
 		await page.goto('/?orden=distancia');
+		// Se espera a la hidratación de la isla para que el filtro lea la URL
+		// y deje la URL consistente antes de comprobar el resultado.
+		await expect(page.getByRole('button', { name: 'Acercar mapa' })).toBeVisible();
 
 		await expect(page.getByRole('radio', { name: 'Más barato' })).toHaveAttribute(
 			'aria-checked',
 			'true',
 		);
 		await expect(page.getByRole('radio', { name: 'Más cercano' })).toBeDisabled();
-		await expect(new URL(page.url()).searchParams.get('orden')).toBe('precio');
+		expect(new URL(page.url()).searchParams.get('orden')).toBe('precio');
 	});
 
 	test('el anillo de foco aparece al navegar los chips con teclado', async ({ page }) => {
@@ -498,7 +493,9 @@ test.describe('filtro de combustible — buscar, comparar y ver detalle', () => 
 		await search.fill('madrid');
 		await expect(page.getByRole('option', { name: /Madrid/ }).first()).toBeVisible();
 		await page.keyboard.press('Enter');
-		await expect(page.getByRole('status')).toHaveText('Gasolineras actualizadas a Madrid.');
+		await expect(
+			page.getByRole('status').filter({ hasText: 'Gasolineras actualizadas a Madrid.' }),
+		).toHaveText('Gasolineras actualizadas a Madrid.');
 
 		// 2) Filtro de combustible.
 		await page.getByRole('radio', { name: 'Gasolina 95' }).click();
@@ -506,7 +503,7 @@ test.describe('filtro de combustible — buscar, comparar y ver detalle', () => 
 
 		// 3) Ordenación.
 		await page.getByRole('radio', { name: 'Más cercano' }).click();
-		await expect(new URL(page.url()).searchParams.get('orden')).toBe('distancia');
+		expect(new URL(page.url()).searchParams.get('orden')).toBe('distancia');
 
 		// 4) Añadir la gasolinera al panel de comparar y abrir su ficha.
 		await page.getByRole('heading', { name: 'REPSOL Norte' }).click();

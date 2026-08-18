@@ -23,6 +23,7 @@ import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -44,7 +45,7 @@ class StationControllerTest {
 	@DisplayName("Una petición válida devuelve las estaciones cercanas")
 	void validRequestReturnsNearbyStations() throws Exception {
 		when(stationService.findNearby(anyDouble(), anyDouble(), anyDouble(),
-				eq(null), eq(FuelType.GASOLINA_95), any(), isNull(), isNull(), isNull(), isNull()))
+				eq(null), eq(FuelType.GASOLINA_95), any(), isNull(), isNull(), isNull(), isNull(), any()))
 				.thenReturn(List.of(
 						new NearbyStationDto("1", "REPSOL", "DIR", "Madrid", "Madrid",
 								40.4168, -3.7038, 2.5, new BigDecimal("1.599"),
@@ -116,7 +117,7 @@ class StationControllerTest {
 	@DisplayName("Radio en el límite máximo (50 km) es válido")
 	void maxRadiusIsValid() throws Exception {
 		when(stationService.findNearby(anyDouble(), anyDouble(), eq(50.0),
-				eq(null), eq(FuelType.GASOLINA_95), any(), isNull(), isNull(), isNull(), isNull()))
+				eq(null), eq(FuelType.GASOLINA_95), any(), isNull(), isNull(), isNull(), isNull(), any()))
 				.thenReturn(List.of());
 
 		mockMvc.perform(get("/api/stations/nearby")
@@ -134,7 +135,7 @@ class StationControllerTest {
 				org.mockito.ArgumentMatchers.argThat((StationService.Bounds b) ->
 						b != null && b.minLat() == 36.0 && b.maxLat() == 44.0
 								&& b.minLon() == -10.0 && b.maxLon() == 3.0),
-				eq(FuelType.GASOLINA_95), any(), anyInt(), isNull(), isNull(), isNull()))
+				eq(FuelType.GASOLINA_95), any(), anyInt(), isNull(), isNull(), isNull(), any()))
 				.thenReturn(List.of(
 						new NearbyStationDto("9", "BALLENOIL", "DIR", "Madrid", "Madrid",
 								40.0, -3.0, 350.0, new BigDecimal("1.599"),
@@ -184,7 +185,7 @@ class StationControllerTest {
 	@DisplayName("Sin radio ni viewport se devuelven todas las estaciones")
 	void missingRadioWithoutBoundsReturnsAllStations() throws Exception {
 		when(stationService.findNearby(eq(40.4168), eq(-3.7038), eq(null),
-				eq(null), eq(FuelType.GASOLINA_95), any(), anyInt(), isNull(), isNull(), isNull()))
+				eq(null), eq(FuelType.GASOLINA_95), any(), anyInt(), isNull(), isNull(), isNull(), any()))
 				.thenReturn(List.of(
 						new NearbyStationDto("9", "BALLENOIL", "DIR", "Madrid", "Madrid",
 								41.0, -2.0, 350.0, new BigDecimal("1.599"),
@@ -208,7 +209,7 @@ class StationControllerTest {
 				org.mockito.ArgumentMatchers.argThat((StationService.Bounds b) ->
 						b != null && b.minLat() == 36.0 && b.maxLat() == 44.0
 								&& b.minLon() == -10.0 && b.maxLon() == 3.0),
-				eq(FuelType.GASOLINA_95), any(), anyInt(), isNull(), isNull(), isNull()))
+				eq(FuelType.GASOLINA_95), any(), anyInt(), isNull(), isNull(), isNull(), any()))
 				.thenReturn(List.of());
 
 		mockMvc.perform(get("/api/stations/nearby")
@@ -291,7 +292,7 @@ class StationControllerTest {
 	@DisplayName("Un límite válido llega al servicio y acota el resultado")
 	void validLimitReachesService() throws Exception {
 		when(stationService.findNearby(eq(40.4168), eq(-3.7038), eq(10.0),
-				eq(null), eq(FuelType.GASOLINA_95), any(), eq(2), isNull(), isNull(), isNull()))
+				eq(null), eq(FuelType.GASOLINA_95), any(), eq(2), isNull(), isNull(), isNull(), any()))
 				.thenReturn(List.of());
 
 		mockMvc.perform(get("/api/stations/nearby")
@@ -304,14 +305,14 @@ class StationControllerTest {
 
 		org.mockito.Mockito.verify(stationService).findNearby(
 				eq(40.4168), eq(-3.7038), eq(10.0), eq(null),
-				eq(FuelType.GASOLINA_95), any(), eq(2), isNull(), isNull(), isNull());
+				eq(FuelType.GASOLINA_95), any(), eq(2), isNull(), isNull(), isNull(), any());
 	}
 
 	@Test
 	@DisplayName("Con radio y sin límite se piden todas las estaciones del rango")
 	void radioWithoutLimitPassesNullToService() throws Exception {
 		when(stationService.findNearby(eq(40.4168), eq(-3.7038), eq(10.0),
-				isNull(), eq(FuelType.GASOLINA_95), any(), isNull(), isNull(), isNull(), isNull()))
+				isNull(), eq(FuelType.GASOLINA_95), any(), isNull(), isNull(), isNull(), isNull(), any()))
 				.thenReturn(List.of());
 
 		mockMvc.perform(get("/api/stations/nearby")
@@ -323,14 +324,14 @@ class StationControllerTest {
 
 		org.mockito.Mockito.verify(stationService).findNearby(
 				eq(40.4168), eq(-3.7038), eq(10.0), isNull(),
-				eq(FuelType.GASOLINA_95), any(), isNull(), isNull(), isNull(), isNull());
+				eq(FuelType.GASOLINA_95), any(), isNull(), isNull(), isNull(), isNull(), any());
 	}
 
 	@Test
 	@DisplayName("Con viewport y sin límite se aplica el límite por defecto de 500")
 	void boundsWithoutLimitAppliesDefaultLimit() throws Exception {
 		when(stationService.findNearby(eq(40.4168), eq(-3.7038), isNull(),
-				any(), eq(FuelType.GASOLINA_95), any(), eq(500), isNull(), isNull(), isNull()))
+				any(), eq(FuelType.GASOLINA_95), any(), eq(500), isNull(), isNull(), isNull(), any()))
 				.thenReturn(List.of());
 
 		mockMvc.perform(get("/api/stations/nearby")
@@ -345,14 +346,14 @@ class StationControllerTest {
 
 		org.mockito.Mockito.verify(stationService).findNearby(
 				eq(40.4168), eq(-3.7038), isNull(), any(),
-				eq(FuelType.GASOLINA_95), any(), eq(500), isNull(), isNull(), isNull());
+				eq(FuelType.GASOLINA_95), any(), eq(500), isNull(), isNull(), isNull(), any());
 	}
 
 	@Test
 	@DisplayName("Un offset válido llega al servicio para paginar el viewport")
 	void validOffsetReachesService() throws Exception {
 		when(stationService.findNearby(eq(40.4168), eq(-3.7038), isNull(),
-				any(), eq(FuelType.GASOLINA_95), any(), eq(500), eq(500), isNull(), isNull()))
+				any(), eq(FuelType.GASOLINA_95), any(), eq(500), eq(500), isNull(), isNull(), any()))
 				.thenReturn(List.of());
 
 		mockMvc.perform(get("/api/stations/nearby")
@@ -368,14 +369,14 @@ class StationControllerTest {
 
 		org.mockito.Mockito.verify(stationService).findNearby(
 				eq(40.4168), eq(-3.7038), isNull(), any(),
-				eq(FuelType.GASOLINA_95), any(), eq(500), eq(500), isNull(), isNull());
+				eq(FuelType.GASOLINA_95), any(), eq(500), eq(500), isNull(), isNull(), any());
 	}
 
 	@Test
 	@DisplayName("Un rango de precio llega al servicio para filtrar")
 	void priceRangeReachesService() throws Exception {
 		when(stationService.findNearby(eq(40.4168), eq(-3.7038), isNull(),
-				any(), eq(FuelType.GASOLINA_95), any(), eq(500), isNull(), eq(1.4), eq(1.8)))
+				any(), eq(FuelType.GASOLINA_95), any(), eq(500), isNull(), eq(1.4), eq(1.8), any()))
 				.thenReturn(List.of());
 
 		mockMvc.perform(get("/api/stations/nearby")
@@ -392,7 +393,7 @@ class StationControllerTest {
 
 		org.mockito.Mockito.verify(stationService).findNearby(
 				eq(40.4168), eq(-3.7038), isNull(), any(),
-				eq(FuelType.GASOLINA_95), any(), eq(500), isNull(), eq(1.4), eq(1.8));
+				eq(FuelType.GASOLINA_95), any(), eq(500), isNull(), eq(1.4), eq(1.8), any());
 	}
 
 	@Test
@@ -406,6 +407,57 @@ class StationControllerTest {
 						.param("maxPrecio", "1.4"))
 				.andExpect(status().isBadRequest())
 				.andExpect(jsonPath("$.code").value("INVALID_PARAMETER"));
+	}
+
+	@Test
+	@DisplayName("Una marca desconocida devuelve 400")
+	void unknownBrandReturns400() throws Exception {
+		mockMvc.perform(get("/api/stations/nearby")
+						.param("lat", "40.4168")
+						.param("lon", "-3.7038")
+						.param("radio", "10")
+						.param("combustible", "GASOLINA_95")
+						.param("marcas", "mitica"))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.code").value("INVALID_PARAMETER"));
+	}
+
+	@Test
+	@DisplayName("Un filtro de marcas válido llega al servicio")
+	void validBrandsReachService() throws Exception {
+		when(stationService.findNearby(eq(40.4168), eq(-3.7038), eq(10.0),
+				eq(null), eq(FuelType.GASOLINA_95), any(), isNull(), isNull(), isNull(), isNull(),
+				eq(List.of("repsol", "otras"))))
+				.thenReturn(List.of());
+
+		mockMvc.perform(get("/api/stations/nearby")
+						.param("lat", "40.4168")
+						.param("lon", "-3.7038")
+						.param("radio", "10")
+						.param("combustible", "GASOLINA_95")
+						.param("marcas", "repsol, otras"))
+				.andExpect(status().isOk());
+
+		org.mockito.Mockito.verify(stationService).findNearby(
+				eq(40.4168), eq(-3.7038), eq(10.0), eq(null),
+				eq(FuelType.GASOLINA_95), any(), isNull(), isNull(), isNull(), isNull(),
+				eq(List.of("repsol", "otras")));
+	}
+
+	@Test
+	@DisplayName("El endpoint de marcas devuelve el catálogo con conteos")
+	void brandsEndpointReturnsCatalog() throws Exception {
+		when(stationService.listBrands()).thenReturn(List.of(
+				new com.example.gasolineras_api.dto.BrandDto("repsol", "Repsol", 42),
+				new com.example.gasolineras_api.dto.BrandDto("otras", "Otras marcas", 91)));
+
+		mockMvc.perform(get("/api/stations/brands"))
+				.andExpect(status().isOk())
+				.andExpect(header().string("Cache-Control", "no-cache"))
+				.andExpect(jsonPath("$[0].code").value("repsol"))
+				.andExpect(jsonPath("$[0].label").value("Repsol"))
+				.andExpect(jsonPath("$[0].count").value(42))
+				.andExpect(jsonPath("$[1].code").value("otras"));
 	}
 
 	@Test

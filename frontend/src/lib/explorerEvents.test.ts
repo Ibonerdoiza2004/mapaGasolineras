@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
 	dispatchFuelChange,
+	dispatchMarcasChange,
 	dispatchNearbyStations,
 	dispatchOrdenChange,
 	dispatchRadioChange,
@@ -9,6 +10,7 @@ import {
 	dispatchViewportChange,
 	FUEL_EVENT,
 	getLastViewport,
+	MARCAS_EVENT,
 	ORDEN_EVENT,
 	RADIO_EVENT,
 	resetLastViewport,
@@ -117,5 +119,23 @@ describe('explorerEvents — eventos entre islas', () => {
 		);
 		expect(ids).toEqual(['s1', null]);
 		window.removeEventListener(STATION_FOCUS_EVENT, listener);
+	});
+
+	it('notifica el conjunto de marcas seleccionadas para filtrar', () => {
+		const listener = vi.fn();
+		window.addEventListener(MARCAS_EVENT, listener);
+
+		dispatchMarcasChange(['repsol', 'otras']);
+		dispatchMarcasChange([]);
+
+		expect(listener).toHaveBeenCalledTimes(2);
+		const events = listener.mock.calls.map(
+			([event]) => (event as CustomEvent<{ marcas: string[] }>).detail.marcas,
+		);
+		expect(events).toEqual([
+			['repsol', 'otras'],
+			[],
+		]);
+		window.removeEventListener(MARCAS_EVENT, listener);
 	});
 });

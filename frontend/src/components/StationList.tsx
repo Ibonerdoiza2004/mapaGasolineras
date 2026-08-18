@@ -4,6 +4,7 @@ import {
 	COMPARE_EVENT,
 	FUEL_EVENT,
 	getLastViewport,
+	MARCAS_EVENT,
 	ORDEN_EVENT,
 	PRICE_FILTER_EVENT,
 	PRICE_RANGE_REQUEST_EVENT,
@@ -116,6 +117,8 @@ export default function StationList() {
 	// Filtro de precio: el rango son los extremos del dataset completo (lo
 	// consulta el backend) y la selección se aplica en la propia consulta.
 	const [priceFilter, setPriceFilter] = useState<PriceRange | null>(null);
+	// Marcas seleccionadas para filtrar (vacío = sin filtro).
+	const [marcas, setMarcas] = useState<string[]>([]);
 	const requestIdRef = useRef(0);
 	const abortRef = useRef<AbortController | null>(null);
 	// Refresco en segundo plano: al cambiar una opción la lista actual
@@ -219,6 +222,16 @@ export default function StationList() {
 		return () => window.removeEventListener(PRICE_FILTER_EVENT, onPriceFilter);
 	}, []);
 
+	useEffect(() => {
+		function onMarcas(event: Event) {
+			const detail = (event as CustomEvent<{ marcas: unknown }>).detail;
+			if (!detail || !Array.isArray(detail.marcas)) return;
+			setMarcas(detail.marcas.filter((code): code is string => typeof code === 'string'));
+		}
+		window.addEventListener(MARCAS_EVENT, onMarcas);
+		return () => window.removeEventListener(MARCAS_EVENT, onMarcas);
+	}, []);
+
 	const load = useCallback(async () => {
 		// Con radio se necesita el punto de referencia; sin él (todas), basta
 		// con el área visible del mapa.
@@ -254,6 +267,7 @@ export default function StationList() {
 				limit: NEARBY_LIMIT,
 				minPrecio: priceFilter?.min,
 				maxPrecio: priceFilter?.max,
+				marcas,
 			});
 			if (requestIdRef.current !== requestId) return;
 			setStations(result);
@@ -279,7 +293,7 @@ export default function StationList() {
 				}
 			}
 		}
-	}, [location, fuel, radio, orden, viewport, priceFilter]);
+	}, [location, fuel, radio, orden, viewport, priceFilter, marcas]);
 
 	useEffect(() => {
 		// El rango del slider es global (toda la base de datos, todos los

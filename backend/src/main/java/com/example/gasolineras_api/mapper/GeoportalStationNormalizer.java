@@ -101,6 +101,7 @@ public class GeoportalStationNormalizer {
 		return java.util.Optional.of(new NormalizedStation(
 				raw.id(),
 				raw.rotulo(),
+				BrandCatalog.normalize(raw.rotulo()),
 				raw.direccion(),
 				raw.codigoPostal(),
 				raw.localidad(),

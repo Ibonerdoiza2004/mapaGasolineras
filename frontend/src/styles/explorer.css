@@ -221,11 +221,147 @@
 	gap: var(--space-2);
 }
 
-.explorer__fuel-group .explorer__field-label {
+.explorer__fuel-group .explorer__field-label,
+.explorer__field-label {
 	color: var(--color-text-muted);
 	font-size: var(--font-size-xs);
 	font-weight: 700;
 	margin: 0;
+}
+
+.explorer__brand-filter {
+	border: 1px solid var(--color-border);
+	border-radius: var(--radius-md);
+	background: var(--color-surface);
+}
+
+.explorer__brand-filter summary {
+	align-items: center;
+	background: transparent;
+	border: 0;
+	border-radius: var(--radius-md) var(--radius-md) 0 0;
+	cursor: pointer;
+	display: flex;
+	gap: var(--space-2);
+	justify-content: space-between;
+	list-style: none;
+	min-height: 2.75rem;
+	padding: var(--space-2) var(--space-3);
+	width: 100%;
+}
+
+.explorer__brand-filter summary:hover {
+	background: var(--color-surface-muted);
+}
+
+.explorer__brand-filter summary::-webkit-details-marker {
+	display: none;
+}
+
+.explorer__brand-filter summary::after {
+	content: '▾';
+	color: var(--color-text-muted);
+	font-size: var(--font-size-xs);
+	line-height: 1;
+	transition: transform var(--transition-fast);
+}
+
+.explorer__brand-filter[open] summary::after {
+	transform: rotate(180deg);
+}
+
+.explorer__brand-filter summary:focus-visible {
+	box-shadow: var(--focus-ring);
+	outline: none;
+}
+
+.explorer__brand-filter-title {
+	font: inherit;
+	font-size: var(--font-size-sm);
+	font-weight: 600;
+}
+
+.explorer__brand-filter-count {
+	align-items: center;
+	background: var(--color-surface-emphasis);
+	border-radius: var(--radius-pill);
+	color: var(--color-brand-900);
+	display: inline-flex;
+	font-size: var(--font-size-xs);
+	font-weight: 700;
+	justify-content: center;
+	line-height: 1;
+	min-width: 1.375rem;
+	padding: var(--space-1) var(--space-2);
+}
+
+.explorer__brand-list {
+	border: 0;
+	border-top: 1px solid var(--color-border);
+	display: grid;
+	gap: 0;
+	margin: 0;
+	/* La lista larga se desplaza dentro del acordeón para no estirar el
+	   panel lateral (18 marcas ocuparían toda la pantalla). */
+	max-height: 11.5rem;
+	overflow-y: auto;
+	padding: var(--space-1);
+}
+
+.explorer__brand-option {
+	align-items: center;
+	border-radius: var(--radius-sm);
+	cursor: pointer;
+	display: grid;
+	grid-template-columns: 1rem 1fr auto;
+	gap: var(--space-2);
+	min-height: 2.125rem;
+	padding: var(--space-1) var(--space-2);
+}
+
+.explorer__brand-option:hover {
+	background: var(--color-surface-muted);
+}
+
+.explorer__brand-option input {
+	accent-color: var(--color-brand-700);
+	height: 1rem;
+	margin: 0;
+	width: 1rem;
+}
+
+.explorer__brand-option > input,
+.explorer__brand-option > .explorer__brand-label,
+.explorer__brand-option > .explorer__brand-count {
+	/* Desplazamiento pequeño y común: conserva la alineación entre columnas. */
+	transform: translateY(-10px);
+}
+
+/* El foco se dibuja en la fila completa, no duplicado sobre el checkbox. */
+.explorer .explorer__brand-option input:focus-visible {
+	box-shadow: none;
+	outline: none;
+}
+
+.explorer__brand-label {
+	font-size: var(--font-size-sm);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.explorer__brand-count {
+	color: var(--color-text-muted);
+	font-size: var(--font-size-xs);
+	font-variant-numeric: tabular-nums;
+}
+
+.explorer__brand-option:has(input:focus-visible) {
+	box-shadow: var(--focus-ring);
+}
+
+.explorer__brand-option:has(input:checked) .explorer__brand-label {
+	font-weight: 600;
 }
 
 .explorer__segmented {

@@ -5,6 +5,7 @@ import StationList from './StationList';
 import {
 	dispatchViewportChange,
 	FUEL_EVENT,
+	MARCAS_EVENT,
 	ORDEN_EVENT,
 	PRICE_FILTER_EVENT,
 	RADIO_EVENT,
@@ -71,6 +72,12 @@ function emitRadio(radio: number | null) {
 function emitOrden(orden: string) {
 	act(() => {
 		window.dispatchEvent(new CustomEvent(ORDEN_EVENT, { detail: { orden } }));
+	});
+}
+
+function emitMarcas(marcas: string[]) {
+	act(() => {
+		window.dispatchEvent(new CustomEvent(MARCAS_EVENT, { detail: { marcas } }));
 	});
 }
 
@@ -901,6 +908,37 @@ describe('StationList — listado de estaciones cercanas', () => {
 		expect(screen.getByRole('heading', { name: 'Estación Norte' }).closest('li')).not.toHaveClass(
 			'station-card--selected',
 		);
+	});
+
+	it('un cambio de marcas vuelve a consultar con el filtro aplicado', async () => {
+		const fetchMock = vi.fn().mockResolvedValue(jsonResponse([station()]));
+		vi.stubGlobal('fetch', fetchMock);
+
+		render(<StationList />);
+		emitViewport();
+		await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+		expect(String(fetchMock.mock.calls[0][0])).not.toContain('marcas=');
+
+		emitMarcas(['repsol', 'otras']);
+
+		await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+		const [url] = fetchMock.mock.calls[1];
+		expect(String(url)).toContain('marcas=repsol%2Cotras');
+	});
+
+	it('ignora un evento de marcas sin lista', async () => {
+		const fetchMock = vi.fn().mockResolvedValue(jsonResponse([station()]));
+		vi.stubGlobal('fetch', fetchMock);
+
+		render(<StationList />);
+		emitViewport();
+		await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+
+		act(() => {
+			window.dispatchEvent(new CustomEvent(MARCAS_EVENT, { detail: { marcas: 'repsol' } }));
+		});
+
+		expect(fetchMock).toHaveBeenCalledTimes(1);
 	});
 
 	it('filtra los resultados por el rango de precios elegido', async () => {

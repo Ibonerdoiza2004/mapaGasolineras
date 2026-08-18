@@ -186,4 +186,75 @@ describe('stations — capa de datos', () => {
 		expect(String(url)).toContain('radio=5');
 		expect(String(url)).not.toContain('minLat=');
 	});
+
+	it('envía las marcas seleccionadas separadas por comas', async () => {
+		const { fetchNearbyStations } = await import('./stations');
+		const fetchMock = vi.fn().mockResolvedValue({
+			ok: true,
+			json: () => Promise.resolve([]),
+		});
+		vi.stubGlobal('fetch', fetchMock);
+
+		await fetchNearbyStations({
+			lat: 40.4168,
+			lon: -3.7038,
+			radio: 10,
+			combustible: 'GASOLINA_95',
+			orden: 'precio',
+			marcas: ['repsol', 'otras'],
+		});
+
+		const [url] = fetchMock.mock.calls[0];
+		expect(String(url)).toContain('marcas=repsol%2Cotras');
+	});
+
+	it('sin marcas no envía el parámetro de filtro', async () => {
+		const { fetchNearbyStations } = await import('./stations');
+		const fetchMock = vi.fn().mockResolvedValue({
+			ok: true,
+			json: () => Promise.resolve([]),
+		});
+		vi.stubGlobal('fetch', fetchMock);
+
+		await fetchNearbyStations({
+			lat: 40.4168,
+			lon: -3.7038,
+			radio: 10,
+			combustible: 'GASOLINA_95',
+			orden: 'precio',
+			marcas: [],
+		});
+
+		const [url] = fetchMock.mock.calls[0];
+		expect(String(url)).not.toContain('marcas=');
+	});
+
+	it('obtiene el catálogo de marcas con sus conteos', async () => {
+		const { fetchBrands } = await import('./stations');
+		const fetchMock = vi.fn().mockResolvedValue({
+			ok: true,
+			json: () =>
+				Promise.resolve([
+					{ code: 'repsol', label: 'Repsol', count: 42 },
+					{ code: 'otras', label: 'Otras marcas', count: 91 },
+				]),
+		});
+		vi.stubGlobal('fetch', fetchMock);
+
+		const brands = await fetchBrands();
+
+		expect(fetchMock.mock.calls[0][0]).toContain('/api/stations/brands');
+		expect(brands).toHaveLength(2);
+		expect(brands[0].code).toBe('repsol');
+		expect(brands[1].count).toBe(91);
+	});
+
+	it('devuelve lista vacía si el catálogo de marcas falla', async () => {
+		const { fetchBrands } = await import('./stations');
+		vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 503 }));
+
+		const brands = await fetchBrands();
+
+		expect(brands).toEqual([]);
+	});
 });

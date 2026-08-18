@@ -136,7 +136,7 @@ class FuelStationImportServiceTest {
 
 	private NormalizedStation normalizedStation() {
 		return new NormalizedStation(
-				"1", "REPSOL", "DIR", "28001", "Madrid", "Madrid", "Madrid",
+				"1", "REPSOL", "repsol", "DIR", "28001", "Madrid", "Madrid", "Madrid",
 				40.4168, -3.7038, "L-D: 06:00-22:00", "P", "D",
 				Map.of(FuelType.GASOLINA_95, new BigDecimal("1.599")));
 	}

@@ -45,8 +45,9 @@ type Scope = (typeof SCOPE_OPTIONS)[number]['value'];
  * islas con el evento `gasolineras:radio`.
  *
  * Sin ubicación (ni compartida ni buscada) no hay punto de referencia para
- * acotar el radio, por lo que la opción de radio permanece deshabilitada
- * hasta que se recibe `gasolineras:location`.
+ * acotar el radio, por lo que la opción de radio permanece deshabilitada. Al
+ * recibir `gasolineras:location` la opción se habilita y el alcance pasa a
+ * radio automáticamente con el radio elegido (o el de 10 km por defecto).
  */
 export default function RadioFilter() {
 	const [scope, setScope] = useState<Scope>(DEFAULT_RADIO !== null ? 'radio' : 'mapa');
@@ -78,27 +79,32 @@ export default function RadioFilter() {
 		setAnnouncement(message);
 	}, []);
 
+	const activateRadio = useCallback(() => {
+		const radio = selectedRef.current;
+		scopeRef.current = 'radio';
+		setScope('radio');
+		setUrlParam(RADIO_URL_PARAM, String(radio));
+		dispatchRadioChange(radio);
+		announce(`Radio de búsqueda activado: ${radioLabel(radio)}`);
+	}, [announce]);
+
 	const setScopeTo = useCallback(
-		(next: Scope, force = false) => {
-			if (disabled && !force && next === 'radio') return;
-			const current = scopeRef.current;
+		(next: Scope) => {
+			if (disabled && next === 'radio') return;
+			if (next === 'radio') {
+				activateRadio();
+				return;
+			}
 			scopeRef.current = next;
 			setScope(next);
-			if (next === 'radio') {
-				const radio = selectedRef.current;
-				setUrlParam(RADIO_URL_PARAM, String(radio));
-				dispatchRadioChange(radio);
-				announce(`Radio de búsqueda activado: ${radioLabel(radio)}`);
-			} else if (current === 'radio') {
-				setUrlParam(RADIO_URL_PARAM, null);
-				dispatchRadioChange(null);
-				// El modo mapa no tiene punto de referencia: se descarta la
-				// ubicación marcada y desaparecen las distancias.
-				dispatchLocationClear();
-				announce('Radio de búsqueda desactivado: se muestran las gasolineras en el mapa');
-			}
+			setUrlParam(RADIO_URL_PARAM, null);
+			dispatchRadioChange(null);
+			// El modo mapa no tiene punto de referencia: se descarta la
+			// ubicación marcada y desaparecen las distancias.
+			dispatchLocationClear();
+			announce('Radio de búsqueda desactivado: se muestran las gasolineras en el mapa');
 		},
-		[disabled, announce],
+		[disabled, announce, activateRadio],
 	);
 
 	const select = useCallback((radio: number) => {
@@ -112,22 +118,19 @@ export default function RadioFilter() {
 		setAnnouncement(`Radio: ${radioLabel(radio)}`);
 	}, []);
 
-	// Sin ubicación el radio no tiene punto de referencia: la opción de radio
-	// se habilita al recibir la primera ubicación y, si se está en el modo
-	// "área del mapa", se pasa automáticamente al modo radio para que la
-	// distancia tenga un punto de referencia.
+	// Al recibir una ubicación (compartida o buscada) el radio se habilita y se
+	// activa automáticamente: ya hay punto de referencia, así que la búsqueda
+	// pasa a acotarse por kilómetros en lugar del área visible.
 	useEffect(() => {
 		function onLocation(event: Event) {
 			const detail = (event as CustomEvent<{ lat: number; lon: number }>).detail;
 			if (!detail || !isValidCoordinates(detail.lat, detail.lon)) return;
 			setDisabled(false);
-			if (scopeRef.current === 'mapa') {
-				setScopeTo('radio', true);
-			}
+			activateRadio();
 		}
 		window.addEventListener(LOCATION_EVENT, onLocation);
 		return () => window.removeEventListener(LOCATION_EVENT, onLocation);
-	}, [setScopeTo]);
+	}, [activateRadio]);
 
 	// Al descartarse la ubicación (p. ej. al volver al modo mapa) el radio
 	// vuelve a necesitar un punto de referencia para activarse.

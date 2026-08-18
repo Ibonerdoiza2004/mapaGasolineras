@@ -46,6 +46,15 @@ export interface NearbyQuery {
 	minPrecio?: number;
 	/** Precio máximo en €/l para acotar los resultados (opcional). */
 	maxPrecio?: number;
+	/** Códigos de marca seleccionados para filtrar (vacío o ausente = sin filtro). */
+	marcas?: string[];
+}
+
+/** Marca del catálogo con el número de estaciones que la usan (GET /api/stations/brands). */
+export interface Brand {
+	code: string;
+	label: string;
+	count: number;
 }
 
 /** Tope de resultados del modo viewport: acota la carga al abrir el mapa.
@@ -101,11 +110,27 @@ export async function fetchNearbyStations(query: NearbyQuery): Promise<NearbySta
 	if (query.maxPrecio != null) {
 		params.set('maxPrecio', String(query.maxPrecio));
 	}
+	if (query.marcas && query.marcas.length > 0) {
+		params.set('marcas', query.marcas.join(','));
+	}
 	const response = await fetch(apiUrl(`/api/stations/nearby?${params.toString()}`));
 	if (!response.ok) {
 		throw new Error(`nearby ${response.status}`);
 	}
 	return (await response.json()) as NearbyStation[];
+}
+
+/**
+ * Catálogo de marcas con conteos de estaciones. Se usa para el filtro de
+ * marca; ante un fallo del backend se devuelve una lista vacía y el filtro
+ * se oculta en lugar de bloquear la búsqueda.
+ */
+export async function fetchBrands(): Promise<Brand[]> {
+	const response = await fetch(apiUrl('/api/stations/brands'));
+	if (!response.ok) {
+		return [];
+	}
+	return (await response.json()) as Brand[];
 }
 /**
  * Rango de precios (mínimo y máximo) sobre toda la base de datos, sin filtrar

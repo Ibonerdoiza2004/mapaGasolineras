@@ -41,6 +41,7 @@ public interface StationRepository extends JpaRepository<Station, String> {
 				ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography,
 				:radiusMeters
 			)
+			AND (:marcas IS NULL OR COALESCE(s.marca, 'otras') = ANY(string_to_array(:marcas, ',')))
 			AND (:minPrecio IS NULL OR cp.price >= :minPrecio)
 			AND (:maxPrecio IS NULL OR cp.price <= :maxPrecio)
 			ORDER BY
@@ -59,7 +60,8 @@ public interface StationRepository extends JpaRepository<Station, String> {
 			@Param("orderMode") String orderMode,
 			@Param("limit") int limit,
 			@Param("minPrecio") Double minPrecio,
-			@Param("maxPrecio") Double maxPrecio
+			@Param("maxPrecio") Double maxPrecio,
+			@Param("marcas") String marcas
 	);
 
 	/**
@@ -84,7 +86,8 @@ public interface StationRepository extends JpaRepository<Station, String> {
 			FROM stations s
 			LEFT JOIN current_prices cp
 				ON cp.station_id = s.official_id AND cp.fuel_type = :fuelType
-			WHERE (:minPrecio IS NULL OR cp.price >= :minPrecio)
+			WHERE (:marcas IS NULL OR s.marca = ANY(string_to_array(:marcas, ',')))
+			AND (:minPrecio IS NULL OR cp.price >= :minPrecio)
 			AND (:maxPrecio IS NULL OR cp.price <= :maxPrecio)
 			ORDER BY
 				CASE WHEN :orderMode = 'distancia'
@@ -101,7 +104,8 @@ public interface StationRepository extends JpaRepository<Station, String> {
 			@Param("orderMode") String orderMode,
 			@Param("limit") int limit,
 			@Param("minPrecio") Double minPrecio,
-			@Param("maxPrecio") Double maxPrecio
+			@Param("maxPrecio") Double maxPrecio,
+			@Param("marcas") String marcas
 	);
 
 	/**
@@ -131,6 +135,7 @@ public interface StationRepository extends JpaRepository<Station, String> {
 			WHERE s.location IS NOT NULL
 				AND ST_Y(s.location) BETWEEN :minLat AND :maxLat
 				AND ST_X(s.location) BETWEEN :minLon AND :maxLon
+				AND (:marcas IS NULL OR COALESCE(s.marca, 'otras') = ANY(string_to_array(:marcas, ',')))
 				AND (:minPrecio IS NULL OR cp.price >= :minPrecio)
 				AND (:maxPrecio IS NULL OR cp.price <= :maxPrecio)
 			ORDER BY
@@ -155,7 +160,8 @@ public interface StationRepository extends JpaRepository<Station, String> {
 			@Param("limit") int limit,
 			@Param("offset") int offset,
 			@Param("minPrecio") Double minPrecio,
-			@Param("maxPrecio") Double maxPrecio
+			@Param("maxPrecio") Double maxPrecio,
+			@Param("marcas") String marcas
 	);
 
 	/** Precio mínimo del combustible en el radio (para calcular el ahorro). */
@@ -169,21 +175,28 @@ public interface StationRepository extends JpaRepository<Station, String> {
 				ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography,
 				:radiusMeters
 			)
+			AND (:marcas IS NULL OR COALESCE(s.marca, 'otras') = ANY(string_to_array(:marcas, ',')))
 			""", nativeQuery = true)
 	BigDecimal findMinPriceNearby(
 			@Param("lat") double lat,
 			@Param("lon") double lon,
 			@Param("radiusMeters") double radiusMeters,
-			@Param("fuelType") String fuelType
+			@Param("fuelType") String fuelType,
+			@Param("marcas") String marcas
 	);
 
 	/** Precio mínimo del combustible en todo el país (para calcular el ahorro). */
 	@Query(value = """
 			SELECT MIN(cp.price)
 			FROM current_prices cp
+			JOIN stations s ON s.official_id = cp.station_id
 			WHERE cp.fuel_type = :fuelType
+			AND (:marcas IS NULL OR COALESCE(s.marca, 'otras') = ANY(string_to_array(:marcas, ',')))
 			""", nativeQuery = true)
-	BigDecimal findMinPriceAll(@Param("fuelType") String fuelType);
+	BigDecimal findMinPriceAll(
+			@Param("fuelType") String fuelType,
+			@Param("marcas") String marcas
+	);
 
 	/** Precio mínimo del combustible en el viewport (para calcular el ahorro). */
 	@Query(value = """
@@ -194,14 +207,27 @@ public interface StationRepository extends JpaRepository<Station, String> {
 			WHERE s.location IS NOT NULL
 				AND ST_Y(s.location) BETWEEN :minLat AND :maxLat
 				AND ST_X(s.location) BETWEEN :minLon AND :maxLon
+				AND (:marcas IS NULL OR COALESCE(s.marca, 'otras') = ANY(string_to_array(:marcas, ',')))
 			""", nativeQuery = true)
 	BigDecimal findMinPriceInBounds(
 			@Param("minLat") double minLat,
 			@Param("maxLat") double maxLat,
 			@Param("minLon") double minLon,
 			@Param("maxLon") double maxLon,
-			@Param("fuelType") String fuelType
+			@Param("fuelType") String fuelType,
+			@Param("marcas") String marcas
 	);
+
+	/** Recuento de estaciones por marca (para el catálogo del filtro). Las
+	 *  estaciones sin marca asignada (p. ej. importadas antes de esta columna)
+	 *  se agrupan en "otras", de modo que la suma de los conteos equivale
+	 *  siempre al total de estaciones. */
+	@Query(value = """
+			SELECT COALESCE(s.marca, 'otras') AS marca, COUNT(*) AS count
+			FROM stations s
+			GROUP BY COALESCE(s.marca, 'otras')
+			""", nativeQuery = true)
+	List<BrandCountProjection> countByBrand();
 
 	/**
 	 * Rango de precios (mínimo y máximo) sobre toda la base de datos, sin
