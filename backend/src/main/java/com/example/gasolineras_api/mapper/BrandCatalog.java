@@ -69,7 +69,17 @@ public final class BrandCatalog {
 			brand("petromiralles", "Petromiralles", "PETROMIRALLES"),
 			brand("familyenergy", "Family Energy", "FAMILY ENERGY"),
 			brand("gmoil", "GMOil", "GMOIL", "GM OIL"),
-			brand("fastfuel", "Fast Fuel", "FAST FUEL")
+			brand("fastfuel", "Fast Fuel", "FAST FUEL"),
+			brand("nieves", "Nieves", "NIEVES"),
+			brand("asc", "ASC Carburantes", "ASC CARBURANTES"),
+			brand("pcan", "Pcan", "PCAN"),
+			brand("blanca", "Blanca Energy", "BLANCA"),
+			brand("staroil", "Staroil", "STAROIL"),
+			brand("euskadilowcost", "Euskadi Low Cost", "EUSKADILOWCOST", "EUSKADI LOW COST", "LOW COST EUSKADI"),
+			brand("farruco", "Farruco", "FARRUCO"),
+			brand("confortauto", "Confort Auto", "CONFORT AUTO"),
+			brand("t9", "T9", "T9"),
+			brand("lowcostfuel", "Low Cost Fuel", "LOWCOSTFUEL", "LOW COST FUEL")
 	);
 
 	private BrandCatalog() {

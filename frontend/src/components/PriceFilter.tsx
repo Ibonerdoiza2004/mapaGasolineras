@@ -18,6 +18,11 @@ export default function PriceFilter() {
 	const [range, setRange] = useState<PriceRange | null>(null);
 	const [min, setMin] = useState(0);
 	const [max, setMax] = useState(0);
+	// Asa que se está usando (o la última usada). La asa activa se dibuja por
+	// encima de la otra: si las dos coinciden, al arrastrar se mueve la que el
+	// usuario espera y no se queda pegada a la contraria. El máximo arranca
+	// arriba para poder arrastrarlo de vuelta a la derecha si quedó al borde.
+	const [active, setActive] = useState<'min' | 'max'>('max');
 
 	useEffect(() => {
 		function onRange(event: Event) {
@@ -55,11 +60,13 @@ export default function PriceFilter() {
 	const round3 = (value: number) => Math.round(value * 1000) / 1000;
 	const changeMin = (value: number) => {
 		const next = round3(Math.min(value, max - step));
+		setActive('min');
 		setMin(next);
 		dispatchPriceFilter(next, max);
 	};
 	const changeMax = (value: number) => {
 		const next = round3(Math.max(value, min + step));
+		setActive('max');
 		setMax(next);
 		dispatchPriceFilter(min, next);
 	};
@@ -88,6 +95,9 @@ export default function PriceFilter() {
 					max={range.max}
 					step={step}
 					value={min}
+					style={{ zIndex: active === 'min' ? 4 : 3 }}
+					onPointerDown={() => setActive('min')}
+					onFocus={() => setActive('min')}
 					onChange={(event) => changeMin(Number(event.target.value))}
 				/>
 				<input
@@ -97,6 +107,9 @@ export default function PriceFilter() {
 					max={range.max}
 					step={step}
 					value={max}
+					style={{ zIndex: active === 'max' ? 4 : 3 }}
+					onPointerDown={() => setActive('max')}
+					onFocus={() => setActive('max')}
 					onChange={(event) => changeMax(Number(event.target.value))}
 				/>
 			</div>

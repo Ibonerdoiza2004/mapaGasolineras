@@ -24,6 +24,19 @@ class BrandCatalogTest {
 		assertThat(BrandCatalog.normalize("MOEVE")).isEqualTo("moeve");
 		assertThat(BrandCatalog.normalize("Moeve")).isEqualTo("moeve");
 		assertThat(BrandCatalog.normalize("GRUPO CACHO - MOEVE")).isEqualTo("moeve");
+		// Marcas con más de 10 estaciones incorporadas al catálogo.
+		assertThat(BrandCatalog.normalize("NIEVES")).isEqualTo("nieves");
+		assertThat(BrandCatalog.normalize("ASC CARBURANTES")).isEqualTo("asc");
+		assertThat(BrandCatalog.normalize("PCAN ARRIETA")).isEqualTo("pcan");
+		assertThat(BrandCatalog.normalize("BLANCA ENERGY")).isEqualTo("blanca");
+		assertThat(BrandCatalog.normalize("STAROIL SAN CIBRAO")).isEqualTo("staroil");
+		assertThat(BrandCatalog.normalize("EUSKADILOWCOST")).isEqualTo("euskadilowcost");
+		assertThat(BrandCatalog.normalize("LOW COST EUSKADI SL")).isEqualTo("euskadilowcost");
+		assertThat(BrandCatalog.normalize("EUSKADI LOW COST GALDAKAO")).isEqualTo("euskadilowcost");
+		assertThat(BrandCatalog.normalize("FARRUCO S.A.")).isEqualTo("farruco");
+		assertThat(BrandCatalog.normalize("CONFORT AUTO")).isEqualTo("confortauto");
+		assertThat(BrandCatalog.normalize("REQUES - T9")).isEqualTo("t9");
+		assertThat(BrandCatalog.normalize("LOW COST FUEL OIL")).isEqualTo("lowcostfuel");
 	}
 
 	@Test
@@ -58,10 +71,12 @@ class BrandCatalogTest {
 
 		assertThat(catalog).isNotEmpty();
 		assertThat(catalog).extracting(BrandCatalog.BrandEntry::code)
-				.contains("repsol", "plenoil", "esclave", "cepsa", "moeve", "q8", "bonarea");
+				.contains("repsol", "plenoil", "esclave", "cepsa", "moeve", "q8", "bonarea",
+						"nieves", "euskadilowcost", "t9", "staroil");
 		// Cepsa y Moeve se exponen por separado (misma empresa, distinto rótulo).
 		assertThat(catalog).extracting(BrandCatalog.BrandEntry::label)
-				.contains("Cepsa", "Moeve", "Repsol", "Plenoil", "Esclave", "BonÀrea")
+				.contains("Cepsa", "Moeve", "Repsol", "Plenoil", "Esclave", "BonÀrea",
+						"Euskadi Low Cost", "Blanca Energy", "Staroil")
 				.doesNotContain("Moove");
 		assertThat(BrandCatalog.isKnown("repsol")).isTrue();
 		assertThat(BrandCatalog.isKnown("plenoil")).isTrue();

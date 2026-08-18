@@ -24,6 +24,7 @@ function readMarcasFromUrl(): string[] {
 export default function BrandFilter() {
 	const [brands, setBrands] = useState<Brand[]>([]);
 	const [selected, setSelected] = useState<string[]>([]);
+	const [query, setQuery] = useState('');
 	const [announcement, setAnnouncement] = useState('');
 	const selectedRef = useRef(selected);
 	selectedRef.current = selected;
@@ -87,6 +88,13 @@ export default function BrandFilter() {
 	if (brands.length === 0) return null;
 
 	const activeCount = selected.length;
+	const normalizedQuery = query.trim().toLocaleLowerCase();
+	const visibleBrands =
+		normalizedQuery.length === 0
+			? brands
+			: brands.filter((brand) =>
+					brand.label.toLocaleLowerCase().includes(normalizedQuery),
+				);
 
 	return (
 		<details className="explorer__brand-filter" onToggle={handleToggle}>
@@ -98,23 +106,37 @@ export default function BrandFilter() {
 					</span>
 				)}
 			</summary>
-			<fieldset className="explorer__brand-list">
-				<legend className="visually-hidden">Marcas de gasolinera</legend>
-				{brands.map((brand) => {
-					const checked = selected.includes(brand.code);
-					return (
-						<label key={brand.code} className="explorer__brand-option">
-							<input
-								type="checkbox"
-								checked={checked}
-								onChange={() => toggle(brand.code)}
-							/>
-							<span className="explorer__brand-label">{brand.label}</span>
-							<span className="explorer__brand-count">{brand.count}</span>
-						</label>
-					);
-				})}
-			</fieldset>
+			<div className="explorer__brand-search-wrap">
+				<input
+					type="search"
+					className="explorer__brand-search"
+					placeholder="Buscar marca…"
+					aria-label="Buscar marca"
+					value={query}
+					onChange={(event) => setQuery(event.target.value)}
+				/>
+			</div>
+			{visibleBrands.length === 0 ? (
+				<p className="explorer__brand-empty">No hay marcas que coincidan con «{query.trim()}».</p>
+			) : (
+				<fieldset className="explorer__brand-list">
+					<legend className="visually-hidden">Marcas de gasolinera</legend>
+					{visibleBrands.map((brand) => {
+						const checked = selected.includes(brand.code);
+						return (
+							<label key={brand.code} className="explorer__brand-option">
+								<input
+									type="checkbox"
+									checked={checked}
+									onChange={() => toggle(brand.code)}
+								/>
+								<span className="explorer__brand-label">{brand.label}</span>
+								<span className="explorer__brand-count">{brand.count}</span>
+							</label>
+						);
+					})}
+				</fieldset>
+			)}
 			{announcement && (
 				<p className="visually-hidden" role="status">
 					{announcement}
