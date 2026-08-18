@@ -13,15 +13,13 @@ import java.util.List;
 import static com.example.gasolineras_api.mapper.BrandCatalog.OTHER;
 
 /**
- * Asigna la marca a las estaciones que se importaron antes de que existiera la
- * columna {@code marca} o que quedaron en la marca de reserva «otras» cuando el
- * catálogo no reconocía su rótulo. Re-evalúa también las «otras» para recoger
- * marcas que se añadan al catálogo después de la primera carga. Normaliza el
- * rótulo con el mismo catálogo de la importación, de modo que los conteos del
- * filtro por marca suman siempre el total de estaciones y filtrar por una
- * marca conocida devuelve resultados desde el primer arranque.
- *
- * <p>Es idempotente: solo toca filas sin marca o marcadas como «otras».</p>
+ * Mantiene la marca de las estaciones alineada con el catálogo actual.
+ * Re-normaliza el rótulo de todas las estaciones con el catálogo vigente y
+ * actualiza solo las filas cuyo valor difiere. Así se cubren desde el primer
+ * arranque: estaciones importadas antes de existir la columna {@code marca},
+ * marcas que se añaden al catálogo después de la primera carga y cambios de
+ * marca por renombrado del rótulo (el identificador estable IDEESS garantiza
+ * que es la misma estación). Es idempotente y converge en cada arranque.
  */
 @Component
 public class BrandBackfillInitializer implements ApplicationRunner {
@@ -37,15 +35,20 @@ public class BrandBackfillInitializer implements ApplicationRunner {
 	@Override
 	public void run(ApplicationArguments args) {
 		List<Object[]> updates = jdbcTemplate.query(
-				"SELECT official_id, rotulo FROM stations WHERE marca IS NULL OR marca = ?",
-				(rs, rowNum) -> new Object[] { BrandCatalog.normalize(rs.getString("rotulo")), rs.getString("official_id") },
-				OTHER);
-		if (updates.isEmpty()) {
+				"SELECT official_id, rotulo, marca FROM stations",
+				(rs, rowNum) -> {
+					String normalized = BrandCatalog.normalize(rs.getString("rotulo"));
+					String current = rs.getString("marca");
+					if (normalized.equals(current)) {
+						return null;
+					}
+					return new Object[] { normalized, rs.getString("official_id") };
+				});
+		List<Object[]> pending = updates.stream().filter(java.util.Objects::nonNull).toList();
+		if (pending.isEmpty()) {
 			return;
 		}
-		jdbcTemplate.batchUpdate(
-				"UPDATE stations SET marca = ? WHERE official_id = ? AND (marca IS NULL OR marca = ?)",
-				updates.stream().map(argsRow -> new Object[] { argsRow[0], argsRow[1], OTHER }).toList());
-		log.info("Marcas reevaluadas en {} estaciones pendientes", updates.size());
+		jdbcTemplate.batchUpdate("UPDATE stations SET marca = ? WHERE official_id = ?", pending);
+		log.info("Marcas actualizadas en {} estaciones", pending.size());
 	}
 }

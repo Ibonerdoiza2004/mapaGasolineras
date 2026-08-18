@@ -239,6 +239,14 @@ export default function StationDetail() {
 					href={`https://www.google.com/maps/dir/?api=1&destination=${detail.latitud},${detail.longitud}&travelmode=driving`}
 					target="_blank"
 					rel="noopener noreferrer"
+					draggable={false}
+					onMouseDown={(event) => {
+						// Arrastrar el enlace con el botón pulsado iniciaba el
+						// arrastre nativo del ancla y dejaba la página colgada
+						// hasta refrescar; se evita para que el clic siga
+						// funcionando.
+						if (event.button === 0) event.preventDefault();
+					}}
 				>
 					Cómo llegar (Google Maps)
 				</a>

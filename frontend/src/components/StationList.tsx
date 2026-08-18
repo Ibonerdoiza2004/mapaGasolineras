@@ -126,6 +126,13 @@ export default function StationList() {
 	// no parpadee. El mensaje de "buscando" solo se muestra si aún no hay
 	// resultados que enseñar.
 	const hasContentRef = useRef(false);
+	// Último estado renderizado: sirve para conservar el mensaje actual
+	// (vacío o error) durante un refresco por movimiento del mapa, evitando
+	// que el panel parpadee entre el mensaje y el esqueleto.
+	const lastStatusRef = useRef<Status>('idle');
+	useEffect(() => {
+		lastStatusRef.current = status;
+	}, [status]);
 
 	useEffect(() => {
 		function onFuel(event: Event) {
@@ -245,8 +252,19 @@ export default function StationList() {
 		const controller = new AbortController();
 		abortRef.current = controller;
 		const refreshing = hasContentRef.current;
-		setStatus(refreshing ? 'success' : 'loading');
+		const previous = lastStatusRef.current;
 		setIsRefreshing(refreshing);
+		if (refreshing) {
+			// Hay resultados previos: se mantienen visibles mientras se refresca.
+			setStatus('success');
+		} else if (previous === 'empty' || previous === 'error') {
+			// Sin resultados y sin error nuevo: se conserva el mensaje actual
+			// mientras llega la consulta (p. ej. al mover el mapa), para que el
+			// panel no parpadee con el esqueleto.
+			setStatus(previous);
+		} else {
+			setStatus('loading');
+		}
 		try {
 			// La distancia se mide siempre desde la ubicación marcada (dispositivo
 			// o búsqueda); solo si no hay ninguna se usa el centro del mapa como

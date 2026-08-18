@@ -102,6 +102,21 @@ describe('StationDetail — ficha de la estación', () => {
 		expect(link).toHaveAttribute('rel', 'noopener noreferrer');
 	});
 
+	it('el enlace de indicaciones no inicia el arrastre nativo al pulsar y mover el ratón', async () => {
+		vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(detailBody())));
+		render(<StationDetail />);
+
+		select('s1');
+		const link = await screen.findByRole('link', { name: /Cómo llegar/ });
+
+		// Sin arrastre nativo: pulsar y mover el puntero sobre el enlace no
+		// deja la página colgada.
+		expect(link).toHaveAttribute('draggable', 'false');
+		const mouseDown = new MouseEvent('mousedown', { button: 0, cancelable: true, bubbles: true });
+		link.dispatchEvent(mouseDown);
+		expect(mouseDown.defaultPrevented).toBe(true);
+	});
+
 	it('muestra error recuperable y Reintentar vuelve a consultar', async () => {
 		const fetchMock = vi
 			.fn()

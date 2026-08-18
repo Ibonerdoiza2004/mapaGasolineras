@@ -1,4 +1,4 @@
-import { act, cleanup, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import BrandFilter from './BrandFilter';
@@ -166,5 +166,44 @@ describe('BrandFilter — filtro por marca', () => {
 			expect(fetchBrands).toHaveBeenCalledTimes(2);
 		});
 		expect(screen.getByText('150')).toBeInTheDocument();
+	});
+
+	it('el buscador filtra las marcas por nombre y las restaura al borrar', async () => {
+		render(<BrandFilter />);
+		await vi.waitFor(() => expect(screen.getByText('Filtrar por marca')).toBeInTheDocument());
+		openFilter();
+
+		const search = screen.getByRole('searchbox', { name: 'Buscar marca' });
+		expect(screen.getAllByRole('checkbox')).toHaveLength(3);
+
+		act(() => {
+			search.focus();
+			fireEvent.change(search, { target: { value: 'reps' } });
+		});
+
+		expect(screen.getAllByRole('checkbox')).toHaveLength(1);
+		expect(screen.getByRole('checkbox', { name: /Repsol/ })).toBeInTheDocument();
+		expect(screen.queryByRole('checkbox', { name: /Cepsa/ })).not.toBeInTheDocument();
+
+		act(() => {
+			fireEvent.change(search, { target: { value: '' } });
+		});
+
+		expect(screen.getAllByRole('checkbox')).toHaveLength(3);
+	});
+
+	it('sin coincidencias en el buscador muestra un mensaje y oculta la lista', async () => {
+		render(<BrandFilter />);
+		await vi.waitFor(() => expect(screen.getByText('Filtrar por marca')).toBeInTheDocument());
+		openFilter();
+
+		act(() => {
+			fireEvent.change(screen.getByRole('searchbox', { name: 'Buscar marca' }), {
+				target: { value: 'zzzz' },
+			});
+		});
+
+		expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+		expect(screen.getByText(/No hay marcas que coincidan con «zzzz»/)).toBeInTheDocument();
 	});
 });

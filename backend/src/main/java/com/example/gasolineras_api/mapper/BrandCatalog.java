@@ -9,10 +9,13 @@ import java.util.regex.Pattern;
  * Catálogo de marcas conocidas para etiquetar las estaciones durante la
  * importación. El catálogo se ajusta a los rótulos reales del Geoportal/MITECO:
  * cada marca puede tener varios alias (p. ej. Plenoil aparece como
- * {@code PLENERGY} y Esclave como {@code ESCLATOIL}). Todo rótulo que no
- * coincida con ninguna marca se asigna a {@link #OTHER}, de modo que el
- * buscador puede filtrar por marcas concretas o por el resto con un único
- * valor en la columna {@code marca}.
+ * {@code PLENERGY} y Esclave como {@code ESCLATOIL}). Cepsa y Moeve se
+ * mantienen separadas: son la misma empresa (Cepsa pasó a llamarse Moeve en
+ * 2024), pero sus estaciones conservan su rótulo histórico y el identificador
+ * estable (IDEESS) permite seguir el cambio de marca sin perder el historial.
+ * Todo rótulo que no coincida con ninguna marca se asigna a {@link #OTHER},
+ * de modo que el buscador puede filtrar por marcas concretas o por el resto
+ * con un único valor en la columna {@code marca}.
  */
 public final class BrandCatalog {
 
@@ -28,8 +31,8 @@ public final class BrandCatalog {
 
 	private static final List<Brand> BRANDS = List.of(
 			brand("repsol", "Repsol", "REPSOL"),
-			brand("moeve", "Moove", "MOEVE"),
 			brand("cepsa", "Cepsa", "CEPSA"),
+			brand("moeve", "Moeve", "MOEVE"),
 			brand("bp", "BP", "BP"),
 			brand("shell", "Shell", "SHELL"),
 			brand("ballenoil", "Ballenoil", "BALLENOIL"),
@@ -66,7 +69,17 @@ public final class BrandCatalog {
 			brand("petromiralles", "Petromiralles", "PETROMIRALLES"),
 			brand("familyenergy", "Family Energy", "FAMILY ENERGY"),
 			brand("gmoil", "GMOil", "GMOIL", "GM OIL"),
-			brand("fastfuel", "Fast Fuel", "FAST FUEL")
+			brand("fastfuel", "Fast Fuel", "FAST FUEL"),
+			brand("nieves", "Nieves", "NIEVES"),
+			brand("asc", "ASC Carburantes", "ASC CARBURANTES"),
+			brand("pcan", "Pcan", "PCAN"),
+			brand("blanca", "Blanca Energy", "BLANCA"),
+			brand("staroil", "Staroil", "STAROIL"),
+			brand("euskadilowcost", "Euskadi Low Cost", "EUSKADILOWCOST", "EUSKADI LOW COST", "LOW COST EUSKADI"),
+			brand("farruco", "Farruco", "FARRUCO"),
+			brand("confortauto", "Confort Auto", "CONFORT AUTO"),
+			brand("t9", "T9", "T9"),
+			brand("lowcostfuel", "Low Cost Fuel", "LOWCOSTFUEL", "LOW COST FUEL")
 	);
 
 	private BrandCatalog() {

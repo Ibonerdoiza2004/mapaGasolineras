@@ -177,10 +177,17 @@ public class StationService {
 						BrandCountProjection::getMarca,
 						BrandCountProjection::getCount,
 						Long::sum));
+		// Las marcas más presentes primero (las más conocidas y fáciles de
+		// localizar) y el resto después; "otras" siempre al final.
 		List<BrandDto> brands = new java.util.ArrayList<>();
-		for (BrandCatalog.BrandEntry entry : BrandCatalog.catalog()) {
-			brands.add(new BrandDto(entry.code(), entry.label(), counts.getOrDefault(entry.code(), 0L)));
-		}
+		BrandCatalog.catalog().stream()
+				.sorted(java.util.Comparator
+						.comparingLong((BrandCatalog.BrandEntry entry) ->
+								counts.getOrDefault(entry.code(), 0L))
+						.reversed())
+				.forEach(entry ->
+						brands.add(new BrandDto(entry.code(), entry.label(),
+								counts.getOrDefault(entry.code(), 0L))));
 		brands.add(new BrandDto(BrandCatalog.OTHER, "Otras marcas",
 				counts.getOrDefault(BrandCatalog.OTHER, 0L)));
 		return brands;
