@@ -389,24 +389,32 @@ class StationServiceTest {
 	}
 
 	@Test
-	@DisplayName("El catálogo de marcas combina el orden conocido con los conteos reales")
+	@DisplayName("El catálogo de marcas se ordena por presencia (de mayor a menor) y «otras» al final")
 	void listBrandsCombinesCatalogWithCounts() {
 		when(stationRepository.countByBrand()).thenReturn(List.of(
 				count("repsol", 42L),
 				count("cepsa", 7L),
+				count("moeve", 30L),
 				count(BrandCatalog.OTHER, 91L)
 		));
 
 		var brands = service.listBrands();
 
 		assertThat(brands).hasSize(BrandCatalog.catalog().size() + 1);
-		assertThat(brands.getFirst().code()).isEqualTo("repsol");
+		// Las marcas con más estaciones primero y el resto con cero al final,
+		// siempre antes de la marca de reserva "otras".
+		assertThat(brands).extracting("code")
+				.startsWith("repsol", "moeve", "cepsa");
+		assertThat(brands.subList(0, brands.size() - 1)).extracting("code")
+				.doesNotContain(BrandCatalog.OTHER);
 		assertThat(brands.getFirst().label()).isEqualTo("Repsol");
 		assertThat(brands.getFirst().count()).isEqualTo(42L);
-		assertThat(brands).extracting("code").contains("cepsa", "shell");
 		assertThat(brands.getLast().code()).isEqualTo(BrandCatalog.OTHER);
 		assertThat(brands.getLast().label()).isEqualTo("Otras marcas");
 		assertThat(brands.getLast().count()).isEqualTo(91L);
+		// El resto de marcas (sin estaciones) conservan el orden del catálogo.
+		var rest = brands.subList(3, brands.size() - 1);
+		assertThat(rest).allSatisfy(b -> assertThat(b.count()).isZero());
 		org.mockito.Mockito.verify(stationRepository).countByBrand();
 	}
 

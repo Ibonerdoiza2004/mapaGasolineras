@@ -17,6 +17,13 @@ class BrandCatalogTest {
 		assertThat(BrandCatalog.normalize("AUTONETOIL")).isEqualTo("autonetoil");
 		assertThat(BrandCatalog.normalize("GM OIL")).isEqualTo("gmoil");
 		assertThat(BrandCatalog.normalize("GMOIL")).isEqualTo("gmoil");
+		// Cepsa y Moeve son la misma empresa (renombrada en 2024) pero se
+		// mantienen separadas según el rótulo: la búsqueda ignora mayúsculas.
+		assertThat(BrandCatalog.normalize("CEPSA")).isEqualTo("cepsa");
+		assertThat(BrandCatalog.normalize("CEPSA E.S. ROCA")).isEqualTo("cepsa");
+		assertThat(BrandCatalog.normalize("MOEVE")).isEqualTo("moeve");
+		assertThat(BrandCatalog.normalize("Moeve")).isEqualTo("moeve");
+		assertThat(BrandCatalog.normalize("GRUPO CACHO - MOEVE")).isEqualTo("moeve");
 	}
 
 	@Test
@@ -51,9 +58,14 @@ class BrandCatalogTest {
 
 		assertThat(catalog).isNotEmpty();
 		assertThat(catalog).extracting(BrandCatalog.BrandEntry::code)
-				.contains("repsol", "plenoil", "esclave", "moeve", "q8", "bonarea");
+				.contains("repsol", "plenoil", "esclave", "cepsa", "moeve", "q8", "bonarea");
+		// Cepsa y Moeve se exponen por separado (misma empresa, distinto rótulo).
+		assertThat(catalog).extracting(BrandCatalog.BrandEntry::label)
+				.contains("Cepsa", "Moeve", "Repsol", "Plenoil", "Esclave", "BonÀrea")
+				.doesNotContain("Moove");
 		assertThat(BrandCatalog.isKnown("repsol")).isTrue();
 		assertThat(BrandCatalog.isKnown("plenoil")).isTrue();
+		assertThat(BrandCatalog.isKnown("moeve")).isTrue();
 		assertThat(BrandCatalog.isKnown("ibeirol")).isFalse();
 		assertThat(BrandCatalog.isKnown(BrandCatalog.OTHER)).isFalse();
 	}
