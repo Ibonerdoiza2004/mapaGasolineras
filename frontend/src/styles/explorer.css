@@ -3,7 +3,10 @@
 	flex: 1;
 	grid-template-columns: minmax(20rem, 25rem) minmax(0, 1fr) auto;
 	grid-template-rows: minmax(0, 1fr);
-	min-height: 38rem;
+	/* Sin suelo de altura: el explorador llena el espacio que deja la cabecera
+	 * (flex: 1) y en pantallas bajas (tablets en horizontal, móviles cortos)
+	 * el mapa cabe sin obligar a desplazar toda la página. */
+	min-height: 0;
 	overflow: hidden;
 }
 
@@ -14,6 +17,7 @@
 	flex-direction: column;
 	min-width: 0;
 	overflow-y: auto;
+	overscroll-behavior: contain;
 	padding: var(--space-6);
 	position: relative;
 	z-index: 1;
@@ -235,7 +239,7 @@
 	background: var(--color-surface);
 }
 
-.explorer__brand-filter summary {
+.explorer__brand-filter-summary {
 	align-items: center;
 	background: transparent;
 	border: 0;
@@ -250,15 +254,17 @@
 	width: 100%;
 }
 
-.explorer__brand-filter summary:hover {
+/* Cuando está cerrado, el resumen ocupa también las esquinas inferiores del
+ * contenedor para que su fondo de hover no sobresalga del borde. */
+.explorer__brand-filter:not(.explorer__brand-filter--open) .explorer__brand-filter-summary {
+	border-radius: var(--radius-md);
+}
+
+.explorer__brand-filter-summary:hover {
 	background: var(--color-surface-muted);
 }
 
-.explorer__brand-filter summary::-webkit-details-marker {
-	display: none;
-}
-
-.explorer__brand-filter summary::after {
+.explorer__brand-filter-summary::after {
 	content: '▾';
 	color: var(--color-text-muted);
 	font-size: var(--font-size-xs);
@@ -266,11 +272,11 @@
 	transition: transform var(--transition-fast);
 }
 
-.explorer__brand-filter[open] summary::after {
+.explorer__brand-filter-summary[aria-expanded='true']::after {
 	transform: rotate(180deg);
 }
 
-.explorer__brand-filter summary:focus-visible {
+.explorer__brand-filter-summary:focus-visible {
 	box-shadow: var(--focus-ring);
 	outline: none;
 }
@@ -351,17 +357,18 @@
 }
 
 .explorer__brand-option input {
+	/* Sin reset, la regla general `.explorer input` impone min-height y
+	 * padding y la casilla se estira (p. ej. 44px en tabletas), rompiendo
+	 * la alineación con la marca. */
 	accent-color: var(--color-brand-700);
+	background: transparent;
+	border: 0;
+	border-radius: 0;
 	height: 1rem;
 	margin: 0;
+	min-height: 0;
+	padding: 0;
 	width: 1rem;
-}
-
-.explorer__brand-option > input,
-.explorer__brand-option > .explorer__brand-label,
-.explorer__brand-option > .explorer__brand-count {
-	/* Desplazamiento pequeño y común: conserva la alineación entre columnas. */
-	transform: translateY(-10px);
 }
 
 /* El foco se dibuja en la fila completa, no duplicado sobre el checkbox. */
@@ -454,6 +461,14 @@
 	background: var(--color-brand-700);
 	border-color: var(--color-brand-700);
 	color: var(--color-text-on-brand);
+}
+
+.explorer__chip:disabled {
+	background: var(--color-surface-muted);
+	border-color: var(--color-border);
+	color: var(--color-text-muted);
+	cursor: not-allowed;
+	opacity: 0.65;
 }
 
 .explorer__chip .station-card__fuel-dot {
@@ -747,7 +762,8 @@
 	inset: 0;
 	justify-content: center;
 	position: fixed;
-	z-index: 900;
+	/* Por encima de los controles de Leaflet, cuyo z-index llega a 1000. */
+	z-index: 1100;
 }
 
 .station-detail__scrim {
@@ -835,12 +851,20 @@
 	gap: var(--space-4);
 	min-height: 0;
 	overflow-y: auto;
+	overscroll-behavior: contain;
 	padding: var(--space-4);
 }
 
 .station-detail__footer {
 	border-top: 1px solid var(--color-border);
 	padding: var(--space-4);
+}
+
+.station-detail__actions {
+	display: flex;
+	flex-direction: column;
+	align-items: stretch;
+	gap: var(--space-3);
 }
 
 .station-detail__prices {
@@ -919,6 +943,28 @@
 	outline: none;
 }
 
+.station-detail__compare {
+	align-self: flex-start;
+	background: var(--color-surface-muted);
+	border: 1px solid var(--color-border-strong);
+	border-radius: var(--radius-md);
+	color: var(--color-text);
+	cursor: pointer;
+	font: inherit;
+	font-size: var(--font-size-sm);
+	font-weight: 600;
+	min-height: 2.5rem;
+	padding: var(--space-2) var(--space-3);
+}
+
+.station-detail__compare:hover,
+.station-detail__compare:focus-visible {
+	background: var(--color-surface-emphasis);
+	border-color: var(--color-brand-700);
+	box-shadow: var(--focus-ring);
+	outline: none;
+}
+
 .station-detail__empty {
 	color: var(--color-text-muted);
 	font-size: var(--font-size-sm);
@@ -945,6 +991,23 @@
 }
 
 .station-card:focus-visible {
+	box-shadow: var(--focus-ring);
+	outline: none;
+}
+
+.station-card__trigger {
+	background: transparent;
+	border: 0;
+	color: inherit;
+	cursor: pointer;
+	display: block;
+	font: inherit;
+	padding: 0;
+	text-align: left;
+	width: 100%;
+}
+
+.station-card__trigger:focus-visible {
 	box-shadow: var(--focus-ring);
 	outline: none;
 }
@@ -1128,9 +1191,20 @@
 
 .explorer__map {
 	background: #dce7e4;
+	/* Los panes de Leaflet usan z-index 200-1000 dentro del contenedor;
+	 * sin un contexto de apilamiento propio pueden pintar por encima del
+	 * panel lateral o del comparador. */
+	isolation: isolate;
 	min-width: 0;
 	overflow: hidden;
 	position: relative;
+	z-index: 0;
+}
+
+/* La ficha vive dentro del mapa, que es un contexto de apilado propio. Al
+ * abrirla, el contexto completo debe quedar por encima de los paneles. */
+.explorer__map:has(.station-detail__overlay) {
+	z-index: 1100;
 }
 
 .map-grid {
@@ -1265,8 +1339,12 @@
 	grid-column: 3;
 	min-width: 0;
 	overflow-y: auto;
+	overscroll-behavior: contain;
 	padding: var(--space-4);
+	position: relative;
 	width: 21rem;
+	/* Por encima del mapa (z-index 0), como el panel lateral. */
+	z-index: 1;
 }
 
 .compare-panel__list {
@@ -1284,62 +1362,171 @@
 	.explorer__sidebar {
 		padding: var(--space-4);
 	}
+
+	.compare-panel {
+		padding: var(--space-3);
+		width: 17rem;
+	}
+
+	.leaflet-map {
+		min-height: 0;
+	}
+}
+
+@media (max-width: 64rem) and (max-height: 30rem) {
+	/* En un móvil horizontal se conserva el panel lateral, pero el comparador
+	 * secundario no cabe en la rejilla de dos columnas. */
+	.explorer,
+	.explorer__map,
+	.explorer__map .leaflet-map,
+	.explorer__map .leaflet-map__container {
+		min-height: 0;
+	}
+
+	.compare-panel {
+		display: none;
+	}
+
+	.explorer__map .leaflet-map__container {
+		padding-bottom: 1.5rem;
+	}
+
+	.explorer__map .leaflet-control-attribution {
+		margin-bottom: 0.5rem;
+	}
+
+	.station-detail__overlay {
+		left: 21rem;
+	}
 }
 
 @media (max-width: 48rem) {
 	.explorer {
 		display: block;
-		min-height: 30rem;
+		height: 100%;
+		min-height: 0;
 		position: relative;
 	}
 
 	.explorer__map {
-		height: 100%;
+		/* En móvil el mapa ocupa viewport − 4.75rem (franja del resumen plegado)
+		 * y no depende del min-height de 320 px de escritorio, que en pantallas
+		 * estrechas (móvil horizontal) lo inflaría sobre el slot y la citación
+		 * de OSM/Leaflet quedaría cortada. Se anula el piso y se fija alto: el
+		 * mapa nunca supera el viewport disponible y la citación se ve. */
+		inset: 0 0 4.75rem 0;
+		min-height: 0;
+		overflow: hidden;
 		position: absolute;
-		inset: 0;
+	}
+
+	.explorer__map .leaflet-map,
+	.leaflet-map,
+	.leaflet-map__container {
+		height: 100%;
+		min-height: 0;
+	}
+
+	/* Espacio para la atribución de Leaflet/OSM (abajo a la derecha) dentro del
+	 * contenedor del mapa, para que no quede cortada por el overflow: hidden. */
+	.leaflet-map__container {
+		padding-bottom: 1.5rem;
+	}
+	.leaflet-map__container .leaflet-control-attribution {
+		margin-bottom: 0.5rem;
 	}
 
 	.explorer__sidebar {
 		background: var(--color-surface);
 		border: 1px solid var(--color-border);
 		border-bottom: 0;
-		border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+		border-radius: 0;
 		bottom: 0;
 		box-shadow: var(--shadow-lg);
+		height: 72%;
 		left: 0;
-		max-height: 72%;
+		overflow: hidden;
 		padding: 0;
 		position: absolute;
 		right: 0;
 		top: auto;
 		z-index: 2;
+		isolation: isolate;
 	}
 
 	.explorer__sidebar:not([open]) {
-		max-height: 4.75rem;
+		height: 4.75rem;
 	}
 
 	.explorer__sidebar > summary {
+		/* Franja de cabecera del desplegable: el borde fino rodea TODO el ancho
+		 * de la zona pulsable (la franja completa), no solo el contenido centrado.
+		 * El contenido (flecha + contador) se centra dentro. */
 		align-items: center;
 		background: var(--color-surface);
-		border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+		border: 1px solid var(--color-border-strong);
+		border-radius: 0;
+		cursor: pointer;
 		display: flex;
-		gap: var(--space-3);
 		justify-content: center;
 		list-style: none;
 		min-height: 4.75rem;
-		padding: var(--space-3) var(--space-5);
+		padding: var(--space-1) var(--space-4);
 		position: relative;
+		touch-action: manipulation;
+		width: 100%;
+	}
+
+	.explorer__sidebar > summary:hover {
+		background: var(--color-surface-muted);
+	}
+
+	.explorer__sidebar > summary:focus-visible {
+		box-shadow: var(--focus-ring);
+		outline: none;
 	}
 
 	.explorer__sidebar > summary::-webkit-details-marker {
 		display: none;
 	}
 
-	.explorer__sidebar > summary > span:nth-child(2) {
-		display: grid;
+	.explorer__summary-toggle {
+		/* Contenedor centrado dentro de la franja: solo agrupa la flecha y el
+		 * contador sin borde propio (el borde está en la franja completa). */
+		align-items: center;
+		display: flex;
+		flex-direction: column;
 		gap: var(--space-1);
-		text-align: center;
+		justify-content: center;
+		padding: var(--space-1) 0;
+	}
+
+	.explorer__summary-arrow {
+		/* Flecha grande, sin círculo. Gira al cambiar el estado del
+		 * desplegable: cerrado apunta hacia arriba. */
+		color: var(--color-text-muted);
+		font-size: 2rem;
+		line-height: 1;
+		transition: transform var(--transition-fast);
+	}
+
+	.explorer__sidebar:not([open]) .explorer__summary-arrow {
+		transform: rotate(180deg);
+	}
+
+	.explorer__summary-count small {
+		color: var(--color-text-muted);
+		font-size: var(--font-size-xs);
+	}
+
+	.explorer__summary-title {
+		display: grid;
+		min-width: 0;
+	}
+
+	.explorer__sidebar > summary strong {
+		font-size: var(--font-size-sm);
+		white-space: nowrap;
 	}
 
 	.explorer__sidebar > summary small {
@@ -1347,30 +1534,17 @@
 		font-size: var(--font-size-xs);
 	}
 
-	.explorer__grabber {
-		background: var(--color-border-strong);
-		border-radius: var(--radius-pill);
-		height: 0.25rem;
-		position: absolute;
-		top: var(--space-2);
-		width: 2.5rem;
-	}
-
-	.explorer__summary-icon {
-		color: var(--color-text-muted);
-		font-size: var(--font-size-lg);
-		position: absolute;
-		right: var(--space-5);
-		transition: transform var(--transition-fast);
-	}
-
-	.explorer__sidebar:not([open]) .explorer__summary-icon {
-		transform: rotate(180deg);
-	}
-
 	.explorer__sidebar-content {
+		/* El contenido de la hoja se desplaza bajo el resumen fijo (posición
+		 * absoluta con la altura restante del panel) y no rebota fuera de sus
+		 * límites; el mapa (debajo) queda al alcance de los gestos en el resto
+		 * de la pantalla. */
+		inset: 4.75rem 0 0 0;
 		overflow-y: auto;
+		overscroll-behavior: none;
 		padding: 0 var(--space-4) var(--space-5);
+		position: absolute;
+		touch-action: pan-y;
 	}
 
 	.explorer__sidebar-heading {
@@ -1386,6 +1560,12 @@
 		flex-wrap: wrap;
 	}
 
+	/* Sin comparador en móvil: el tap de la tarjeta abre la ficha, y las
+	   acciones expandidas de escritorio no tienen cabida. */
+	.station-card__actions {
+		display: none;
+	}
+
 	.map-controls {
 		right: var(--space-4);
 		top: var(--space-4);
@@ -1398,13 +1578,13 @@
 
 @media (max-width: 48rem) {
 	.station-detail__overlay {
-		align-items: flex-end;
+		align-items: center;
 	}
 
 	.station-detail {
-		border-radius: var(--radius-lg) var(--radius-lg) 0 0;
-		max-height: 72%;
-		width: 100%;
+		border-radius: var(--radius-lg);
+		max-height: 80%;
+		width: min(28rem, calc(100% - 2rem));
 	}
 }
 
@@ -1417,10 +1597,11 @@
 @media (max-width: 48rem) {
 	.compare-panel {
 		background: var(--color-surface);
-		border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+		border-radius: 0;
 		border-top: 1px solid var(--color-border);
 		bottom: 0;
 		box-shadow: var(--shadow-lg);
+		display: none;
 		left: 0;
 		max-height: 55%;
 		overflow-y: auto;

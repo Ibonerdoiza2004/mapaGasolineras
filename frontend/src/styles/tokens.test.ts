@@ -41,6 +41,54 @@ function token(theme: keyof typeof themeCss, name: string) {
 	return match[1];
 }
 
+function focusRingColor(theme: keyof typeof themeCss) {
+	const match = themeCss[theme].match(
+		/--focus-ring:\s*0 0 0 \d+px rgb\((\d+)\s+(\d+)\s+(\d+)\)/,
+	);
+	if (!match) throw new Error(`Anillo de foco no encontrado: ${theme}`);
+	const [red, green, blue] = [match[1], match[2], match[3]].map((value) =>
+		Number.parseInt(value, 10),
+	);
+	return `#${[red, green, blue]
+		.map((value) => value.toString(16).padStart(2, '0'))
+		.join('')}`;
+}
+
+const AA_TEXT_PAIRS: Array<[string, string]> = [
+	['--color-text', '--color-page'],
+	['--color-text', '--color-surface'],
+	['--color-text', '--color-surface-muted'],
+	['--color-text', '--color-surface-emphasis'],
+	['--color-text-muted', '--color-page'],
+	['--color-text-muted', '--color-surface'],
+	['--color-text-muted', '--color-surface-muted'],
+	['--color-text-muted', '--color-surface-emphasis'],
+	['--color-brand-900', '--color-page'],
+	['--color-brand-900', '--color-surface'],
+	['--color-brand-900', '--color-surface-emphasis'],
+	['--color-brand-700', '--color-page'],
+	['--color-brand-700', '--color-surface'],
+	['--color-text-on-brand', '--color-brand-700'],
+	['--color-text-on-brand', '--color-brand-900'],
+	['--color-success', '--color-success-surface'],
+	['--color-warning', '--color-warning-surface'],
+	['--color-danger', '--color-danger-surface'],
+	['--color-text', '--color-danger-surface'],
+	['--color-text', '--color-warning-surface'],
+	['--color-text', '--color-success-surface'],
+];
+
+const UI_PAIRS: Array<[string, string]> = [
+	['--color-border', '--color-page'],
+	['--color-border', '--color-surface'],
+	['--color-border', '--color-surface-muted'],
+	['--color-border', '--color-surface-emphasis'],
+	['--color-border-strong', '--color-page'],
+	['--color-border-strong', '--color-surface'],
+	['--color-border-strong', '--color-surface-muted'],
+	['--color-border-strong', '--color-surface-emphasis'],
+];
+
 describe('tokens visuales', () => {
 	afterEach(() => {
 		document.documentElement.removeAttribute('data-theme');
@@ -54,18 +102,24 @@ describe('tokens visuales', () => {
 		expect(token(theme as keyof typeof themeCss, '--color-text')).toBe(text);
 	});
 
-	it.each([
-		['light', '--color-text', '--color-page'],
-		['light', '--color-text-muted', '--color-page'],
-		['light', '--color-success', '--color-success-surface'],
-		['dark', '--color-text', '--color-page'],
-		['dark', '--color-text-muted', '--color-page'],
-		['dark', '--color-success', '--color-success-surface'],
-	])('mantiene contraste AA en %s entre %s y %s', (theme, foreground, background) => {
-		const selectedTheme = theme as keyof typeof themeCss;
+	it.each(
+		(['light', 'dark'] as const).flatMap((theme) =>
+			AA_TEXT_PAIRS.map(([foreground, background]) => [theme, foreground, background] as const),
+		),
+	)('mantiene contraste de texto AA (4.5:1) en %s entre %s y %s', (theme, foreground, background) => {
 		expect(
-			contrastRatio(token(selectedTheme, foreground), token(selectedTheme, background)),
+			contrastRatio(token(theme, foreground), token(theme, background)),
 		).toBeGreaterThanOrEqual(4.5);
+	});
+
+	it.each(
+		(['light', 'dark'] as const).flatMap((theme) =>
+			UI_PAIRS.map(([foreground, background]) => [theme, foreground, background] as const),
+		),
+	)('mantiene contraste no textual (3:1) en %s entre %s y %s', (theme, foreground, background) => {
+		expect(
+			contrastRatio(token(theme, foreground), token(theme, background)),
+		).toBeGreaterThanOrEqual(3);
 	});
 
 	it.each([
@@ -80,5 +134,24 @@ describe('tokens visuales', () => {
 		expect(
 			contrastRatio(token(selectedTheme, color), token(selectedTheme, '--color-surface')),
 		).toBeGreaterThanOrEqual(3);
+	});
+
+	it.each(['light', 'dark'] as const)(
+		'define el anillo de foco con color sólido en el tema %s',
+		(theme) => {
+			expect(themeCss[theme]).toMatch(/--focus-ring:\s*0 0 0 \d+px rgb\(\d+\s+\d+\s+\d+\)/);
+		},
+	);
+
+	it.each(
+		(['light', 'dark'] as const).flatMap((theme) =>
+			(['--color-page', '--color-surface-emphasis'] as const).map(
+				(background) => [theme, background] as const,
+			),
+		),
+	)('el anillo de foco mantiene 3:1 sobre %s en el tema %s', (theme, background) => {
+		expect(contrastRatio(focusRingColor(theme), token(theme, background))).toBeGreaterThanOrEqual(
+			3,
+		);
 	});
 });

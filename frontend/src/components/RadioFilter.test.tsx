@@ -3,11 +3,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import RadioFilter from './RadioFilter';
 import { RADIO_EVENT } from '../lib/explorerEvents';
-import { LOCATION_CLEAR_EVENT, LOCATION_EVENT } from '../lib/geolocation';
+import { dispatchUserLocation, LOCATION_CLEAR_EVENT, LOCATION_EVENT, resetLastLocation } from '../lib/geolocation';
 
 const originalLocation = window.location.href;
 
 beforeEach(() => {
+	resetLastLocation();
 	window.history.replaceState(null, '', '/explorar');
 });
 
@@ -83,7 +84,7 @@ describe('RadioFilter — alcance de la búsqueda (mapa o radio)', () => {
 		window.removeEventListener(RADIO_EVENT, listener);
 	});
 
-	it('recibir una ubicación en el modo radio mantiene el radio elegido', () => {
+	it('al recibir una ubicación mantiene la preferencia de radio de la URL', async () => {
 		window.history.replaceState(null, '', '/explorar?radio=50');
 		const listener = vi.fn();
 		window.addEventListener(RADIO_EVENT, listener);
@@ -91,14 +92,12 @@ describe('RadioFilter — alcance de la búsqueda (mapa o radio)', () => {
 
 		emitLocation();
 
-		expect(screen.getByRole('radio', { name: '50 km' })).toHaveAttribute(
-			'aria-checked',
-			'true',
+		await vi.waitFor(() =>
+			expect(screen.getByRole('radio', { name: '50 km' })).toHaveAttribute('aria-checked', 'true'),
 		);
-		// El radio ya estaba activo desde la URL: la ubicación no lo cambia,
-		// solo confirma el valor ya seleccionado.
+		// La URL no activa el radio mientras falta la ubicación, pero conserva
+		// la preferencia para cuando el usuario introduce una.
 		expect(listener).toHaveBeenCalledWith(expect.objectContaining({ detail: { radio: 50 } }));
-		expect(listener).not.toHaveBeenCalledWith(expect.objectContaining({ detail: { radio: 10 } }));
 		window.removeEventListener(RADIO_EVENT, listener);
 	});
 
@@ -150,6 +149,7 @@ describe('RadioFilter — alcance de la búsqueda (mapa o radio)', () => {
 	});
 
 	it('notifica el valor restaurado desde la URL al hidratarse', async () => {
+		dispatchUserLocation(40.4168, -3.7038, 'search');
 		window.history.replaceState(null, '', '/explorar?radio=50');
 		const listener = vi.fn();
 		window.addEventListener(RADIO_EVENT, listener);
@@ -164,6 +164,22 @@ describe('RadioFilter — alcance de la búsqueda (mapa o radio)', () => {
 			'true',
 		);
 		expect(listener).toHaveBeenCalledWith(expect.objectContaining({ detail: { radio: 50 } }));
+		window.removeEventListener(RADIO_EVENT, listener);
+	});
+
+	it('descarta el radio de la URL si se recarga sin ubicación', async () => {
+		window.history.replaceState(null, '', '/explorar?radio=50');
+		const listener = vi.fn();
+		window.addEventListener(RADIO_EVENT, listener);
+
+		render(<RadioFilter />);
+
+		await vi.waitFor(() => {
+			expect(mapScopeRadio()).toHaveAttribute('aria-checked', 'true');
+		});
+		expect(scopeRadio()).toBeDisabled();
+		expect(new URL(window.location.href).searchParams.get('radio')).toBeNull();
+		expect(listener).toHaveBeenCalledWith(expect.objectContaining({ detail: { radio: null } }));
 		window.removeEventListener(RADIO_EVENT, listener);
 	});
 

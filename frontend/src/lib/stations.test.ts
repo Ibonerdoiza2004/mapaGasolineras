@@ -26,6 +26,7 @@ describe('stations — formato de precios, distancias y fechas', () => {
 
 	it('formatea la fecha de actualización en hora local', () => {
 		expect(formatUpdateDate('2026-08-17T10:00:00Z')).toMatch(/17 ago/);
+		expect(formatUpdateDate('20/08/2026 0:35:37')).toMatch(/20 ago/);
 	});
 
 	it('devuelve null para fechas ausentes o malformadas', () => {

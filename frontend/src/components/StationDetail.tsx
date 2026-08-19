@@ -1,8 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { FUEL_EVENT, STATION_DETAIL_EVENT, dispatchStationDetail } from '../lib/explorerEvents';
+import {
+	COMPARE_EVENT,
+	FUEL_EVENT,
+	STATION_DETAIL_EVENT,
+	dispatchStationDetail,
+	dispatchStationSelect,
+} from '../lib/explorerEvents';
 import { FUEL_OPTIONS, fuelLabel, type FuelType } from '../lib/fuel';
 import { fetchStationDetail, formatPrice, formatUpdateDate, isPriceFresh, type StationDetail } from '../lib/stations';
+import { MOBILE_MEDIA_QUERY, useMediaQuery } from '../lib/useMediaQuery';
 
 type Status = 'idle' | 'loading' | 'success' | 'error';
 
@@ -17,6 +24,8 @@ export default function StationDetail() {
 	const [status, setStatus] = useState<Status>('idle');
 	const [detail, setDetail] = useState<StationDetail | null>(null);
 	const [selectedFuel, setSelectedFuel] = useState<FuelType | null>(null);
+	const [comparedIds, setComparedIds] = useState<string[]>([]);
+	const isMobile = useMediaQuery(MOBILE_MEDIA_QUERY);
 	const requestIdRef = useRef(0);
 	const returnFocusRef = useRef<HTMLElement | null>(null);
 	const panelRef = useRef<HTMLElement | null>(null);
@@ -29,6 +38,16 @@ export default function StationDetail() {
 		}
 		window.addEventListener(FUEL_EVENT, onFuel);
 		return () => window.removeEventListener(FUEL_EVENT, onFuel);
+	}, []);
+
+	useEffect(() => {
+		function onCompare(event: Event) {
+			const detail = (event as CustomEvent<{ ids: unknown }>).detail;
+			if (!detail || !Array.isArray(detail.ids)) return;
+			setComparedIds(detail.ids.filter((id): id is string => typeof id === 'string'));
+		}
+		window.addEventListener(COMPARE_EVENT, onCompare);
+		return () => window.removeEventListener(COMPARE_EVENT, onCompare);
 	}, []);
 
 	useEffect(() => {
@@ -232,24 +251,33 @@ export default function StationDetail() {
 			</div>
 		)}
 
-		{status === 'success' && detail && Number.isFinite(detail.latitud) && Number.isFinite(detail.longitud) && (
+		{status === 'success' && detail && (
 			<footer className="station-detail__footer">
-				<a
-					className="station-detail__directions"
-					href={`https://www.google.com/maps/dir/?api=1&destination=${detail.latitud},${detail.longitud}&travelmode=driving`}
-					target="_blank"
-					rel="noopener noreferrer"
-					draggable={false}
-					onMouseDown={(event) => {
-						// Arrastrar el enlace con el botón pulsado iniciaba el
-						// arrastre nativo del ancla y dejaba la página colgada
-						// hasta refrescar; se evita para que el clic siga
-						// funcionando.
-						if (event.button === 0) event.preventDefault();
-					}}
-				>
-					Cómo llegar (Google Maps)
-				</a>
+				<div className="station-detail__actions">
+					{Number.isFinite(detail.latitud) && Number.isFinite(detail.longitud) && (
+						<a
+							className="station-detail__directions"
+							href={`https://www.google.com/maps/dir/?api=1&destination=${detail.latitud},${detail.longitud}&travelmode=driving`}
+							target="_blank"
+							rel="noopener noreferrer"
+							draggable={false}
+							onMouseDown={(event) => {
+								if (event.button === 0) event.preventDefault();
+							}}
+						>
+							Cómo llegar (Google Maps)
+						</a>
+					)}
+					{!isMobile && !comparedIds.includes(stationId) && (
+						<button
+							type="button"
+							className="station-detail__compare"
+							onClick={() => dispatchStationSelect(stationId)}
+						>
+							Añadir al comparador
+						</button>
+					)}
+				</div>
 			</footer>
 		)}
 			</aside>

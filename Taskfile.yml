@@ -7,6 +7,7 @@ version: '3'
 
 vars:
   ENV_FILE: backend/.env.local
+  FRONTEND_ENV_FILE: frontend/.env.local
   COMPOSE_FILE: docker-compose.dev.yml
   TEST_COMPOSE_FILE: docker-compose.test.yml
 
@@ -15,7 +16,7 @@ tasks:
     aliases: [up, dev]
     desc: Arranca la aplicación completa (base de datos + backend + frontend)
     cmds:
-      - docker compose --env-file {{.ENV_FILE}} -f {{.COMPOSE_FILE}} --profile all up --build
+      - docker compose --env-file {{.ENV_FILE}} --env-file {{.FRONTEND_ENV_FILE}} -f {{.COMPOSE_FILE}} --profile all up --build
 
   db:
     desc: Arranca solo la base de datos PostgreSQL/PostGIS
@@ -30,7 +31,7 @@ tasks:
   frontend:
     desc: Arranca solo el frontend (Astro)
     cmds:
-      - docker compose -f {{.COMPOSE_FILE}} --profile frontend up --build
+      - docker compose --env-file {{.FRONTEND_ENV_FILE}} -f {{.COMPOSE_FILE}} --profile frontend up --build
 
   deps:
     desc: Reinstala las dependencias del frontend en el volumen de desarrollo

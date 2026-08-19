@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type SyntheticEvent } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { dispatchMarcasChange } from '../lib/explorerEvents';
 import { fetchBrands, type Brand } from '../lib/stations';
@@ -16,15 +16,21 @@ function readMarcasFromUrl(): string[] {
 }
 
 /**
- * Filtro por marca en un acordeón plegado por defecto. El catálogo (con
- * conteos) se consulta al backend; cada marca es una casilla y la selección
- * se refleja en la URL y se notifica con `gasolineras:marcas`. Si el backend
- * no responde, el filtro se oculta sin bloquear la búsqueda.
+ * Filtro por marca en un acordeón controlado, plegado por defecto. El
+ * catálogo (con conteos) se consulta al backend; cada marca es una casilla y
+ * la selección se refleja en la URL y se notifica con `gasolineras:marcas`.
+ * Si el backend no responde, el filtro se oculta sin bloquear la búsqueda.
+ *
+ * El contenido solo se renderiza con el acordeón abierto: así, mientras está
+ * plegado no hay etiquetas ocultas en el DOM (el auditor de Astro marca como
+ * problema las etiquetas sin texto visible, que es lo que ocurre dentro de
+ * un `details` cerrado).
  */
 export default function BrandFilter() {
 	const [brands, setBrands] = useState<Brand[]>([]);
 	const [selected, setSelected] = useState<string[]>([]);
 	const [query, setQuery] = useState('');
+	const [open, setOpen] = useState(false);
 	const [announcement, setAnnouncement] = useState('');
 	const selectedRef = useRef(selected);
 	selectedRef.current = selected;
@@ -62,12 +68,13 @@ export default function BrandFilter() {
 			.catch(() => {});
 	}, []);
 
-	const handleToggle = useCallback(
-		(event: SyntheticEvent<HTMLDetailsElement>) => {
-			if (event.currentTarget.open) refreshCounts();
-		},
-		[refreshCounts],
-	);
+	const handleToggle = useCallback(() => {
+		setOpen((current) => {
+			const next = !current;
+			if (next) refreshCounts();
+			return next;
+		});
+	}, [refreshCounts]);
 
 	const toggle = useCallback((code: string) => {
 		const next = selectedRef.current.includes(code)
@@ -97,51 +104,61 @@ export default function BrandFilter() {
 				);
 
 	return (
-		<details className="explorer__brand-filter" onToggle={handleToggle}>
-			<summary>
+		<div className={['explorer__brand-filter', open ? 'explorer__brand-filter--open' : ''].join(' ')}>
+			<button
+				type="button"
+				className="explorer__brand-filter-summary"
+				aria-expanded={open}
+				aria-controls="explorer-brand-filter-panel"
+				onClick={handleToggle}
+			>
 				<span className="explorer__brand-filter-title">Filtrar por marca</span>
 				{activeCount > 0 && (
 					<span className="explorer__brand-filter-count" aria-label={`${activeCount} marcas activas`}>
 						{activeCount}
 					</span>
 				)}
-			</summary>
-			<div className="explorer__brand-search-wrap">
-				<input
-					type="search"
-					className="explorer__brand-search"
-					placeholder="Buscar marca…"
-					aria-label="Buscar marca"
-					value={query}
-					onChange={(event) => setQuery(event.target.value)}
-				/>
-			</div>
-			{visibleBrands.length === 0 ? (
-				<p className="explorer__brand-empty">No hay marcas que coincidan con «{query.trim()}».</p>
-			) : (
-				<fieldset className="explorer__brand-list">
-					<legend className="visually-hidden">Marcas de gasolinera</legend>
-					{visibleBrands.map((brand) => {
-						const checked = selected.includes(brand.code);
-						return (
-							<label key={brand.code} className="explorer__brand-option">
-								<input
-									type="checkbox"
-									checked={checked}
-									onChange={() => toggle(brand.code)}
-								/>
-								<span className="explorer__brand-label">{brand.label}</span>
-								<span className="explorer__brand-count">{brand.count}</span>
-							</label>
-						);
-					})}
-				</fieldset>
+			</button>
+			{open && (
+				<div id="explorer-brand-filter-panel" className="explorer__brand-filter-panel">
+					<div className="explorer__brand-search-wrap">
+						<input
+							type="search"
+							className="explorer__brand-search"
+							placeholder="Buscar marca…"
+							aria-label="Buscar marca"
+							value={query}
+							onChange={(event) => setQuery(event.target.value)}
+						/>
+					</div>
+					{visibleBrands.length === 0 ? (
+						<p className="explorer__brand-empty">No hay marcas que coincidan con «{query.trim()}».</p>
+					) : (
+						<fieldset className="explorer__brand-list">
+							<legend className="visually-hidden">Marcas de gasolinera</legend>
+							{visibleBrands.map((brand) => {
+								const checked = selected.includes(brand.code);
+								return (
+									<label key={brand.code} className="explorer__brand-option">
+										<input
+											type="checkbox"
+											checked={checked}
+											onChange={() => toggle(brand.code)}
+										/>
+										<span className="explorer__brand-label">{brand.label}</span>
+										<span className="explorer__brand-count">{brand.count}</span>
+									</label>
+								);
+							})}
+						</fieldset>
+					)}
+				</div>
 			)}
 			{announcement && (
 				<p className="visually-hidden" role="status">
 					{announcement}
 				</p>
 			)}
-		</details>
+		</div>
 	);
 }

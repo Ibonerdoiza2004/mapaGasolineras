@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import StationDetail from './StationDetail';
-import { FUEL_EVENT, STATION_DETAIL_EVENT } from '../lib/explorerEvents';
+import { FUEL_EVENT, STATION_DETAIL_EVENT, STATION_SELECT_EVENT } from '../lib/explorerEvents';
 
 vi.mock('../config/runtime', () => ({
 	apiUrl: (path: string) => 'https://api.test' + path,
@@ -100,6 +100,35 @@ describe('StationDetail — ficha de la estación', () => {
 		);
 		expect(link).toHaveAttribute('target', '_blank');
 		expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+	});
+
+	it('permite añadir la estación al comparador desde la ficha', async () => {
+		vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(detailBody())));
+		const listener = vi.fn();
+		window.addEventListener(STATION_SELECT_EVENT, listener);
+		render(<StationDetail />);
+
+		select('s1');
+		await screen.findByText('REPSOL Norte');
+		fireEvent.click(screen.getByRole('button', { name: 'Añadir al comparador' }));
+
+		expect(listener).toHaveBeenCalledWith(expect.objectContaining({ detail: { id: 's1' } }));
+		window.removeEventListener(STATION_SELECT_EVENT, listener);
+	});
+
+	it('oculta la acción de comparar en móvil', async () => {
+		vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(detailBody())));
+		vi.spyOn(window, 'matchMedia').mockImplementation((query) => ({
+			matches: query.includes('max-width: 48rem'),
+			media: query,
+			addEventListener: vi.fn(),
+			removeEventListener: vi.fn(),
+		} as unknown as MediaQueryList));
+		render(<StationDetail />);
+
+		select('s1');
+		await screen.findByText('REPSOL Norte');
+		expect(screen.queryByRole('button', { name: 'Añadir al comparador' })).toBeNull();
 	});
 
 	it('el enlace de indicaciones no inicia el arrastre nativo al pulsar y mover el ratón', async () => {

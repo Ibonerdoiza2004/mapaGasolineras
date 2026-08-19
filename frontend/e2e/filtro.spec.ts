@@ -200,33 +200,26 @@ test.describe('filtro de combustible — buscar, comparar y ver detalle', () => 
 		await expect(page.locator('.radius-circle')).not.toBeVisible();
 	});
 
-	test('recargar conserva el radio elegido desde la URL', async ({ page }) => {
+	test('descarta el radio de la URL si no hay ubicación', async ({ page }) => {
 		stubNearby(page, NEARBY);
 		await page.goto('/?radio=25');
 
-		await expect(page.getByRole('radio', { name: 'Radio de búsqueda' })).toHaveAttribute(
+		await expect(page.getByRole('radio', { name: 'Área visible en el mapa' })).toHaveAttribute(
 			'aria-checked',
 			'true',
 		);
-		await expect(page.getByRole('radio', { name: '25 km', exact: true })).toHaveAttribute(
-			'aria-checked',
-			'true',
-		);
-		await expect(page.getByRole('radio', { name: '5 km', exact: true })).toHaveAttribute(
-			'aria-checked',
-			'false',
-		);
+		await expect(page.getByRole('radio', { name: 'Radio de búsqueda' })).toBeDisabled();
+		await expect(page.getByRole('radio', { name: '25 km', exact: true })).toHaveCount(0);
+		await expect.poll(() => new URL(page.url()).searchParams.get('radio')).toBeNull();
 
 		await page.reload();
 
-		await expect(page.getByRole('radio', { name: 'Radio de búsqueda' })).toHaveAttribute(
+		await expect(page.getByRole('radio', { name: 'Área visible en el mapa' })).toHaveAttribute(
 			'aria-checked',
 			'true',
 		);
-		await expect(page.getByRole('radio', { name: '25 km', exact: true })).toHaveAttribute(
-			'aria-checked',
-			'true',
-		);
+		await expect(page.getByRole('radio', { name: 'Radio de búsqueda' })).toBeDisabled();
+		await expect(page.getByRole('radio', { name: 'Más cercano' })).toBeDisabled();
 	});
 
 	test('la búsqueda manual marca el punto de referencia sin estilo de dispositivo', async ({
@@ -386,7 +379,11 @@ test.describe('filtro de combustible — buscar, comparar y ver detalle', () => 
 		expect(shadow).not.toBe('none');
 	});
 
-	test('añadir una gasolinera al panel de comparar y abrir su ficha', async ({ page }) => {
+	test('añadir una gasolinera al panel de comparar y abrir su ficha', async ({
+		page,
+		isMobile,
+	}) => {
+		test.skip(isMobile, 'el comparador solo existe en escritorio');
 		stubNearby(page, NEARBY);
 		page.route('**/api/stations/st-1', (route) =>
 			route.fulfill({
@@ -416,6 +413,14 @@ test.describe('filtro de combustible — buscar, comparar y ver detalle', () => 
 		// Al principio no hay columna de comparar.
 		await expect(page.getByRole('heading', { name: 'Comparar' })).toHaveCount(0);
 
+		// El caso problemático ocurría al añadir desde el zoom mínimo del mapa.
+		// Llegamos al mínimo con el control real, como lo haría un usuario.
+		for (let step = 0; step < 30; step += 1) {
+			const zoomOut = page.getByRole('button', { name: 'Alejar mapa' });
+			if (await zoomOut.isDisabled()) break;
+			await zoomOut.click();
+		}
+
 		// Clic en una gasolinera: despliega las acciones y se añade al comparador.
 		await page.getByRole('heading', { name: 'REPSOL Norte' }).click();
 		await page.getByRole('button', { name: 'Añadir al comparador' }).click();
@@ -425,6 +430,9 @@ test.describe('filtro de combustible — buscar, comparar y ver detalle', () => 
 		await expect(comparar.getByRole('heading', { name: 'Comparar' })).toBeVisible();
 		await expect(comparar.getByText('1 gasolinera')).toBeVisible();
 		await expect(comparar.getByText('1,459 €/l')).toBeVisible();
+
+		// La aparición del comparador no debe dejar el mapa bloqueado.
+		await page.getByRole('button', { name: 'Acercar mapa' }).click();
 
 		// La ficha se abre desde el panel con «Ver ficha».
 		await comparar.getByRole('button', { name: 'Ver ficha' }).click();
@@ -443,8 +451,117 @@ test.describe('filtro de combustible — buscar, comparar y ver detalle', () => 
 		await expect(comparar).not.toBeVisible();
 	});
 
+	test('en móvil, tocar una tarjeta abre la ficha directamente', async ({ page, isMobile }) => {
+		test.skip(!isMobile, 'comportamiento de móvil');
+		stubNearby(page, NEARBY);
+		page.route('**/api/stations/st-1', (route) =>
+			route.fulfill({
+				status: 200,
+				contentType: 'application/json',
+				body: JSON.stringify({
+					id: 'st-1',
+					rotulo: 'REPSOL Norte',
+					direccion: 'Av. de la Industria, 24',
+					codigoPostal: '28001',
+					localidad: 'Madrid',
+					municipio: 'Madrid',
+					provincia: 'Madrid',
+					latitud: 40.426,
+					longitud: -3.7038,
+					horario: 'L-D: 06:00-22:00',
+					tipoVenta: 'P',
+					margen: 'D',
+					precios: { DIESEL: 1.459, GASOLINA_95: 1.599, GASOLINA_98: 1.699 },
+					fechaActualizacion: '2026-08-18T10:00:00Z',
+				}),
+			}),
+		);
+		await page.goto('/');
+		await expect(page.getByRole('button', { name: 'Acercar mapa' })).toBeVisible();
+		await page.setViewportSize({ width: 915, height: 412 });
+
+		// En móvil no hay columna de comparar.
+		await expect(page.getByRole('heading', { name: 'Comparar' })).toHaveCount(0);
+
+		// El tap abre la ficha de la estación sin pasar por el comparador.
+		await page.getByRole('heading', { name: 'REPSOL Norte' }).click();
+
+		const ficha = page.getByRole('dialog', { name: 'Ficha de la gasolinera' });
+		await expect(ficha).toBeVisible();
+		await expect(ficha.getByText('L-D: 06:00-22:00')).toBeVisible();
+		await expect(ficha.getByText('1,459 €/l')).toBeVisible();
+
+		await page.getByRole('button', { name: 'Cerrar ficha' }).click();
+		await expect(ficha).not.toBeVisible();
+	});
+
+	test('en móvil, el panel desplaza su contenido hasta el final de la lista', async ({
+		page,
+		isMobile,
+	}) => {
+		test.skip(!isMobile, 'hoja inferior de móvil');
+		const manyStations = Array.from({ length: 15 }, (_, i) => ({
+			id: `st-${100 + i}`,
+			rotulo: `Gasolinera ${i + 1}`,
+			direccion: `Calle ${i + 1}, 1`,
+			localidad: 'Madrid',
+			provincia: 'Madrid',
+			latitud: 40.4168 + i * 0.001,
+			longitud: -3.7038 + i * 0.001,
+			distanciaKm: 1 + i,
+			precio: 1.45 + i * 0.01,
+			ahorro: i * 0.01,
+			fechaActualizacion: '2026-08-17T10:00:00Z',
+		}));
+		stubNearby(page, manyStations);
+		await grantLocation(page);
+		await page.goto('/');
+		await expect(page.getByRole('button', { name: 'Acercar mapa' })).toBeVisible();
+
+		await page.getByRole('button', { name: 'Usar mi ubicación' }).click();
+		await expect(page.getByRole('listitem').first()).toBeVisible();
+
+		// El contenido desborda la hoja: es el contenedor que se desplaza
+		// (el resumen queda fijo arriba).
+		const content = page.locator('.explorer__sidebar-content');
+		await expect
+			.poll(() => content.evaluate((el) => el.scrollHeight > el.clientHeight))
+			.toBe(true);
+
+		// La rueda sobre el contenido avanza su scroll (no el del details).
+		await expect
+			.poll(
+				async () => {
+					const box = await content.boundingBox();
+					if (!box) return false;
+					await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+					await page.mouse.wheel(0, 600);
+					return content.evaluate((el) => el.scrollTop > 0);
+				},
+				{ timeout: 15_000 },
+			)
+			.toBe(true);
+
+		// Se llega al fondo de la lista.
+		await expect
+			.poll(
+				async () => {
+					const box = await content.boundingBox();
+					if (!box) return false;
+					await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+					await page.mouse.wheel(0, 600);
+					return content.evaluate(
+						(el) => el.scrollTop + el.clientHeight >= el.scrollHeight - 1,
+					);
+				},
+				{ timeout: 15_000 },
+			)
+			.toBe(true);
+	});
+
 	test('flujo MVP completo: buscar, filtrar, ordenar, abrir ficha e indicaciones', async ({
 		page,
+		isMobile,
 	}) => {
 		stubNearby(page, NEARBY);
 		page.route('**/api/stations/st-1', (route) =>
@@ -505,13 +622,19 @@ test.describe('filtro de combustible — buscar, comparar y ver detalle', () => 
 		await page.getByRole('radio', { name: 'Más cercano' }).click();
 		expect(new URL(page.url()).searchParams.get('orden')).toBe('distancia');
 
-		// 4) Añadir la gasolinera al panel de comparar y abrir su ficha.
+		// 4) Añadir la gasolinera al panel de comparar y abrir su ficha. En
+		// móvil no hay comparador: el tap abre la ficha directamente.
 		await page.getByRole('heading', { name: 'REPSOL Norte' }).click();
-		await page.getByRole('button', { name: 'Añadir al comparador' }).click();
-		const comparar = page.getByRole('complementary', { name: 'Gasolineras para comparar' });
-		await expect(comparar).toBeVisible();
-		await comparar.getByRole('button', { name: 'Ver ficha' }).click();
 		const ficha = page.getByRole('dialog', { name: 'Ficha de la gasolinera' });
+		if (isMobile) {
+			await expect(ficha).toBeVisible();
+			await expect(ficha.getByText('1,459 €/l')).toBeVisible();
+		} else {
+			await page.getByRole('button', { name: 'Añadir al comparador' }).click();
+			const comparar = page.getByRole('complementary', { name: 'Gasolineras para comparar' });
+			await expect(comparar).toBeVisible();
+			await comparar.getByRole('button', { name: 'Ver ficha' }).click();
+		}
 		await expect(ficha).toBeVisible();
 		await expect(ficha.getByText('1,459 €/l')).toBeVisible();
 

@@ -242,7 +242,7 @@ public class StationService {
 	}
 
 	private static final DateTimeFormatter MITECO_DATETIME =
-			DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss");
+			DateTimeFormatter.ofPattern("dd/MM/yyyy H:mm:ss");
 
 	private Comparator<NearbyStationDto> comparator(OrderBy orderBy) {
 		return switch (orderBy) {

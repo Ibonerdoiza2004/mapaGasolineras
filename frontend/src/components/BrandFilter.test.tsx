@@ -52,16 +52,36 @@ describe('BrandFilter — filtro por marca', () => {
 		await vi.waitFor(() => {
 			expect(screen.getByText('Filtrar por marca')).toBeInTheDocument();
 		});
-		// Plegado por defecto: el panel no está abierto.
-		expect(document.querySelector('details')).not.toHaveAttribute('open');
+		// Plegado por defecto: el contenido no se renderiza, así que no hay
+		// etiquetas ocultas en el DOM (el auditor de Astro las marcaría).
+		const summary = screen.getByRole('button', { name: /Filtrar por marca/ });
+		expect(summary).toHaveAttribute('aria-expanded', 'false');
+		expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
 
 		openFilter();
 
-		expect(document.querySelector('details')).toHaveAttribute('open');
+		expect(summary).toHaveAttribute('aria-expanded', 'true');
 		expect(screen.getAllByRole('checkbox')).toHaveLength(3);
 		expect(screen.getByRole('checkbox', { name: /Repsol/ })).toBeInTheDocument();
 		expect(screen.getByRole('checkbox', { name: /Otras marcas/ })).toBeInTheDocument();
 		expect(screen.getByText('91')).toBeInTheDocument();
+	});
+
+	it('al cerrar el acordeón retira las casillas del DOM', async () => {
+		render(<BrandFilter />);
+		await vi.waitFor(() => expect(screen.getByText('Filtrar por marca')).toBeInTheDocument());
+		openFilter();
+		expect(screen.getAllByRole('checkbox')).toHaveLength(3);
+
+		act(() => {
+			screen.getByRole('button', { name: /Filtrar por marca/ }).click();
+		});
+
+		expect(screen.getByRole('button', { name: /Filtrar por marca/ })).toHaveAttribute(
+			'aria-expanded',
+			'false',
+		);
+		expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
 	});
 
 	it('al marcar una marca la refleja en la URL, notifica y anuncia', async () => {
@@ -165,7 +185,8 @@ describe('BrandFilter — filtro por marca', () => {
 		await vi.waitFor(() => {
 			expect(fetchBrands).toHaveBeenCalledTimes(2);
 		});
-		expect(screen.getByText('150')).toBeInTheDocument();
+		// El refresco es asíncrono: se espera a que el nuevo conteo llegue al DOM.
+		await vi.waitFor(() => expect(screen.getByText('150')).toBeInTheDocument());
 	});
 
 	it('el buscador filtra las marcas por nombre y las restaura al borrar', async () => {

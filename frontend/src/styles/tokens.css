@@ -20,8 +20,8 @@
 	--color-surface: #ffffff;
 	--color-surface-muted: #f4f6f8;
 	--color-surface-emphasis: #e8eef2;
-	--color-border: #d6dee5;
-	--color-border-strong: #aebdca;
+	--color-border: #72808d;
+	--color-border-strong: #586678;
 	--color-text: #17232d;
 	--color-text-muted: #5d6d79;
 	--color-text-on-brand: #ffffff;
@@ -58,7 +58,7 @@
 	--shadow-sm: 0 1px 2px rgb(18 50 74 / 0.08);
 	--shadow-md: 0 4px 14px rgb(18 50 74 / 0.12);
 	--shadow-lg: 0 12px 32px rgb(18 50 74 / 0.16);
-	--focus-ring: 0 0 0 3px rgb(23 105 170 / 0.28);
+	--focus-ring: 0 0 0 3px rgb(23 105 170);
 
 	/* Movimiento */
 	--transition-fast: 120ms ease;
@@ -77,8 +77,8 @@ html[data-theme="dark"] {
 	--color-surface: #1e252b;
 	--color-surface-muted: #252e35;
 	--color-surface-emphasis: #303b44;
-	--color-border: #46535d;
-	--color-border-strong: #667681;
+	--color-border: #7a8995;
+	--color-border-strong: #82919e;
 	--color-text: #f1f5f7;
 	--color-text-muted: #b9c6ce;
 	--color-text-on-brand: #10212c;
@@ -96,7 +96,7 @@ html[data-theme="dark"] {
 	--shadow-sm: 0 1px 2px rgb(0 0 0 / 0.24);
 	--shadow-md: 0 4px 14px rgb(0 0 0 / 0.32);
 	--shadow-lg: 0 12px 32px rgb(0 0 0 / 0.4);
-	--focus-ring: 0 0 0 3px rgb(130 200 237 / 0.34);
+	--focus-ring: 0 0 0 3px rgb(130 200 237);
 }
 
 /* Hasta que exista el selector manual, el sistema operativo puede elegir el
@@ -112,8 +112,8 @@ html[data-theme="dark"] {
 		--color-surface: #1e252b;
 		--color-surface-muted: #252e35;
 		--color-surface-emphasis: #303b44;
-		--color-border: #46535d;
-		--color-border-strong: #667681;
+		--color-border: #7a8995;
+		--color-border-strong: #82919e;
 		--color-text: #f1f5f7;
 		--color-text-muted: #b9c6ce;
 		--color-text-on-brand: #10212c;
@@ -131,7 +131,7 @@ html[data-theme="dark"] {
 		--shadow-sm: 0 1px 2px rgb(0 0 0 / 0.24);
 		--shadow-md: 0 4px 14px rgb(0 0 0 / 0.32);
 		--shadow-lg: 0 12px 32px rgb(0 0 0 / 0.4);
-		--focus-ring: 0 0 0 3px rgb(130 200 237 / 0.34);
+		--focus-ring: 0 0 0 3px rgb(130 200 237);
 	}
 }
 

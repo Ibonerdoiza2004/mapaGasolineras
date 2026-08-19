@@ -95,6 +95,32 @@ Edita `backend/.env.local` y configura el usuario, contraseña, base de datos,
 host y puerto que utilizará este entorno. El mismo usuario y contraseña se
 utilizarán para crear PostgreSQL y para conectar el backend.
 
+Para abrir la aplicación desde un móvil conectado a la misma red, crea también
+`frontend/.env.local` a partir de su plantilla y añade `PUBLIC_API_URL` con la
+IP local del ordenador (`ip addr` en Linux):
+
+```bash
+cp frontend/.env.example frontend/.env.local
+```
+
+Por ejemplo, si la IP del ordenador es `192.168.1.42`:
+
+```dotenv
+PUBLIC_API_URL=http://192.168.1.42:8080
+```
+
+Si `PUBLIC_API_URL` no está definida, Compose usa `http://localhost:8080`, que
+es el valor apto para CI y para el acceso desde el propio ordenador.
+
+Añade el origen del frontend al archivo `backend/.env.local`:
+
+```dotenv
+CORS_ALLOWED_ORIGINS=http://localhost:4321,http://192.168.1.42:4321
+```
+
+Después ejecuta `task default` y abre `http://192.168.1.42:4321` desde el
+móvil. La IP puede cambiar si el router la asigna por DHCP.
+
 ### 3️⃣ Arrancar los servicios con Docker Compose
 
 El archivo `docker-compose.dev.yml` utiliza perfiles. Todos los comandos usan
@@ -111,9 +137,10 @@ Cloud basados en Ampere).
 | Solo frontend | `docker compose -f docker-compose.dev.yml --profile frontend up --build` |
 | Aplicación completa | `docker compose --env-file backend/.env.local -f docker-compose.dev.yml --profile all up --build` |
 
-La primera ejecución descarga las imágenes y dependencias. La aplicación
-completa queda disponible en `http://localhost:4321` y el backend en
-`http://localhost:8080`. En Compose, el backend conecta a PostgreSQL mediante
+La primera ejecución descarga las imágenes y dependencias. En el propio
+ordenador, la aplicación completa queda disponible en `http://localhost:4321`
+y el backend en `http://localhost:8080`; desde otro dispositivo se usa la IP
+LAN del ordenador y los mismos puertos. En Compose, el backend conecta a PostgreSQL mediante
 el nombre interno `db`; no hay que cambiar `POSTGRES_HOST=localhost` en el
 archivo local, que se conserva para ejecutar el backend fuera de Docker.
 
