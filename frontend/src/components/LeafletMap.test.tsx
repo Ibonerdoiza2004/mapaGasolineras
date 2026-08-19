@@ -14,7 +14,8 @@ import {
 import { dispatchUserLocation, LOCATION_EVENT, resetLastLocation } from '../lib/geolocation';
 import { SPAIN_BOUNDS, PENINSULA_CENTER } from '../lib/spainBounds';
 
-const { leafletMock, markerInstance, circleInstance, mapState } = vi.hoisted(() => {
+const { leafletMock, markerInstance, circleInstance, mapState, zoomControlInstance } =
+	vi.hoisted(() => {
 	const mapState = {
 		size: { x: 1580, y: 1024 },
 		zoom: 5.25,
@@ -24,6 +25,7 @@ const { leafletMock, markerInstance, circleInstance, mapState } = vi.hoisted(() 
 	const zeroZoom: Record<string, { x: number; y: number }> = {
 		'27.63': { x: 115.09, y: 107.54 },
 		'39.9': { x: 125.8, y: 96.99 },
+		'43.8': { x: 128.79, y: 93.34 },
 		'52.17': { x: 136.5, y: 84.27 },
 	};
 	const mapInstance = {
@@ -32,6 +34,8 @@ const { leafletMock, markerInstance, circleInstance, mapState } = vi.hoisted(() 
 			getSouthWest: () => ({ lat: 36.5, lng: -9.5 }),
 			getNorthEast: () => ({ lat: 43.8, lng: 3.5 }),
 		})),
+		getCenter: vi.fn(() => ({ lat: 40.4, lng: -3.7 })),
+		_limitCenter: vi.fn((center: unknown) => center),
 		getMaxZoom: vi.fn(() => 19),
 		getMinZoom: vi.fn(() => 3),
 		getSize: vi.fn(() => mapState.size),
@@ -73,6 +77,10 @@ const { leafletMock, markerInstance, circleInstance, mapState } = vi.hoisted(() 
 	};
 	const tileLayerInstance = { addTo: vi.fn() };
 	const zoomControlInstance = { addTo: vi.fn() };
+	// El control de zoom propio se construye con `L.Control.extend(props)` y se
+	// instancia después; para que la prueba ejercite el `onAdd` real (que crea
+	// los botones y desactiva la propagación de clics), el mock conserva las
+	// opciones pasadas a `extend` y `addTo` invoca `onAdd` antes de añadirse.
 	return {
 		mapState,
 		markerInstance,
@@ -85,7 +93,36 @@ const { leafletMock, markerInstance, circleInstance, mapState } = vi.hoisted(() 
 			circle: vi.fn(() => circleInstance),
 			divIcon: vi.fn((opts: unknown) => opts),
 			control: { zoom: vi.fn(() => zoomControlInstance) },
-			latLngBounds: vi.fn(() => ({ pad: vi.fn(() => ({})) })),
+			Control: {
+				extend: vi.fn((props: unknown) => {
+					return vi.fn(function (this: {
+						addTo: ReturnType<typeof vi.fn>;
+						onAdd?: () => HTMLElement;
+						options?: { position: string };
+					}) {
+						Object.assign(this, props as object, {
+							addTo: vi.fn((map: unknown) => {
+								if (typeof this.onAdd === 'function') this.onAdd();
+								return zoomControlInstance.addTo(map);
+							}),
+						});
+					});
+				}),
+			},
+			DomUtil: {
+				create: vi.fn((tag: string, className: string) => {
+					const element = document.createElement(tag);
+					element.className = className;
+					return element;
+				}),
+			},
+			DomEvent: {
+				disableClickPropagation: vi.fn(),
+			},
+			latLngBounds: vi.fn(() => ({
+				pad: vi.fn(() => ({})),
+				getCenter: vi.fn(() => ({ lat: 39.9, lng: -3.1 })),
+			})),
 		},
 	};
 });
@@ -109,10 +146,14 @@ describe('LeafletMap', () => {
 
 	afterEach(() => {
 		cleanup();
+		// El resto de pruebas asume el ancho de escritorio de JSDOM.
+		Object.defineProperty(window, 'innerWidth', { value: 1024, configurable: true });
 	});
 
 	it('inicializa el mapa y añade la capa de teselas de OpenStreetMap', async () => {
-		render(<LeafletMap stations={stations} center={[40.4168, -3.7038]} zoom={13} />);
+		render(
+			<LeafletMap stations={stations} center={[40.4168, -3.7038]} zoom={13} bounds={SPAIN_BOUNDS} />,
+		);
 
 		await waitFor(() => expect(leafletMock.map).toHaveBeenCalledTimes(1));
 		const [container, options] = leafletMock.map.mock.calls[0] as unknown as [
@@ -123,6 +164,8 @@ describe('LeafletMap', () => {
 			zoomControl: boolean;
 			minZoom: number;
 			maxZoom: number;
+			touchZoom: boolean;
+			bounceAtZoomLimits: boolean;
 			zoomSnap: number;
 			zoomDelta: number;
 			maxBounds: unknown;
@@ -134,14 +177,24 @@ describe('LeafletMap', () => {
 		expect(options.zoomControl).toBe(false);
 		expect(options.minZoom).toBe(3);
 		expect(options.maxZoom).toBe(19);
+		expect(options.touchZoom).toBe(true);
+		// El pellizco se frena en el zoom mínimo/máximo, sin rebote.
+		expect(options.bounceAtZoomLimits).toBe(false);
 		expect(options.zoomSnap).toBe(0.5);
 		expect(options.zoomDelta).toBe(0.5);
 		expect(options.maxBoundsViscosity).toBe(1);
-		expect(leafletMock.latLngBounds).toHaveBeenCalledWith(SPAIN_BOUNDS);
-		const boundsMock = leafletMock.latLngBounds.mock.results[0].value as {
-			pad: ReturnType<typeof vi.fn>;
-		};
-		expect(boundsMock.pad).toHaveBeenCalledWith(0.08);
+		// Los límites de arrastre son asimétricos: el norte es un valor absoluto
+		// justo por encima de la vista inicial (50º) para no dejar océano de
+		// sobra sobre la península, y el sur depende del ancho del viewport
+		// (JSDOM usa 1024 px exactos: entra en la rama ancha de escritorio).
+		const [swLat, swLng] = SPAIN_BOUNDS[0];
+		const [neLat, neLng] = SPAIN_BOUNDS[1];
+		const latSpan = neLat - swLat;
+		const lngSpan = neLng - swLng;
+		expect(leafletMock.latLngBounds).toHaveBeenCalledWith(
+			[swLat - latSpan * 0.05, swLng - lngSpan * 0.2],
+			[50, neLng + lngSpan * 0.05],
+		);
 		expect(options.maxBounds).toBeDefined();
 		expect(leafletMock.tileLayer).toHaveBeenCalledWith(
 			'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
@@ -150,10 +203,16 @@ describe('LeafletMap', () => {
 				attribution: expect.stringContaining('OpenStreetMap'),
 			}),
 		);
-		expect(leafletMock.control.zoom).toHaveBeenCalledWith({
-			zoomInTitle: 'Acercar mapa',
-			zoomOutTitle: 'Alejar mapa',
-		});
+		// El control de zoom es propio y accesible (botones, no <a href="#">).
+		expect(leafletMock.Control.extend).toHaveBeenCalled();
+		expect(leafletMock.DomEvent.disableClickPropagation).toHaveBeenCalled();
+		const buttonTags = leafletMock.DomUtil.create.mock.calls
+			.map(([tag]) => tag)
+			.filter((tag) => tag === 'button');
+		expect(buttonTags).toHaveLength(2);
+		expect(zoomControlInstance.addTo).toHaveBeenCalledWith(
+			leafletMock.map.mock.results[0].value,
+		);
 		expect(container).toBeInstanceOf(HTMLElement);
 		const mapInstance = leafletMock.map.mock.results[0].value as {
 			fitBounds: ReturnType<typeof vi.fn>;
@@ -229,7 +288,9 @@ describe('LeafletMap', () => {
 		const mapInstance = leafletMock.map.mock.results[0].value as {
 			panTo: ReturnType<typeof vi.fn>;
 		};
-		await waitFor(() => expect(mapInstance.panTo).toHaveBeenCalledWith([27.63, -18.16]));
+		await waitFor(() =>
+			expect(mapInstance.panTo).toHaveBeenCalledWith([27.63, -18.16], { animate: false }),
+		);
 
 		const selectedIcon = leafletMock.divIcon.mock.calls
 			.map((call) => call[0] as { className?: string })
@@ -378,34 +439,85 @@ describe('LeafletMap', () => {
 		window.removeEventListener(STATION_DETAIL_EVENT, detailListener);
 	});
 
+	it('el popup de una estación solo enfocada ofrece añadir, no quitar del comparador', async () => {
+		const spread = [
+			{ id: '1', lat: 40.4168, lon: -3.7038, rotulo: 'REPSOL', price: 1.599 },
+			{ id: '2', lat: 27.63, lon: -18.16, rotulo: 'CEPSA', price: 1.65 },
+		];
+		render(<LeafletMap stations={spread} center={[40.4168, -3.7038]} zoom={13} />);
+		await waitFor(() => expect(markerInstance.bindPopup).toHaveBeenCalled());
+
+		// Se enfoca la estación 2 desde el listado sin añadirla al comparador.
+		act(() => {
+			window.dispatchEvent(new CustomEvent(STATION_FOCUS_EVENT, { detail: { id: '2' } }));
+		});
+
+		await waitFor(() => {
+			const calls = markerInstance.bindPopup.mock.calls as unknown as [string][];
+			const last = calls.filter(([html]) => html.includes('data-station-id="2"')).at(-1)?.[0];
+			expect(last).toBeDefined();
+			expect(last).toContain('Añadir al comparador');
+			expect(last).not.toContain('Quitar del comparador');
+		});
+
+		// Al añadirla al comparador, el popup pasa a ofrecer quitarla.
+		act(() => {
+			window.dispatchEvent(
+				new CustomEvent(COMPARE_EVENT, { detail: { ids: ['2'], added: '2' } }),
+			);
+		});
+
+		await waitFor(() => {
+			const calls = markerInstance.bindPopup.mock.calls as unknown as [string][];
+			const last = calls.filter(([html]) => html.includes('data-station-id="2"')).at(-1)?.[0];
+			expect(last).toBeDefined();
+			expect(last).toContain('Quitar del comparador');
+		});
+	});
+
 	it('ajusta la vista a los límites, conserva el margen bajo Canarias y aumenta el detalle', async () => {
 		render(<LeafletMap stations={stations} center={[40.4168, -3.7038]} zoom={13} bounds={SPAIN_BOUNDS} />);
 
 		await waitFor(() => expect(leafletMock.map).toHaveBeenCalledTimes(1));
 		const mapInstance = leafletMock.map.mock.results[0].value as {
-			fitBounds: ReturnType<typeof vi.fn>;
 			project: ReturnType<typeof vi.fn>;
 			setMinZoom: ReturnType<typeof vi.fn>;
 			setView: ReturnType<typeof vi.fn>;
 			unproject: ReturnType<typeof vi.fn>;
 			options: { zoomSnap: number };
 		};
-		expect(mapInstance.fitBounds).toHaveBeenCalledWith(SPAIN_BOUNDS, { padding: [16, 16] });
-		expect(mapInstance.project).toHaveBeenNthCalledWith(1, SPAIN_BOUNDS[0], 5.25);
-		expect(mapInstance.project).toHaveBeenNthCalledWith(2, SPAIN_BOUNDS[1], 5.25);
+		// El zoom mínimo se calcula proyectando el rectángulo a zoom 0: el
+		// encuadre de España (el menor de ambos ejes, con un pequeño margen
+		// lateral) nunca baja del encuadre del área desplazable con margen.
+		expect(mapInstance.project).toHaveBeenNthCalledWith(1, SPAIN_BOUNDS[0], 0);
+		expect(mapInstance.project).toHaveBeenNthCalledWith(2, SPAIN_BOUNDS[1], 0);
 		expect(mapInstance.project).toHaveBeenNthCalledWith(3, SPAIN_BOUNDS[0], 0);
 		expect(mapInstance.project).toHaveBeenNthCalledWith(4, PENINSULA_CENTER, 0);
-		// El zoom parte del margen de 28 px bajo Canarias y gana un octavo de
-		// nivel para que las carreteras sean algo más legibles desde la carga inicial.
+		expect(mapInstance.project).toHaveBeenNthCalledWith(5, SPAIN_BOUNDS[0], 0);
+		expect(mapInstance.project).toHaveBeenNthCalledWith(6, [43.8, 0], 0);
+		const boundsWidth = 136.5 - 115.09;
+		const boundsHeight = 107.54 - 84.27;
+		const minZoom = Math.max(
+			Math.min(Math.log2((1580 * 0.97) / boundsWidth), Math.log2(1024 / boundsHeight)),
+			Math.log2(1580 / (boundsWidth * 1.25)),
+		);
+		// El zoom mínimo impide alejarse más allá de los límites de España.
+		expect(mapInstance.setMinZoom).toHaveBeenCalledWith(minZoom);
+		// La vista inicial de escritorio encuadra la península anclando Canarias
+		// a 28 px del borde inferior. En este viewport de 1024 px no se aplica
+		// INITIAL_ZOOM_PAD.
 		const bottomOffset = 107.54 - 96.99;
 		const baseZoom = Math.log2((1024 / 2 - 28) / bottomOffset);
-		const targetZoom = baseZoom + 0.125;
-		expect(mapInstance.setView).toHaveBeenCalledWith([36.5, -6.9], targetZoom, {
+		const peninsulaZoom = Math.log2(1024 / (107.54 - 93.34));
+		const targetZoom = Math.max(
+			Math.min(baseZoom, 19, peninsulaZoom),
+			minZoom,
+		);
+		const framedZoom = Math.max(targetZoom, 3);
+		expect(mapInstance.setMinZoom).toHaveBeenCalledWith(framedZoom);
+		expect(mapInstance.setView).toHaveBeenCalledWith([36.5, -6.9], framedZoom, {
 			animate: false,
 		});
-		// El zoom mínimo coincide con la vista inicial: no se puede alejar más
-		// allá de los límites de España.
-		expect(mapInstance.setMinZoom).toHaveBeenCalledWith(targetZoom);
 		expect(mapInstance.unproject).toHaveBeenCalled();
 		// El ajuste a la rejilla se desactiva solo durante la vista inicial.
 		expect(mapInstance.options.zoomSnap).toBe(0.5);
@@ -421,14 +533,196 @@ describe('LeafletMap', () => {
 
 		await waitFor(() => expect(leafletMock.map).toHaveBeenCalledTimes(1));
 		const mapInstance = leafletMock.map.mock.results[0].value as {
-			fitBounds: ReturnType<typeof vi.fn>;
 			setMinZoom: ReturnType<typeof vi.fn>;
 			setView: ReturnType<typeof vi.fn>;
+			options: { zoomSnap: number };
 		};
-		expect(mapInstance.fitBounds).toHaveBeenCalledWith(SPAIN_BOUNDS, { padding: [16, 16] });
-		expect(mapInstance.setView).not.toHaveBeenCalled();
-		// El zoom mínimo es el del encuadre por anchura (sin desplazamiento).
-		expect(mapInstance.setMinZoom).toHaveBeenCalledWith(4);
+		const minZoom = Math.max(
+			Math.min(
+				Math.log2((400 * 0.97) / (136.5 - 115.09)),
+				Math.log2(700 / (107.54 - 84.27)),
+			),
+			Math.log2(400 / ((136.5 - 115.09) * 1.25)),
+		);
+		// El zoom mínimo encuadra España entera (el menor de ambos ejes),
+		// nunca por debajo del encuadre del área desplazable con margen (el
+		// margen este ahora es 0.05 en todo ancho de pantalla).
+		expect(mapInstance.setMinZoom).toHaveBeenCalledWith(minZoom);
+		// La anchura limita: la vista inicial muestra España centrada al zoom
+		// mínimo, no el zoom del mapa (que sería un no-op).
+		expect(mapInstance.setView).toHaveBeenCalledWith([39.9, -3.1], minZoom, {
+			animate: false,
+		});
+		// El ajuste a la rejilla se desactiva solo durante la vista inicial.
+		expect(mapInstance.options.zoomSnap).toBe(0.5);
+	});
+
+	it('en tablet de 1024 px no aplica el alejamiento de escritorio (quedaría demasiado alejado)', async () => {
+		mapState.size = { x: 1024, y: 768 };
+		Object.defineProperty(window, 'innerWidth', { value: 1024, configurable: true });
+
+		render(<LeafletMap stations={stations} center={[40.4168, -3.7038]} zoom={13} bounds={SPAIN_BOUNDS} />);
+
+		await waitFor(() => expect(leafletMock.map).toHaveBeenCalledTimes(1));
+		const mapInstance = leafletMock.map.mock.results[0].value as {
+			project: ReturnType<typeof vi.fn>;
+			setMinZoom: ReturnType<typeof vi.fn>;
+			setView: ReturnType<typeof vi.fn>;
+			unproject: ReturnType<typeof vi.fn>;
+			options: { zoomSnap: number };
+		};
+		const boundsWidth = 136.5 - 115.09;
+		const boundsHeight = 107.54 - 84.27;
+		const minZoom = Math.max(
+			Math.min(Math.log2((1024 * 0.97) / boundsWidth), Math.log2(768 / boundsHeight)),
+			Math.log2(1024 / (boundsWidth * 1.25)),
+		);
+		const bottomOffset = 107.54 - 96.99;
+		const baseZoom = Math.log2((768 / 2 - 28) / bottomOffset);
+		const peninsulaZoom = Math.log2(768 / (107.54 - 93.34));
+		const targetZoom = Math.max(
+			Math.min(baseZoom, 19, peninsulaZoom),
+			minZoom,
+		);
+		// 1024 px no supera el umbral de escritorio ancho: sin INITIAL_ZOOM_PAD,
+		// el zoom inicial coincide con el target (no hay -0.4). El floor real es
+		// el zoom mínimo absoluto (3), no el encuadre.
+		const expectedFramed = Math.max(targetZoom, 3);
+		expect(mapInstance.setMinZoom).toHaveBeenCalledWith(expectedFramed);
+		expect(mapInstance.setView).toHaveBeenCalledWith([36.5, -6.9], expectedFramed, {
+			animate: false,
+		});
+		expect(mapInstance.options.zoomSnap).toBe(0.5);
+	});
+
+	it('en móvil deja margen para mostrar Baleares sin perder Canarias', async () => {
+		mapState.size = { x: 400, y: 700 };
+		mapState.southWest = { x: 50, y: 650 };
+		mapState.northEast = { x: 360, y: 150 };
+		Object.defineProperty(window, 'innerWidth', { value: 412, configurable: true });
+
+		render(<LeafletMap stations={stations} center={[40.4168, -3.7038]} zoom={13} bounds={SPAIN_BOUNDS} />);
+
+		await waitFor(() => expect(leafletMock.map).toHaveBeenCalledTimes(1));
+		const mapInstance = leafletMock.map.mock.results[0].value as {
+			setMinZoom: ReturnType<typeof vi.fn>;
+			setView: ReturnType<typeof vi.fn>;
+			unproject: ReturnType<typeof vi.fn>;
+			options: { zoomSnap: number };
+		};
+		const [swLat, swLng] = SPAIN_BOUNDS[0];
+		const [neLat, neLng] = SPAIN_BOUNDS[1];
+		const latSpan = neLat - swLat;
+		const lngSpan = neLng - swLng;
+		const baseMinZoom = Math.max(
+			Math.min(
+				Math.log2((400 * 0.97) / (136.5 - 115.09)),
+				Math.log2(700 / (107.54 - 84.27)),
+			),
+			Math.log2(400 / ((136.5 - 115.09) * 1.25)),
+		);
+		// En móvil el margen este del área desplazable se reduce (0.05) para
+		// no dejar océano navegable a la derecha de la península; el oeste
+		// conserva su margen (0.2) para que Canarias no queden cortadas.
+		expect(leafletMock.latLngBounds).toHaveBeenCalledWith(
+			[swLat - latSpan * 0.35, swLng - lngSpan * 0.2],
+			[50, neLng + lngSpan * 0.05],
+		);
+		// En móvil se aleja ligeramente para que quepan las Baleares completas.
+		expect(mapInstance.setMinZoom).toHaveBeenCalledWith(baseMinZoom + 0.4);
+		// La vista inicial ancla el borde oeste (Canarias) en el margen que
+		// dejaba la vista centrada: las islas siguen en el mismo sitio.
+		expect(mapInstance.unproject).toHaveBeenCalledWith(
+			[50 + 400 / 2 - (400 * (1 - 0.97)) / 2, (150 + 650) / 2],
+			baseMinZoom + 0.4,
+		);
+		expect(mapInstance.setView).toHaveBeenCalledWith([36.5, -6.9], baseMinZoom + 0.4, {
+			animate: false,
+		});
+		expect(mapInstance.options.zoomSnap).toBe(0.5);
+	});
+
+	it('en tableta la vista inicial es el zoom mínimo con España centrada', async () => {
+		mapState.size = { x: 834, y: 600 };
+		mapState.zoom = 4;
+		Object.defineProperty(window, 'innerWidth', { value: 834, configurable: true });
+
+		render(<LeafletMap stations={stations} center={[40.4168, -3.7038]} zoom={13} bounds={SPAIN_BOUNDS} />);
+
+		await waitFor(() => expect(leafletMock.map).toHaveBeenCalledTimes(1));
+		const mapInstance = leafletMock.map.mock.results[0].value as {
+			setMinZoom: ReturnType<typeof vi.fn>;
+			setView: ReturnType<typeof vi.fn>;
+			options: { zoomSnap: number };
+		};
+		const boundsWidth = 136.5 - 115.09;
+		const boundsHeight = 107.54 - 84.27;
+		const baseMinZoom = Math.max(
+			Math.min(
+				Math.log2((834 * 0.97) / boundsWidth),
+				Math.log2(600 / boundsHeight),
+			),
+			Math.log2(834 / (boundsWidth * 1.25)),
+		);
+		// La tableta (768-1023 px) no sube el zoom mínimo como el móvil.
+		expect(mapInstance.setMinZoom).toHaveBeenCalledWith(baseMinZoom);
+		// Aunque la altura limite el encuadre, la vista inicial de tableta es
+		// la de España entera centrada al zoom mínimo (sin el anclaje de la
+		// península que la dejaba pegada arriba).
+		expect(mapInstance.setView).toHaveBeenCalledWith([39.9, -3.1], baseMinZoom, {
+			animate: false,
+		});
+		expect(mapInstance.options.zoomSnap).toBe(0.5);
+	});
+
+	it('clama el centro durante el pellizco para no salir de los límites', async () => {
+		render(<LeafletMap stations={stations} center={[40.4168, -3.7038]} zoom={13} bounds={SPAIN_BOUNDS} />);
+
+		await waitFor(() => expect(leafletMock.map).toHaveBeenCalledTimes(1));
+		const mapInstance = leafletMock.map.mock.results[0].value as {
+			getCenter: ReturnType<typeof vi.fn>;
+			getZoom: ReturnType<typeof vi.fn>;
+			_limitCenter: ReturnType<typeof vi.fn>;
+			panTo: ReturnType<typeof vi.fn>;
+			on: ReturnType<typeof vi.fn>;
+			touchZoom: { _center?: { lat: number; lng: number } };
+			options: { maxBounds?: unknown };
+		};
+		mapInstance.options.maxBounds = {};
+		mapInstance.getCenter.mockReturnValue({ lat: 52.5, lng: 14 });
+		mapInstance.getZoom.mockReturnValue(4);
+		mapInstance._limitCenter.mockReturnValue({ lat: 50, lng: 5 });
+		// Leaflet expone el gesto de pellizco como `map.touchZoom`.
+		mapInstance.touchZoom = { _center: { lat: 52.5, lng: 14 } };
+
+		const moveHandler = mapInstance.on.mock.calls.find(
+			([event]) => event === 'move',
+		)?.[1] as () => void;
+		const zoomHandler = mapInstance.on.mock.calls.find(
+			([event]) => event === 'zoom',
+		)?.[1] as () => void;
+		expect(moveHandler).toBeDefined();
+		expect(zoomHandler).toBeDefined();
+
+		// El centro fuera de los límites se devuelve dentro con un movimiento
+		// inmediato (sin animación para no encadenar gestos).
+		act(() => {
+			moveHandler();
+		});
+		expect(mapInstance.panTo).toHaveBeenCalledWith({ lat: 50, lng: 5 }, { animate: false });
+		// El gesto de pellizco mantiene su centro interno clampeado para que al
+		// soltar la animación no salga fuera de los límites y rebote.
+		expect(mapInstance.touchZoom._center).toEqual({ lat: 50, lng: 5 });
+
+		// Dentro de los límites el manejador no fuerza ningún movimiento.
+		mapInstance.panTo.mockClear();
+		mapInstance.getCenter.mockReturnValue({ lat: 40.4, lng: -3.7 });
+		mapInstance._limitCenter.mockReturnValue({ lat: 40.4, lng: -3.7 });
+		act(() => {
+			moveHandler();
+			zoomHandler();
+		});
+		expect(mapInstance.panTo).not.toHaveBeenCalled();
 	});
 
 	it('no ajusta la vista si no se proporcionan límites', async () => {
@@ -940,6 +1234,39 @@ describe('LeafletMap', () => {
 		expect(listener).not.toHaveBeenCalled();
 
 		await new Promise((resolve) => setTimeout(resolve, 400));
+		expect(listener).toHaveBeenCalledOnce();
+		window.removeEventListener(VIEWPORT_EVENT, listener);
+	});
+
+	it('no recarga el viewport mientras un popup hace auto-pan', async () => {
+		const listener = vi.fn();
+		window.addEventListener(VIEWPORT_EVENT, listener);
+
+		render(<LeafletMap stations={stations} center={[40.4168, -3.7038]} zoom={13} />);
+		await waitFor(() => expect(leafletMock.map).toHaveBeenCalledTimes(1));
+		listener.mockClear();
+
+		const mapInstance = leafletMock.map.mock.results[0].value as {
+			on: ReturnType<typeof vi.fn>;
+		};
+		const popupOpenHandler = mapInstance.on.mock.calls.find(
+			([event]) => event === 'popupopen',
+		)?.[1] as () => void;
+		const popupCloseHandler = mapInstance.on.mock.calls.find(
+			([event]) => event === 'popupclose',
+		)?.[1] as () => void;
+		const moveendHandler = mapInstance.on.mock.calls.find(
+			([event]) => event === 'moveend',
+		)?.[1] as () => void;
+
+		act(() => {
+			popupOpenHandler();
+			moveendHandler();
+		});
+		await new Promise((resolve) => setTimeout(resolve, 350));
+		expect(listener).not.toHaveBeenCalled();
+
+		act(() => popupCloseHandler());
 		expect(listener).toHaveBeenCalledOnce();
 		window.removeEventListener(VIEWPORT_EVENT, listener);
 	});

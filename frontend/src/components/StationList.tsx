@@ -22,6 +22,7 @@ import { DEFAULT_FUEL, fuelLabel, isFuelType, type FuelType } from '../lib/fuel'
 import {
 	LOCATION_CLEAR_EVENT,
 	LOCATION_EVENT,
+	getLastLocation,
 	type UserLocation,
 	isValidCoordinates,
 } from '../lib/geolocation';
@@ -41,6 +42,7 @@ import {
 	type OrderBy,
 } from '../lib/stations';
 import { getUrlParam } from '../lib/urlState';
+import { MOBILE_MEDIA_QUERY, useMediaQuery } from '../lib/useMediaQuery';
 
 type Status = 'idle' | 'loading' | 'success' | 'empty' | 'error';
 
@@ -68,6 +70,7 @@ function readFuelFromUrl(): FuelType {
 }
 
 function readRadioFromUrl(): number | null {
+	if (!getLastLocation()) return null;
 	const value = getUrlParam(RADIO_URL_PARAM);
 	if (value === null) {
 		return DEFAULT_RADIO;
@@ -119,6 +122,8 @@ export default function StationList() {
 	const [priceFilter, setPriceFilter] = useState<PriceRange | null>(null);
 	// Marcas seleccionadas para filtrar (vacío = sin filtro).
 	const [marcas, setMarcas] = useState<string[]>([]);
+	// En móvil el comparador no existe: tocar una tarjeta abre la ficha.
+	const isMobile = useMediaQuery(MOBILE_MEDIA_QUERY);
 	const requestIdRef = useRef(0);
 	const abortRef = useRef<AbortController | null>(null);
 	// Refresco en segundo plano: al cambiar una opción la lista actual
@@ -441,6 +446,14 @@ export default function StationList() {
 					isExpanded ? 'station-card--expanded' : '',
 				].join(' ');
 				const toggleCard = () => {
+					if (isMobile) {
+						// En móvil no hay comparador: el tap abre la ficha de la
+						// estación y la resalta en el mapa.
+						dispatchStationFocus(station.id);
+						setFocusedId(station.id);
+						dispatchStationDetail(station.id);
+						return;
+					}
 					setExpandedId((current) => (current === station.id ? null : station.id));
 					setFocusedId((current) => {
 						// Resalta en el mapa aunque no esté en el comparador; al
@@ -455,17 +468,15 @@ export default function StationList() {
 					<li
 						key={station.id}
 						className={cardClass}
-						tabIndex={0}
 						onClick={toggleCard}
-						onKeyDown={(event) => {
-							if (event.key === 'Enter' || event.key === ' ') {
-								event.preventDefault();
-								toggleCard();
-							}
-						}}
-						aria-expanded={isExpanded}
-						aria-current={isFocused ? 'true' : undefined}
 					>
+						<button
+							type="button"
+							className="station-card__trigger"
+							tabIndex={0}
+							aria-expanded={isExpanded}
+							aria-current={isFocused ? 'true' : undefined}
+						>
 						<div className="station-card__topline">
 							<div>
 								{isBest && (
@@ -510,6 +521,7 @@ export default function StationList() {
 								</span>
 							)}
 						</div>
+						</button>
 						{isExpanded && (
 							<div className="station-card__actions">
 								<button

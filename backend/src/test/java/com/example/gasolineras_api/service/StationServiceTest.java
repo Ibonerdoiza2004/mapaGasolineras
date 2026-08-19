@@ -339,7 +339,7 @@ class StationServiceTest {
 		var station = new com.example.gasolineras_api.domain.Station(
 				"1", "REPSOL", "repsol", "CALLE MAYOR 1", "28001",
 				"Madrid", "Madrid", "Madrid", point(-3.7038, 40.4168),
-				"L-D: 06:00-22:00", "P", "D", "17/08/2026",
+				"L-D: 06:00-22:00", "P", "D", "20/08/2026 0:35:37",
 				java.time.Instant.now());
 		when(stationRepository.findById("1")).thenReturn(java.util.Optional.of(station));
 		when(currentPriceRepository.findByStation(station)).thenReturn(List.of(
@@ -360,7 +360,7 @@ class StationServiceTest {
 		assertThat(detail.precios())
 				.containsEntry(FuelType.GASOLINA_95, new BigDecimal("1.599"))
 				.containsEntry(FuelType.DIESEL, new BigDecimal("1.749"));
-		assertThat(detail.fechaActualizacion()).isEqualTo("17/08/2026");
+		assertThat(detail.fechaActualizacion()).isEqualTo("2026-08-20T00:35:37");
 	}
 
 	@Test

@@ -16,10 +16,11 @@ import { SPAIN_BOUNDS } from '../lib/spainBounds';
 
 <section class="explorer" aria-label="Explorador de gasolineras">
 	<details class="explorer__sidebar" open>
-		<summary>
-			<span class="explorer__grabber" aria-hidden="true"></span>
-			<span><strong>Gasolineras cercanas</strong><small>0 resultados</small></span>
-			<span class="explorer__summary-icon" aria-hidden="true">⌃</span>
+		<summary aria-label="Gasolineras cercanas">
+			<span class="explorer__summary-toggle">
+				<span class="explorer__summary-arrow" aria-hidden="true">▾</span>
+				<span class="explorer__summary-count"><small>0 resultados</small></span>
+			</span>
 		</summary>
 		<div class="explorer__sidebar-content">
 		<div class="explorer__sidebar-heading">

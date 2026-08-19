@@ -106,7 +106,7 @@ describe('ExplorerWorkspace — nombres accesibles de controles y filtros', () =
 describe('ExplorerWorkspace — paneles y marcadores alternativos', () => {
 	it('expone el panel inferior con un nombre accesible en su resumen', () => {
 		expect(workspaceAstro).toContain('<details class="explorer__sidebar" open>');
-		expect(workspaceAstro).toContain('<strong>Gasolineras cercanas</strong>');
+		expect(workspaceAstro).toContain('<summary aria-label="Gasolineras cercanas">');
 	});
 
 	it('contiene el contenedor del mapa', () => {
@@ -128,6 +128,7 @@ describe('ExplorerWorkspace — paneles y marcadores alternativos', () => {
 
 	it('permite desplegar las acciones de una tarjeta con teclado y anunciar el estado', () => {
 		expect(stationListSource).toContain('tabIndex={0}');
+		expect(stationListSource).toContain('className="station-card__trigger"');
 		expect(stationListSource).toContain('aria-expanded={isExpanded}');
 		expect(stationListSource).toContain('Añadir al comparador');
 		expect(stationListSource).toContain('Ver ficha');

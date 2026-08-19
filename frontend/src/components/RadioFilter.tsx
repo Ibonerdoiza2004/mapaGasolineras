@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { dispatchRadioChange } from '../lib/explorerEvents';
 import {
 	dispatchLocationClear,
+	getLastLocation,
 	LOCATION_CLEAR_EVENT,
 	LOCATION_EVENT,
 	isValidCoordinates,
@@ -17,13 +18,20 @@ import {
 } from '../lib/radio';
 import { getUrlParam, setUrlParam } from '../lib/urlState';
 
-function readRadioFromUrl(): number | null {
+function readRadioValueFromUrl(): number | null {
 	const value = getUrlParam(RADIO_URL_PARAM);
 	if (value === null) {
 		return DEFAULT_RADIO;
 	}
 	const parsed = Number(value);
 	return isRadioValue(parsed) ? parsed : DEFAULT_RADIO;
+}
+
+function readRadioFromUrl(): number | null {
+	// La URL puede sobrevivir a una recarga, pero la ubicación solo vive en
+	// memoria; sin ella el radio no puede activarse todavía.
+	if (!getLastLocation()) return null;
+	return readRadioValueFromUrl();
 }
 
 const SCOPE_GROUP_ID = 'explorer-scope';
@@ -50,11 +58,11 @@ type Scope = (typeof SCOPE_OPTIONS)[number]['value'];
  * radio automáticamente con el radio elegido (o el de 10 km por defecto).
  */
 export default function RadioFilter() {
-	const [scope, setScope] = useState<Scope>(DEFAULT_RADIO !== null ? 'radio' : 'mapa');
+	const [scope, setScope] = useState<Scope>('mapa');
 	const [selected, setSelected] = useState<number>(
-		readRadioFromUrl() ?? DEFAULT_RADIUS_KM,
+		readRadioValueFromUrl() ?? DEFAULT_RADIUS_KM,
 	);
-	const [disabled, setDisabled] = useState(true);
+	const [disabled, setDisabled] = useState(() => getLastLocation() === null);
 	const [announcement, setAnnouncement] = useState('');
 	const selectedRef = useRef(selected);
 	selectedRef.current = selected;
@@ -66,11 +74,15 @@ export default function RadioFilter() {
 	useEffect(() => {
 		const restored = readRadioFromUrl();
 		const active = restored !== null;
+		setDisabled(getLastLocation() === null);
 		scopeRef.current = active ? 'radio' : 'mapa';
 		setScope(active ? 'radio' : 'mapa');
 		if (restored !== null) {
 			selectedRef.current = restored;
 			setSelected(restored);
+		}
+		if (restored === null) {
+			setUrlParam(RADIO_URL_PARAM, null);
 		}
 		dispatchRadioChange(restored);
 	}, []);
@@ -137,6 +149,10 @@ export default function RadioFilter() {
 	useEffect(() => {
 		function onLocationClear() {
 			setDisabled(true);
+			scopeRef.current = 'mapa';
+			setScope('mapa');
+			setUrlParam(RADIO_URL_PARAM, null);
+			dispatchRadioChange(null);
 		}
 		window.addEventListener(LOCATION_CLEAR_EVENT, onLocationClear);
 		return () => window.removeEventListener(LOCATION_CLEAR_EVENT, onLocationClear);

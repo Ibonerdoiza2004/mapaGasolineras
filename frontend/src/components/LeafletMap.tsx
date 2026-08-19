@@ -23,7 +23,12 @@ import {
 import { clusterizeStations } from '../lib/markerCluster';
 import type { NearbyStation } from '../lib/stations';
 import { isPriceFresh } from '../lib/stations';
-import { PENINSULA_CENTER, SPAIN_BOUNDS } from '../lib/spainBounds';
+import { MOBILE_MEDIA_QUERY, useMediaQuery } from '../lib/useMediaQuery';
+import {
+	PENINSULA_CENTER,
+	PENINSULA_NORTH_LAT,
+	SPAIN_BOUNDS,
+} from '../lib/spainBounds';
 
 export interface MapStation {
 	id: string;
@@ -43,13 +48,47 @@ export interface LeafletMapProps {
 }
 
 const DEFAULT_TILE_URL = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
-const VIEW_PADDING = 16;
 const BOTTOM_MARGIN = 28;
-const INITIAL_ZOOM_BOOST = 0.125;
+/**
+ * En escritorio el encuadre inicial ancla Canarias a BOTTOM_MARGIN del borde
+ * inferior. Reducir el zoom (INITIAL_ZOOM_PAD) sin mover el anclaje de Canarias
+ * deja la península un poco más abajo en la pantalla: España se aleja unos
+ * niveles y se asienta hacia el borde inferior. El floor es el zoom mínimo
+ * absoluto (MIN_ZOOM_FLOOR) de la instancia, no el encuadre, para que el
+ * alejamiento tenga efecto tanto en la vista como en el floor impuesto.
+ */
+const INITIAL_ZOOM_PAD = 0.4;
+/**
+ * Umbral a partir del que se considera escritorio para aplicar
+ * `INITIAL_ZOOM_PAD`: por debajo (tabletas de ~1024 px, p. ej. iPad
+ * horizontal) reduciría el zoom de más y dejaría el mapa demasiado alejado.
+ */
+const DESKTOP_ZOOM_PAD_MIN_WIDTH = 1280;
+/** Zoom mínimo absoluto de la instancia (tope inferior de la que se puede alejar el mapa). */
+const MIN_ZOOM_FLOOR = 3;
 const ZOOM_STEP = 0.5;
 const VIEWPORT_DEBOUNCE_MS = 250;
-/** Margen del área desplazable alrededor de SPAIN_BOUNDS (fracción). */
-const MAP_BOUNDS_PADDING = 0.08;
+/** Margen lateral del área desplazable alrededor de SPAIN_BOUNDS (fracción). */
+const MAP_BOUNDS_PADDING_WEST = 0.2;
+/** El oeste conserva su margen para que Canarias queden a la vista, pero por
+ * la derecha un margen amplio (0.2) dejaba océano navegable hasta casi Grecia
+ * en todas las pantallas: se reduce al mínimo en escritorio y móvil. */
+const MAP_BOUNDS_PADDING_EAST = 0.05;
+/**
+ * Límite norte (latitud) del área desplazable: justo por encima de la vista
+ * inicial de escritorio para que al arrastrar no aparezca demasiado océano
+ * sobre la península. Es un valor absoluto porque la vista inicial ya se
+ * detiene ~49,4º en las ventanas más altas.
+ */
+const MAP_NORTH_LAT = 50;
+/** Margen vertical inferior según el ancho del viewport (fracción del alto de SPAIN_BOUNDS). */
+const MAP_BOTTOM_PAD_NARROW = 0.35;
+const MAP_BOTTOM_PAD_TABLET = 0.2;
+const MAP_BOTTOM_PAD_WIDE = 0.05;
+const NARROW_BREAKPOINT = 768;
+const TABLET_BREAKPOINT = 1024;
+/** Fracción del ancho del viewport que ocupa el rectángulo en el zoom mínimo. */
+const BOX_WIDTH_FIT = 0.97;
 /** Tamaño (px) de la celda que agrupa marcadores próximos al nivel de zoom actual. */
 const CLUSTER_GRID_SIZE_PX = 80;
 const OSM_ATTRIBUTION =
@@ -117,6 +156,59 @@ function buildClusterIcon(L: typeof import('leaflet'), count: number) {
 	});
 }
 
+/**
+ * Control de zoom propio con `<button>`: el control nativo de Leaflet usa
+ * enlaces `<a href="#">`, que el auditor de accesibilidad de Astro marca
+ * como enlaces con href inválido.
+ */
+function createZoomControl(L: typeof import('leaflet'), map: import('leaflet').Map) {
+	const ZoomControl = L.Control.extend({
+		options: { position: 'topleft' },
+		onAdd() {
+			const container = L.DomUtil.create('div', 'leaflet-bar leaflet-control zoom-control');
+			const zoomIn = L.DomUtil.create('button', 'zoom-control__button', container);
+			zoomIn.type = 'button';
+			zoomIn.title = 'Acercar mapa';
+			zoomIn.setAttribute('aria-label', 'Acercar mapa');
+			zoomIn.textContent = '+';
+			const zoomOut = L.DomUtil.create(
+				'button',
+				'zoom-control__button zoom-control__button--bottom',
+				container,
+			);
+			zoomOut.type = 'button';
+			zoomOut.title = 'Alejar mapa';
+			zoomOut.setAttribute('aria-label', 'Alejar mapa');
+			zoomOut.textContent = '−';
+
+			const updateDisabledState = () => {
+				const zoom = map.getZoom();
+				const minZoom = map.getMinZoom();
+				const maxZoom = map.getMaxZoom();
+				zoomIn.disabled = zoom >= maxZoom;
+				zoomOut.disabled = zoom <= minZoom;
+				zoomIn.setAttribute('aria-disabled', String(zoomIn.disabled));
+				zoomOut.setAttribute('aria-disabled', String(zoomOut.disabled));
+			};
+			updateDisabledState();
+			map.on('zoomend', updateDisabledState);
+
+			zoomIn.addEventListener('click', (event) => {
+				event.preventDefault();
+				map.zoomIn();
+			});
+			zoomOut.addEventListener('click', (event) => {
+				event.preventDefault();
+				map.zoomOut();
+			});
+
+			L.DomEvent.disableClickPropagation(container);
+			return container;
+		},
+	});
+	return new ZoomControl();
+}
+
 function toMapStation(station: NearbyStation): MapStation | null {
 	// Una estación sin coordenadas válidas no debe generar un marcador.
 	if (!Number.isFinite(station.latitud) || !Number.isFinite(station.longitud)) {
@@ -175,6 +267,8 @@ export default function LeafletMap({
 	const [mapReady, setMapReady] = useState(false);
 	// Contador que cambia en cada zoom para re-agrupar los marcadores.
 	const [zoomTick, setZoomTick] = useState(0);
+	// En móvil el comparador no existe: tocar un pin abre la ficha directamente.
+	const isMobile = useMediaQuery(MOBILE_MEDIA_QUERY);
 
 	const applyLocation = useCallback((location: UserLocation) => {
 		const map = mapRef.current;
@@ -225,10 +319,17 @@ export default function LeafletMap({
 					title: station.rotulo ?? station.id,
 					keyboard: true,
 				}).addTo(map);
-				marker.bindPopup(buildStationPopup(station, selectedIds.includes(station.id)));
-				marker.on('click', () => {
-					onSelect?.(station.id);
-				});
+				if (isMobile) {
+					// Sin comparador ni popups en móvil: el tap abre la ficha.
+					marker.on('click', () => {
+						dispatchStationDetail(station.id);
+					});
+				} else {
+					marker.bindPopup(buildStationPopup(station, selectedIds.includes(station.id)));
+					marker.on('click', () => {
+						onSelect?.(station.id);
+					});
+				}
 				markersRef.current.set(station.id, marker);
 			} else {
 				const marker = L.marker([cluster.lat, cluster.lon], {
@@ -257,13 +358,19 @@ export default function LeafletMap({
 				// no quede tapado.
 				zIndexOffset: 1000,
 			}).addTo(map);
-			marker.bindPopup(buildStationPopup(station, true));
-			marker.on('click', () => {
-				onSelect?.(station.id);
-			});
+			if (isMobile) {
+				marker.on('click', () => {
+					dispatchStationDetail(station.id);
+				});
+			} else {
+				marker.bindPopup(buildStationPopup(station, selectedIds.includes(station.id)));
+				marker.on('click', () => {
+					onSelect?.(station.id);
+				});
+			}
 			markersRef.current.set(station.id, marker);
 		}
-	}, [nearbyStations, selectedIds, focusedId, onSelect]);
+	}, [nearbyStations, selectedIds, focusedId, onSelect, isMobile]);
 
 	const renderMarkersRef = useRef(renderMarkers);	renderMarkersRef.current = renderMarkers;
 
@@ -272,6 +379,7 @@ export default function LeafletMap({
 		let wheelHandler: ((event: WheelEvent) => void) | null = null;
 		let wheelTimer: ReturnType<typeof setTimeout> | undefined;
 		let viewportTimer: ReturnType<typeof setTimeout> | undefined;
+		let popupOpen = false;
 
 		async function init() {
 			const imported = (await import('leaflet')) as
@@ -284,31 +392,52 @@ export default function LeafletMap({
 			const container = containerRef.current;
 			if (!container) return;
 
+			// Sin límite, arrastrar lateralmente da una vuelta al mundo y el
+			// viewport llega con coordenadas inválidas o con regiones sin
+			// estaciones (Sao Tomé, Comoras...). El desplazamiento se acota al
+			// área de España con un margen: sin él, Leaflet sujeta la vista
+			// inicial contra el borde del área y Canarias quedaría cortada. El
+			// margen inferior es mayor en móvil (panel inferior) y en tableta
+			// (vista inicial centrada más al sur); en escritorio queda poco
+			// océano bajo Canarias. El zoom mínimo (ver más abajo) impide
+			// alejarse más allá de los límites.
+			const [swLat, swLng] = SPAIN_BOUNDS[0];
+			const [neLat, neLng] = SPAIN_BOUNDS[1];
+			const latSpan = neLat - swLat;
+			const lngSpan = neLng - swLng;
+			const viewportWidth = window.innerWidth || container.clientWidth;
+			const eastPad = MAP_BOUNDS_PADDING_EAST;
+			const bottomPad =
+				viewportWidth < NARROW_BREAKPOINT
+					? MAP_BOTTOM_PAD_NARROW
+					: viewportWidth < TABLET_BREAKPOINT
+						? MAP_BOTTOM_PAD_TABLET
+						: MAP_BOTTOM_PAD_WIDE;
+
 			try {
 				const map = L.map(container, {
 					center,
 					zoom,
 					zoomControl: false,
 					attributionControl: true,
-					minZoom: 3,
+					minZoom: MIN_ZOOM_FLOOR,
 					maxZoom: 19,
-					// Sin límite, arrastrar lateralmente da una vuelta al mundo y
-					// el viewport llega con coordenadas inválidas o con regiones
-					// sin estaciones (Sao Tomé, Comoras...). El desplazamiento se
-					// acota al área de España con un margen: sin él, Leaflet
-					// sujeta la vista inicial contra el borde del área y Canarias
-					// quedaría cortada. El zoom mínimo (ver más abajo) impide
-					// alejarse más allá de los límites.
-					maxBounds: L.latLngBounds(SPAIN_BOUNDS).pad(MAP_BOUNDS_PADDING),
+					touchZoom: true,
+					// El pellizco se frena en el zoom mínimo/máximo en lugar de
+					// sobrepasarlos y rebotar al soltar el dedo.
+					bounceAtZoomLimits: false,
+					maxBounds: L.latLngBounds(
+						[swLat - latSpan * bottomPad, swLng - lngSpan * MAP_BOUNDS_PADDING_WEST],
+						[MAP_NORTH_LAT, neLng + lngSpan * eastPad],
+					),
 					maxBoundsViscosity: 1.0,
-zoomSnap: ZOOM_STEP,
-				zoomDelta: ZOOM_STEP,
-			});
+					zoomSnap: ZOOM_STEP,
+					zoomDelta: ZOOM_STEP,
+				});
 			L.tileLayer(configuredTileUrl(), {
 				attribution: OSM_ATTRIBUTION,
 				maxZoom: 19,
 			}).addTo(map);
-			L.control.zoom({ zoomInTitle: 'Acercar mapa', zoomOutTitle: 'Alejar mapa' }).addTo(map);
 
 			// La rueda nativa de Leaflet acumula el delta del navegador y
 			// redondea hacia arriba a la rejilla de zoomSnap, produciendo
@@ -344,8 +473,25 @@ zoomSnap: ZOOM_STEP,
 					// el zoom mínimo) Leaflet frenaría el zoom pero recalcularía
 					// el centro del mapa para el zoom pedido: la pantalla se
 					// desplazaría aunque el nivel no cambiara. En esos casos el
-					// paso se ignora y la vista no se mueve.
-					if (nextZoom < map.getMinZoom() || nextZoom > map.getMaxZoom()) {
+					// paso se ignora y la vista no se mueve, salvo cuando un paso
+					// entero se queda por encima del mínimo (el zoom mínimo no cae
+					// en la rejilla): entonces se llega exactamente al mínimo.
+					const currentZoom = map.getZoom();
+					if (nextZoom > map.getMaxZoom()) {
+						wheelAccumPx = 0;
+						return;
+					}
+					if (nextZoom < map.getMinZoom()) {
+						if (currentZoom > map.getMinZoom() + 1e-9) {
+							const zoomAnimation = map as unknown as {
+								_animatingZoom?: boolean;
+								_onZoomTransitionEnd?: () => void;
+							};
+							if (zoomAnimation._animatingZoom) {
+								zoomAnimation._onZoomTransitionEnd?.();
+							}
+							map.setZoomAround(point, map.getMinZoom());
+						}
 						wheelAccumPx = 0;
 						return;
 					}
@@ -362,54 +508,146 @@ zoomSnap: ZOOM_STEP,
 			};
 			container.addEventListener('wheel', wheelHandler, { passive: false });
 				if (bounds) {
-					map.fitBounds(bounds, { padding: [VIEW_PADDING, VIEW_PADDING] });
-
-					// fitBounds redondea el zoom y centra el rectángulo, dejando
-					// océano bajo Canarias. Si es la altura lo que limita el
-					// encuadre, centramos el mapa en la península y elegimos el
-					// zoom exacto que deja su borde inferior a BOTTOM_MARGIN px
-					// del borde inferior del mapa.
+					// Se calcula proyectando el rectángulo a zoom 0, que no
+					// depende del zoom actual.
 					const size = map.getSize();
-					const fittedZoom = map.getZoom();
-					const southWest = map.project(bounds[0], fittedZoom);
-					const northEast = map.project(bounds[1], fittedZoom);
-					const frameWidth = northEast.x - southWest.x;
-					const frameHeight = southWest.y - northEast.y;
-					if (frameWidth / size.x <= frameHeight / size.y) {
-						// La distorsión de Mercator desplaza el centro visual de la
-						// península (su punto medio en píxeles está en lat ~41,1º),
-						// por eso el mapa se centra en PENINSULA_CENTER y no en el
-						// centro del rectángulo.
+					const boundsSouthWest = map.project(bounds[0], 0);
+					const boundsNorthEast = map.project(bounds[1], 0);
+					const boundsWidth = boundsNorthEast.x - boundsSouthWest.x;
+					const boundsHeight = boundsSouthWest.y - boundsNorthEast.y;
+					const paddedFactor = 1 + MAP_BOUNDS_PADDING_WEST + eastPad;
+					// El encuadre del rectángulo (el menor de ambos ejes) hace que
+					// todo el territorio español quepa en el viewport con un
+					// pequeño margen lateral: es la vista inicial de siempre en
+					// pantallas estrechas (móvil, tableta). Sin el margen, el
+					// rectángulo llenaría el ancho exacto y Canarias rozarían el
+					// borde.
+					const boxFitWidth = Math.log2((size.x * BOX_WIDTH_FIT) / boundsWidth);
+					const boxFitHeight = Math.log2(size.y / boundsHeight);
+					// Pero si el viewport fuese más ancho que el área desplazable
+					// (maxBounds, España con su margen), el arrastre escaparía
+					// lateralmente de los límites y Leaflet no podría sujetarlo;
+					// el zoom mínimo no puede ser menor que ese encuadre.
+					const paddedFitWidth = Math.log2(size.x / (boundsWidth * paddedFactor));
+					const baseMinZoom = Math.min(
+						Math.max(
+							Math.min(boxFitWidth, boxFitHeight),
+							paddedFitWidth,
+							map.getMinZoom(),
+						),
+						map.getMaxZoom(),
+					);
+					// En móvil se reduce ligeramente el zoom para dejar margen al
+					// extremo oriental, incluida Menorca, sin alejar demasiado el mapa.
+					const isNarrowViewport = viewportWidth < NARROW_BREAKPOINT;
+					// La tableta (entre 768 y 1023 px) muestra España entera al
+					// zoom mínimo, sin el anclaje de la península que usaba el
+					// encuadre por altura (dejaba la península pegada arriba).
+					const isTabletViewport = !isNarrowViewport && viewportWidth < TABLET_BREAKPOINT;
+					const minZoom = Math.min(
+						baseMinZoom + (isNarrowViewport ? 4*ZOOM_STEP/5 : 0),
+						map.getMaxZoom(),
+					);
+					map.setMinZoom(minZoom);
+
+					// La proporción del rectángulo es constante en cualquier zoom,
+					// así que la rama no depende del zoom inicial del mapa: si la
+					// altura del viewport es la que limita el encuadre, la vista
+					// inicial deja Canarias con un margen inferior; si es la
+					// anchura, España se muestra centrada por completo.
+					const heightLimited = size.y / size.x <= boundsHeight / boundsWidth;
+					if (heightLimited && !isTabletViewport) {
+						// fitBounds redondea el zoom y centra el rectángulo,
+						// dejando océano bajo Canarias. Centramos el mapa en la
+						// península y elegimos el zoom exacto que deja su borde
+						// inferior a BOTTOM_MARGIN px del borde inferior del
+						// mapa. La distorsión de Mercator desplaza el centro
+						// visual de la península (su punto medio en píxeles está
+						// en lat ~41,1º), por eso se apunta a PENINSULA_CENTER y
+						// no al centro del rectángulo.
 						const bottomOffset =
 							map.project(bounds[0], 0).y - map.project(PENINSULA_CENTER, 0).y;
 						const baseZoom = Math.log2((size.y / 2 - BOTTOM_MARGIN) / bottomOffset);
-						const targetZoom = Math.min(
-							baseZoom + INITIAL_ZOOM_BOOST,
-							map.getMaxZoom(),
-						);
-						const peninsulaPoint = map.project(PENINSULA_CENTER, targetZoom);
-						const canaryPoint = map.project(bounds[0], targetZoom);
+// El zoom mínimo lo puede fijar la anchura (p. ej. una ventana
+					// muy ancha) o la altura; el zoom de la península no debe
+					// superar el que encaja la península en la altura del
+					// viewport, ni el que encaja el rectángulo en la anchura
+					// (con su margen): si España es más ancha que el viewport
+					// (tableta en apaisado), se cortan sus extremos y Canarias
+					// pierden su isla más occidental.
+					const peninsulaSpan =
+						map.project(bounds[0], 0).y -
+						map.project([PENINSULA_NORTH_LAT, 0], 0).y;
+					const peninsulaZoom = Math.log2(size.y / peninsulaSpan);
+				// En escritorio la vista inicial encuadra la península (con Canarias
+			// ancladas a `BOTTOM_MARGIN` del borde inferior) y se aleja unos niveles
+			// con `INITIAL_ZOOM_PAD`: el zoom inicial es algo más bajo que la vista
+			// centrada completa y, al mismo tiempo, se impone como el zoom mínimo
+			// (`map.setMinZoom(framedZoom)`), de modo que al retrasar no se deje ver
+			// más océano del necesario. Como el anclaje recompone `targetCenter`,
+			// Canarias conserva su posición en pantalla aunque el zoom cambie.
+				const targetZoom = Math.max(
+					Math.min(
+						baseZoom,
+						map.getMaxZoom(),
+						peninsulaZoom,
+						boxFitWidth,
+					),
+					minZoom,
+				);
+			// Se aleja unos niveles (INITIAL_ZOOM_PAD) solo en escritorio ancho:
+			// manteniendo Canarias ancladas a BOTTOM_MARGIN (el cálculo del
+			// centro no depende del zoom), España se asienta más abajo en la
+			// pantalla. En tablets de ~1024 px se omite por si dejara el mapa
+			// demasiado alejado. El floor es el zoom mínimo absoluto (MIN_ZOOM_FLOOR)
+			// y no el encuadre: el alejamiento baja el floor y la vista.
+			const initialPad = viewportWidth >= DESKTOP_ZOOM_PAD_MIN_WIDTH ? INITIAL_ZOOM_PAD : 0;
+			const framedZoom = Math.max(targetZoom - initialPad, MIN_ZOOM_FLOOR);
+			// El zoom inicial es el mínimo permitido.
+			map.setMinZoom(framedZoom);
+						const peninsulaPoint = map.project(PENINSULA_CENTER, framedZoom);
+						const canaryPoint = map.project(bounds[0], framedZoom);
 						const targetCenter = map.unproject(
 							[
 								peninsulaPoint.x,
 								canaryPoint.y - (size.y / 2 - BOTTOM_MARGIN),
 							],
-							targetZoom,
+							framedZoom,
 						);
 						// El zoom exacto (p. ej. 4.84) no cae en la rejilla de
 						// zoomSnap; se desactiva el ajuste solo durante esta vista.
 						map.options.zoomSnap = 0;
-						map.setView([targetCenter.lat, targetCenter.lng], targetZoom, { animate: false });
+					map.setView([targetCenter.lat, targetCenter.lng], framedZoom, { animate: false });
+					map.options.zoomSnap = ZOOM_STEP;
+					} else if (isNarrowViewport) {
+						// En móvil el zoom mínimo subió un paso y el rectángulo ya
+						// no cabe en el viewport: la vista inicial ancla su borde
+						// oeste (Canarias) en el margen que dejaba la vista centrada
+						// anterior y centra el rectángulo verticalmente, de modo
+						// que las islas quedan en el mismo sitio que antes.
+						const southWestPoint = map.project(bounds[0], minZoom);
+						const northEastPoint = map.project(bounds[1], minZoom);
+						const westMargin = (size.x * (1 - BOX_WIDTH_FIT)) / 2;
+						const anchoredCenter = map.unproject(
+							[
+								southWestPoint.x + size.x / 2 - westMargin,
+								(northEastPoint.y + southWestPoint.y) / 2,
+							],
+							minZoom,
+						);
+						map.options.zoomSnap = 0;
+						map.setView([anchoredCenter.lat, anchoredCenter.lng], minZoom, { animate: false });
 						map.options.zoomSnap = ZOOM_STEP;
-						// El zoom mínimo coincide con la vista inicial de España:
-						// no se puede alejar más, de modo que el viewport nunca
-						// abarca terreno fuera de los límites. El margen del área
-						// permite la vista inicial sin que Leaflet la sujete.
-						map.setMinZoom(targetZoom);
 					} else {
-						map.setMinZoom(fittedZoom);
+						// La anchura limita el encuadre: España entera (incluida
+						// Canarias) centrada al zoom mínimo.
+						const centered = L.latLngBounds(bounds).getCenter();
+						map.options.zoomSnap = 0;
+						map.setView([centered.lat, centered.lng], minZoom, { animate: false });
+						map.options.zoomSnap = ZOOM_STEP;
 					}
 				}
+				createZoomControl(L, map).addTo(map);
 				mapRef.current = map;
 
 				// El listado muestra las estaciones del área visible: se
@@ -419,7 +657,19 @@ zoomSnap: ZOOM_STEP,
 				const emitViewport = () => {
 					dispatchViewportChange(viewportBounds(map));
 				};
+				map.on('popupopen', () => {
+					// Leaflet puede hacer auto-pan para que el popup entre en la
+					// pantalla. Ese movimiento no debe lanzar una nueva consulta:
+					// reconstruir los marcadores durante el auto-pan cerraría el popup.
+					popupOpen = true;
+				});
+				map.on('popupclose', () => {
+					popupOpen = false;
+					clearTimeout(viewportTimer);
+					emitViewport();
+				});
 				map.on('moveend', () => {
+					if (popupOpen) return;
 					clearTimeout(viewportTimer);
 					viewportTimer = setTimeout(emitViewport, VIEWPORT_DEBOUNCE_MS);
 				});
@@ -433,6 +683,77 @@ zoomSnap: ZOOM_STEP,
 			// El nivel de zoom decide la agrupación de marcadores: cada cambio
 			// re-dibuja los pines para fundir o separar los grupos.
 			map.on('zoomend', () => setZoomTick((tick) => tick + 1));
+
+		// El pellizco con dos dedos desplaza el centro fuera del área
+		// desplazable y Leaflet lo devuelve al soltar el gesto. Se clama el
+		// centro en cada movimiento para que la vista no salga de los
+		// límites ni un instante; si ya está dentro, no hace nada.
+		// Además se actualiza el centro interno del gesto
+		// (`touchZoom._center`): al soltar, Leaflet anima hacia él y, si siguiera
+		// fuera de los límites, el mapa saltaría brevemente y recuperaría el
+		// posición con el `panTo` del siguiente `move`, produciendo el efecto de
+		// "sale fuera y vuelve". Manteniéndolo clampeado, la animación de
+		// liberación ya apunta al centro válido.
+		const limitCenterDuringGesture = () => {
+			if (!map.options.maxBounds) return;
+			const internal = map as unknown as {
+				_limitCenter: (
+					center: import('leaflet').LatLng,
+					zoom: number,
+					bounds: import('leaflet').LatLngBounds,
+				) => import('leaflet').LatLng;
+			};
+			const touchZoom = map.touchZoom as unknown as { _center?: import('leaflet').LatLng } | undefined;
+			const center = map.getCenter();
+			const limited = internal._limitCenter(
+				center,
+				map.getZoom(),
+				map.options.maxBounds as import('leaflet').LatLngBounds,
+			);
+			if (limited.lat !== center.lat || limited.lng !== center.lng) {
+				if (touchZoom) touchZoom._center = limited;
+				map.panTo(limited, { animate: false });
+			}
+		};
+		map.on('move', limitCenterDuringGesture);
+		map.on('zoom', limitCenterDuringGesture);
+
+		// Al soltar el pellizco, Leaflet anima hacia el centro que el gesto
+		// registró internamente (`touchZoom._center`), que no se acota con
+		// maxBounds: el mapa saltaría brevemente fuera de los límites y solo el
+		// siguiente `move` lo devolvería. Como `_onTouchEnd` se registra (sobre
+		// `document`) en el primer `touchstart`, el parche debe aplicarse aquí,
+		// antes de cualquier toque. Se clama el centro del gesto al límite antes
+		// de ejecutar el original, de modo que la animación de liberación apunte
+		// al centro válido y no rebote.
+		const touchZoomHandler = map.touchZoom as unknown as {
+			_center?: import('leaflet').LatLng;
+			_onTouchEnd?: () => void;
+		} | null;
+		if (touchZoomHandler && typeof touchZoomHandler._onTouchEnd === 'function') {
+			const originalOnTouchEnd = touchZoomHandler._onTouchEnd;
+			touchZoomHandler._onTouchEnd = function () {
+				const internal = map as unknown as {
+					_limitCenter: (
+						center: import('leaflet').LatLng,
+						zoom: number,
+						bounds: import('leaflet').LatLngBounds,
+					) => import('leaflet').LatLng;
+				};
+				if (
+					this._center &&
+					map.options.maxBounds &&
+					internal._limitCenter
+				) {
+					this._center = internal._limitCenter(
+						this._center,
+						map.getZoom(),
+						map.options.maxBounds as import('leaflet').LatLngBounds,
+					);
+				}
+				originalOnTouchEnd.call(this);
+			};
+		}
 
 			renderMarkersRef.current();
 			setMapReady(true);
@@ -511,7 +832,11 @@ zoomSnap: ZOOM_STEP,
 				const map = mapRef.current;
 				const station = nearbyStations.find((candidate) => candidate.id === detail.added);
 				if (map && station) {
-					map.panTo([station.lat, station.lon]);
+					// El comparador reduce el ancho del mapa. En el zoom mínimo,
+					// combinar ese cambio de tamaño con una animación de pan y
+					// maxBounds puede dejar a Leaflet en un estado intermedio y
+					// bloquear los gestos hasta que el comparador desaparece.
+					map.panTo([station.lat, station.lon], { animate: false });
 				}
 			}
 		}
@@ -542,7 +867,10 @@ zoomSnap: ZOOM_STEP,
 		const container = containerRef.current;
 		if (!container || typeof ResizeObserver === 'undefined') return;
 		const observer = new ResizeObserver(() => {
-			mapRef.current?.invalidateSize();
+			// El ancho cambia al montar/desmontar el comparador. No dejes que
+			// invalidateSize haga además un pan automático: en el zoom mínimo
+			// puede entrar en conflicto con maxBounds y con el pan de selección.
+			mapRef.current?.invalidateSize({ pan: false, debounceMoveend: true });
 		});
 		observer.observe(container);
 		return () => observer.disconnect();

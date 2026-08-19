@@ -31,6 +31,10 @@ describe('SortFilter — ordenación de resultados', () => {
 			'aria-disabled',
 			'true',
 		);
+		expect(screen.getByRole('radio', { name: 'Más cercano' })).toHaveAttribute(
+			'title',
+			'Activa tu ubicación o busca un lugar para ordenar por cercanía',
+		);
 	});
 
 	it('habilita la cercanía al marcar una ubicación', () => {

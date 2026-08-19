@@ -19,6 +19,7 @@ import {
 } from '../lib/explorerEvents';
 import { LOCATION_EVENT } from '../lib/geolocation';
 import type { NearbyStation } from '../lib/stations';
+import { MOBILE_MEDIA_QUERY } from '../lib/useMediaQuery';
 
 vi.mock('../config/runtime', () => ({
 	apiUrl: (path: string) => 'https://api.test' + path,
@@ -380,12 +381,12 @@ describe('StationList — listado de estaciones cercanas', () => {
 		render(<StationList />);
 		emitViewport();
 		await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
-		expect(screen.getAllByRole('listitem')).toHaveLength(2);
+		expect(document.querySelectorAll('.station-card')).toHaveLength(2);
 
 		// La nueva consulta queda pendiente: la lista anterior sigue visible.
 		emitFuel('GASOLINA_98');
 		await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
-		expect(screen.getAllByRole('listitem')).toHaveLength(2);
+		expect(document.querySelectorAll('.station-card')).toHaveLength(2);
 		const list = screen.getByRole('list');
 		expect(list).toHaveAttribute('aria-busy', 'true');
 		expect(list.className).toContain('explorer__stations--refreshing');
@@ -394,7 +395,7 @@ describe('StationList — listado de estaciones cercanas', () => {
 		await act(async () => {
 			resolveSecond(jsonResponse([station({ id: 's3', rotulo: 'Nueva' })]));
 		});
-		await waitFor(() => expect(screen.getAllByRole('listitem')).toHaveLength(1));
+		await waitFor(() => expect(document.querySelectorAll('.station-card')).toHaveLength(1));
 		expect(screen.getByText('Nueva')).toBeInTheDocument();
 		expect(screen.getByRole('list')).toHaveAttribute('aria-busy', 'false');
 		expect(screen.getByRole('list').className).not.toContain('explorer__stations--refreshing');
@@ -410,14 +411,14 @@ describe('StationList — listado de estaciones cercanas', () => {
 		render(<StationList />);
 		emitViewport();
 		await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
-		expect(screen.getAllByRole('listitem')).toHaveLength(1);
+		expect(document.querySelectorAll('.station-card')).toHaveLength(1);
 
 		emitFuel('GASOLINA_98');
 		await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
 		await waitFor(() => expect(screen.getByRole('list')).toHaveAttribute('aria-busy', 'false'));
 
 		// Sin mensaje de error: la lista anterior no desaparece.
-		expect(screen.getAllByRole('listitem')).toHaveLength(1);
+		expect(document.querySelectorAll('.station-card')).toHaveLength(1);
 		expect(screen.queryByText(/No se pudieron cargar/)).not.toBeInTheDocument();
 	});
 
@@ -760,10 +761,11 @@ describe('StationList — listado de estaciones cercanas', () => {
 		const card = (await screen.findByRole('heading', { name: 'Estación Norte' })).closest(
 			'li',
 		) as HTMLElement;
+		const trigger = card.querySelector('.station-card__trigger') as HTMLElement;
 
 		fireEvent.click(card);
 
-		expect(card).toHaveAttribute('aria-expanded', 'true');
+		expect(trigger).toHaveAttribute('aria-expanded', 'true');
 		expect(within(card).getByRole('button', { name: 'Añadir al comparador' })).toBeInTheDocument();
 		expect(within(card).getByRole('button', { name: 'Ver ficha' })).toBeInTheDocument();
 		// El clic en la tarjeta ya no añade directamente al comparador.
@@ -784,13 +786,14 @@ describe('StationList — listado de estaciones cercanas', () => {
 		const card = (await screen.findByRole('heading', { name: 'Estación Norte' })).closest(
 			'li',
 		) as HTMLElement;
+		const trigger = card.querySelector('.station-card__trigger') as HTMLElement;
 
 		fireEvent.click(card);
 
 		expect(listener).toHaveBeenCalledOnce();
 		const first = listener.mock.calls[0][0] as CustomEvent<{ id: string | null }>;
 		expect(first.detail.id).toBe('s1');
-		expect(card).toHaveAttribute('aria-current', 'true');
+		expect(trigger).toHaveAttribute('aria-current', 'true');
 		expect(card).toHaveClass('station-card--focused');
 		// Sin añadirla al comparador, sigue marcada solo como foco.
 		expect(card).not.toHaveClass('station-card--selected');
@@ -800,7 +803,7 @@ describe('StationList — listado de estaciones cercanas', () => {
 		expect(listener).toHaveBeenCalledTimes(2);
 		const second = listener.mock.calls[1][0] as CustomEvent<{ id: string | null }>;
 		expect(second.detail.id).toBeNull();
-		expect(card).not.toHaveAttribute('aria-current');
+		expect(trigger).not.toHaveAttribute('aria-current');
 		expect(card).not.toHaveClass('station-card--focused');
 		window.removeEventListener(STATION_FOCUS_EVENT, listener);
 	});
@@ -848,13 +851,14 @@ describe('StationList — listado de estaciones cercanas', () => {
 		const card = (await screen.findByRole('heading', { name: 'Gasolinera Sur' })).closest(
 			'li',
 		) as HTMLElement;
+		const trigger = card.querySelector('.station-card__trigger') as HTMLElement;
 
-		fireEvent.keyDown(card, { key: 'Enter' });
-		expect(card).toHaveAttribute('aria-expanded', 'true');
+		fireEvent.click(trigger);
+		expect(trigger).toHaveAttribute('aria-expanded', 'true');
 		expect(within(card).getByRole('button', { name: 'Añadir al comparador' })).toBeInTheDocument();
 
-		fireEvent.keyDown(card, { key: 'Enter' });
-		expect(card).toHaveAttribute('aria-expanded', 'false');
+		fireEvent.click(trigger);
+		expect(trigger).toHaveAttribute('aria-expanded', 'false');
 		expect(within(card).queryByRole('button', { name: 'Añadir al comparador' })).toBeNull();
 	});
 
@@ -1129,5 +1133,52 @@ describe('StationList — listado de estaciones cercanas', () => {
 			expect(screen.getByText(/No se pudo actualizar los precios/)).toBeInTheDocument(),
 		);
 		expect(screen.getByRole('heading', { name: 'Estación Norte' })).toBeInTheDocument();
+	});
+});
+
+describe('StationList — comportamiento móvil', () => {
+	function mockMobile() {
+		vi.stubGlobal('matchMedia', (query: string) => ({
+			matches: query === MOBILE_MEDIA_QUERY,
+			media: query,
+			onchange: null,
+			addListener: () => undefined,
+			removeListener: () => undefined,
+			addEventListener: () => undefined,
+			removeEventListener: () => undefined,
+			dispatchEvent: () => false,
+		}));
+	}
+
+	it('en móvil el tap de una tarjeta abre la ficha directamente, sin desplegar acciones', async () => {
+		mockMobile();
+		vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse([station()])));
+		const detailListener = vi.fn();
+		window.addEventListener(STATION_DETAIL_EVENT, detailListener);
+		const focusListener = vi.fn();
+		window.addEventListener(STATION_FOCUS_EVENT, focusListener);
+
+		render(<StationList />);
+		emitViewport();
+		const card = (await screen.findByRole('heading', { name: 'Estación Norte' })).closest(
+			'li',
+		) as HTMLElement;
+		const trigger = card.querySelector('.station-card__trigger') as HTMLElement;
+
+		fireEvent.click(card);
+
+		// No despliega las acciones de comparador ni marca el foco persistente.
+		expect(trigger).toHaveAttribute('aria-expanded', 'false');
+		expect(within(card).queryByRole('button', { name: 'Añadir al comparador' })).toBeNull();
+		expect(within(card).queryByRole('button', { name: 'Ver ficha' })).toBeNull();
+		expect(detailListener).toHaveBeenCalledOnce();
+		const event = detailListener.mock.calls[0][0] as CustomEvent<{ id: string }>;
+		expect(event.detail.id).toBe('s1');
+		expect(focusListener).toHaveBeenCalledWith(
+			expect.objectContaining({ detail: { id: 's1' } }),
+		);
+
+		window.removeEventListener(STATION_DETAIL_EVENT, detailListener);
+		window.removeEventListener(STATION_FOCUS_EVENT, focusListener);
 	});
 });

@@ -221,6 +221,46 @@ test.describe('teclado — orden de foco y operación', () => {
 	});
 });
 
+test.describe('rotación — el panel lateral reaparece al volver a horizontal', () => {
+	test('reabre la hoja plegada en vertical al pasar al layout de escritorio', async ({ page }) => {
+		await page.setViewportSize({ width: 760, height: 1024 });
+		await page.goto('/');
+		await expect(page.getByRole('button', { name: 'Acercar mapa' })).toBeVisible();
+
+		const details = page.locator('.explorer__sidebar');
+		await expect(details).toHaveAttribute('open', '');
+
+		// En vertical (layout móvil) se puede plegar la hoja.
+		await page.locator('.explorer__sidebar > summary').click();
+		await expect(details).not.toHaveAttribute('open');
+
+		// Al rotar a horizontal de tablet (layout con panel izquierdo) la hoja se
+		// reabre sola; si quedara cerrada, la columna lateral se vería vacía.
+		await page.setViewportSize({ width: 1024, height: 760 });
+		await expect(details).toHaveAttribute('open', '');
+
+		// La columna lateral vuelve a tener contenido visible (no vacío).
+		const content = page.locator('.explorer__sidebar-content');
+		await expect(content).toBeVisible();
+		const box = await content.boundingBox();
+		expect(box?.width).toBeGreaterThan(200);
+		expect(box?.height).toBeGreaterThan(200);
+	});
+
+	test('la hoja abierta en vertical se mantiene abierta al rotar', async ({ page }) => {
+		await page.setViewportSize({ width: 760, height: 1024 });
+		await page.goto('/');
+		await expect(page.getByRole('button', { name: 'Acercar mapa' })).toBeVisible();
+
+		const details = page.locator('.explorer__sidebar');
+		await expect(details).toHaveAttribute('open', '');
+
+		await page.setViewportSize({ width: 1280, height: 800 });
+
+		await expect(details).toHaveAttribute('open', '');
+	});
+});
+
 test.describe('geolocalización', () => {
 	async function waitForHydration(page: import('@playwright/test').Page) {
 		// El botón existe en el HTML de servidor; esperar a que la isla React se

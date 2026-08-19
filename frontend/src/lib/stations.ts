@@ -172,7 +172,7 @@ export const PRICE_FRESHNESS_DAYS = 7;
 function parseFlexibleDate(value: string): Date {
 	const iso = new Date(value);
 	if (!Number.isNaN(iso.getTime())) return iso;
-	const match = /^(\d{2})\/(\d{2})\/(\d{4})(?: (\d{2}):(\d{2}):(\d{2}))?$/.exec(value.trim());
+	const match = /^(\d{2})\/(\d{2})\/(\d{4})(?: (\d{1,2}):(\d{2}):(\d{2}))?$/.exec(value.trim());
 	if (match) {
 		const [, d, m, y, hh = '0', mm = '0', ss = '0'] = match;
 		return new Date(Number(y), Number(m) - 1, Number(d), Number(hh), Number(mm), Number(ss));
