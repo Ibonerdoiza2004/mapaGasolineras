@@ -45,6 +45,7 @@ export interface LeafletMapProps {
 const DEFAULT_TILE_URL = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
 const VIEW_PADDING = 16;
 const BOTTOM_MARGIN = 28;
+const INITIAL_ZOOM_BOOST = 0.125;
 const ZOOM_STEP = 0.5;
 const VIEWPORT_DEBOUNCE_MS = 250;
 /** Margen del área desplazable alrededor de SPAIN_BOUNDS (fracción). */
@@ -381,14 +382,24 @@ zoomSnap: ZOOM_STEP,
 						// centro del rectángulo.
 						const bottomOffset =
 							map.project(bounds[0], 0).y - map.project(PENINSULA_CENTER, 0).y;
+						const baseZoom = Math.log2((size.y / 2 - BOTTOM_MARGIN) / bottomOffset);
 						const targetZoom = Math.min(
-							Math.log2((size.y / 2 - BOTTOM_MARGIN) / bottomOffset),
+							baseZoom + INITIAL_ZOOM_BOOST,
 							map.getMaxZoom(),
+						);
+						const peninsulaPoint = map.project(PENINSULA_CENTER, targetZoom);
+						const canaryPoint = map.project(bounds[0], targetZoom);
+						const targetCenter = map.unproject(
+							[
+								peninsulaPoint.x,
+								canaryPoint.y - (size.y / 2 - BOTTOM_MARGIN),
+							],
+							targetZoom,
 						);
 						// El zoom exacto (p. ej. 4.84) no cae en la rejilla de
 						// zoomSnap; se desactiva el ajuste solo durante esta vista.
 						map.options.zoomSnap = 0;
-						map.setView(PENINSULA_CENTER, targetZoom, { animate: false });
+						map.setView([targetCenter.lat, targetCenter.lng], targetZoom, { animate: false });
 						map.options.zoomSnap = ZOOM_STEP;
 						// El zoom mínimo coincide con la vista inicial de España:
 						// no se puede alejar más, de modo que el viewport nunca

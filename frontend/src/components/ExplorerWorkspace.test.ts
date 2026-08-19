@@ -94,6 +94,11 @@ describe('ExplorerWorkspace — vista de móvil', () => {
 	it('permite desplazar el contenido sin bloquear el mapa', () => {
 		expect(mobileCss).toContain('.explorer__sidebar-content { overflow-y: auto;');
 	});
+
+	it('mantiene la alineación de marcas', () => {
+			expect(normalize(explorerCss)).toContain('transform: translateY(-15%);');
+			expect(normalize(explorerCss)).toContain('.explorer__brand-option > input { transform: none; }');
+		});
 });
 
 describe('ExplorerWorkspace — áreas táctiles y límites', () => {

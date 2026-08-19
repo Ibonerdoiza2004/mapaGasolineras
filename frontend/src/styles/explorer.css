@@ -360,8 +360,12 @@
 .explorer__brand-option > input,
 .explorer__brand-option > .explorer__brand-label,
 .explorer__brand-option > .explorer__brand-count {
-	/* Desplazamiento pequeño y común: conserva la alineación entre columnas. */
-	transform: translateY(-10px);
+	/* El ajuste es proporcional al propio control para adaptarse a tabletas. */
+	transform: translateY(-15%);
+}
+
+.explorer__brand-option > input {
+	transform: none;
 }
 
 /* El foco se dibuja en la fila completa, no duplicado sobre el checkbox. */
@@ -1313,6 +1317,7 @@
 		right: 0;
 		top: auto;
 		z-index: 2;
+		isolation: isolate;
 	}
 
 	.explorer__sidebar:not([open]) {

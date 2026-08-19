@@ -51,8 +51,12 @@ services:
       context: ./frontend
       dockerfile: Dockerfile.dev
     profiles: ["frontend", "all"]
+    env_file:
+      - ./frontend/.env.local
     environment:
       CHOKIDAR_USEPOLLING: "true"
+      # CI usa localhost; frontend/.env.local lo sobrescribe para la red LAN.
+      PUBLIC_API_URL: "${PUBLIC_API_URL:-http://localhost:8080}"
     ports:
       - "4321:4321"
     volumes:

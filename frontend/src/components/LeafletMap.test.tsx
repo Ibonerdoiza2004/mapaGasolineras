@@ -378,7 +378,7 @@ describe('LeafletMap', () => {
 		window.removeEventListener(STATION_DETAIL_EVENT, detailListener);
 	});
 
-	it('ajusta la vista a los límites y deja 18 px bajo Canarias centrando la península', async () => {
+	it('ajusta la vista a los límites, conserva el margen bajo Canarias y aumenta el detalle', async () => {
 		render(<LeafletMap stations={stations} center={[40.4168, -3.7038]} zoom={13} bounds={SPAIN_BOUNDS} />);
 
 		await waitFor(() => expect(leafletMock.map).toHaveBeenCalledTimes(1));
@@ -395,18 +395,18 @@ describe('LeafletMap', () => {
 		expect(mapInstance.project).toHaveBeenNthCalledWith(2, SPAIN_BOUNDS[1], 5.25);
 		expect(mapInstance.project).toHaveBeenNthCalledWith(3, SPAIN_BOUNDS[0], 0);
 		expect(mapInstance.project).toHaveBeenNthCalledWith(4, PENINSULA_CENTER, 0);
-		// El zoom se calcula para que el borde inferior del encuadre quede a
-		// 28 px del borde inferior del mapa (puede no caer en la rejilla de
-		// zoomSnap) y el centro apunta al centro visual de la península.
+		// El zoom parte del margen de 28 px bajo Canarias y gana un octavo de
+		// nivel para que las carreteras sean algo más legibles desde la carga inicial.
 		const bottomOffset = 107.54 - 96.99;
-		const targetZoom = Math.log2((1024 / 2 - 28) / bottomOffset);
-		expect(mapInstance.setView).toHaveBeenCalledWith(PENINSULA_CENTER, targetZoom, {
+		const baseZoom = Math.log2((1024 / 2 - 28) / bottomOffset);
+		const targetZoom = baseZoom + 0.125;
+		expect(mapInstance.setView).toHaveBeenCalledWith([36.5, -6.9], targetZoom, {
 			animate: false,
 		});
 		// El zoom mínimo coincide con la vista inicial: no se puede alejar más
 		// allá de los límites de España.
 		expect(mapInstance.setMinZoom).toHaveBeenCalledWith(targetZoom);
-		expect(mapInstance.unproject).not.toHaveBeenCalled();
+		expect(mapInstance.unproject).toHaveBeenCalled();
 		// El ajuste a la rejilla se desactiva solo durante la vista inicial.
 		expect(mapInstance.options.zoomSnap).toBe(0.5);
 	});
