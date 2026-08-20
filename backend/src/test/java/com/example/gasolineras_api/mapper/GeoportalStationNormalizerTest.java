@@ -109,10 +109,25 @@ class GeoportalStationNormalizerTest {
 	}
 
 	@Test
-	@DisplayName("Coordenadas en el océano Índico (latitud/longitud intercambiadas) se rechazan")
-	void swappedCoordinatesAreRejected() {
-		// Una estación gallega con lat/lon intercambiadas cae junto a Comoras.
+	@DisplayName("Latitud y longitud intercambiadas se corrigen automáticamente")
+	void swappedCoordinatesAreCorrected() {
+		// Una estación gallega con lat/lon intercambiadas se corrige y se acepta.
 		var raw = station("1", "GUAY", "1,599", "1,749", "1,699", "-8,659", "42,037");
+
+		NormalizationResult result = normalizer.normalize(List.of(raw), "17/08/2026");
+
+		assertThat(result.validStations()).hasSize(1);
+		assertThat(result.rejectedRecords()).isEmpty();
+		NormalizedStation s = result.validStations().getFirst();
+		assertThat(s.latitud()).isEqualTo(42.037);
+		assertThat(s.longitud()).isEqualTo(-8.659);
+	}
+
+	@Test
+	@DisplayName("Coordenadas fuera de España que no son un intercambio válido se rechazan")
+	void nonSwapOutOfSpainCoordinatesAreRejected() {
+		// (lat=30, lon=40): al intercambiar tampoco cae en España → se descarta.
+		var raw = station("1", "REPSOL", "1,599", "1,749", "1,699", "30,0", "40,0");
 
 		NormalizationResult result = normalizer.normalize(List.of(raw), "17/08/2026");
 
