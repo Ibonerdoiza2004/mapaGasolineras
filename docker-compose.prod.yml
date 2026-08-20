@@ -25,11 +25,10 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     restart: unless-stopped
-    # El DNS interno de Docker en Oracle no resuelve siempre el proveedor
-    # oficial; estos resolvers permiten que el importador llegue a MITECO.
+    # Resolver DNS privado de Oracle para que el contenedor pueda acceder al
+    # proveedor oficial sin depender de consultas DNS públicas bloqueadas.
     dns:
-      - 1.1.1.1
-      - 8.8.8.8
+      - 169.254.169.254
     environment:
       SERVER_PORT: "8080"
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:?CORS_ALLOWED_ORIGINS no está definido}
