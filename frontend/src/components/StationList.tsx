@@ -22,7 +22,6 @@ import { DEFAULT_FUEL, fuelLabel, isFuelType, type FuelType } from '../lib/fuel'
 import {
 	LOCATION_CLEAR_EVENT,
 	LOCATION_EVENT,
-	getLastLocation,
 	type UserLocation,
 	isValidCoordinates,
 } from '../lib/geolocation';
@@ -47,7 +46,6 @@ import { MOBILE_MEDIA_QUERY, useMediaQuery } from '../lib/useMediaQuery';
 type Status = 'idle' | 'loading' | 'success' | 'empty' | 'error';
 
 const FUEL_URL_PARAM = 'combustible';
-const RADIO_URL_PARAM = 'radio';
 const ORDEN_URL_PARAM = 'orden';
 const MAX_VIEWPORT_DEGREES = 180;
 
@@ -67,16 +65,6 @@ function isValidBounds(bounds: ViewportBounds): boolean {
 function readFuelFromUrl(): FuelType {
 	const value = getUrlParam(FUEL_URL_PARAM);
 	return isFuelType(value) ? value : DEFAULT_FUEL;
-}
-
-function readRadioFromUrl(): number | null {
-	if (!getLastLocation()) return null;
-	const value = getUrlParam(RADIO_URL_PARAM);
-	if (value === null) {
-		return DEFAULT_RADIO;
-	}
-	const parsed = Number(value);
-	return isRadioValue(parsed) ? parsed : DEFAULT_RADIO;
 }
 
 function readOrdenFromUrl(): OrderBy {
@@ -104,7 +92,7 @@ const FUEL_CLASS: Record<FuelType, string> = {
 export default function StationList() {
 	const [location, setLocation] = useState<UserLocation | null>(null);
 	const [fuel, setFuel] = useState<FuelType>(readFuelFromUrl);
-	const [radio, setRadio] = useState<number | null>(readRadioFromUrl);
+	const [radio, setRadio] = useState<number | null>(DEFAULT_RADIO);
 	const [orden, setOrden] = useState<OrderBy>(readOrdenFromUrl);
 	const [viewport, setViewport] = useState<ViewportBounds | null>(null);
 	const [status, setStatus] = useState<Status>('idle');

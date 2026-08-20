@@ -10,32 +10,14 @@ import {
 } from '../lib/geolocation';
 import {
 	DEFAULT_RADIUS_KM,
-	DEFAULT_RADIO,
-	isRadioValue,
 	RADIO_OPTIONS,
-	RADIO_URL_PARAM,
 	radioLabel,
 } from '../lib/radio';
-import { getUrlParam, setUrlParam } from '../lib/urlState';
-
-function readRadioValueFromUrl(): number | null {
-	const value = getUrlParam(RADIO_URL_PARAM);
-	if (value === null) {
-		return DEFAULT_RADIO;
-	}
-	const parsed = Number(value);
-	return isRadioValue(parsed) ? parsed : DEFAULT_RADIO;
-}
-
-function readRadioFromUrl(): number | null {
-	// La URL puede sobrevivir a una recarga, pero la ubicación solo vive en
-	// memoria; sin ella el radio no puede activarse todavía.
-	if (!getLastLocation()) return null;
-	return readRadioValueFromUrl();
-}
+import { setUrlParam } from '../lib/urlState';
 
 const SCOPE_GROUP_ID = 'explorer-scope';
 const RADIO_GROUP_ID = 'explorer-radio';
+const RADIO_QUERY_PARAM = 'radio';
 
 const SCOPE_OPTIONS = [
 	{ value: 'mapa', label: 'Área visible en el mapa' },
@@ -58,10 +40,8 @@ type Scope = (typeof SCOPE_OPTIONS)[number]['value'];
  * radio automáticamente con el radio elegido (o el de 10 km por defecto).
  */
 export default function RadioFilter() {
-	const [scope, setScope] = useState<Scope>('mapa');
-	const [selected, setSelected] = useState<number>(
-		readRadioValueFromUrl() ?? DEFAULT_RADIUS_KM,
-	);
+	const [scope, setScope] = useState<Scope>(() => (getLastLocation() ? 'radio' : 'mapa'));
+	const [selected, setSelected] = useState<number>(DEFAULT_RADIUS_KM);
 	const [disabled, setDisabled] = useState(() => getLastLocation() === null);
 	const [announcement, setAnnouncement] = useState('');
 	const selectedRef = useRef(selected);
@@ -72,19 +52,13 @@ export default function RadioFilter() {
 	// Restaura el estado desde la URL tras la hidratación y notifica el valor
 	// para que el listado y el mapa partan del filtro correcto.
 	useEffect(() => {
-		const restored = readRadioFromUrl();
-		const active = restored !== null;
-		setDisabled(getLastLocation() === null);
+		// El radio es estado de sesión, no un estado persistente de la URL.
+		setUrlParam(RADIO_QUERY_PARAM, null);
+		const active = getLastLocation() !== null;
+		setDisabled(!active);
 		scopeRef.current = active ? 'radio' : 'mapa';
 		setScope(active ? 'radio' : 'mapa');
-		if (restored !== null) {
-			selectedRef.current = restored;
-			setSelected(restored);
-		}
-		if (restored === null) {
-			setUrlParam(RADIO_URL_PARAM, null);
-		}
-		dispatchRadioChange(restored);
+		dispatchRadioChange(active ? selectedRef.current : null);
 	}, []);
 
 	const announce = useCallback((message: string) => {
@@ -95,7 +69,6 @@ export default function RadioFilter() {
 		const radio = selectedRef.current;
 		scopeRef.current = 'radio';
 		setScope('radio');
-		setUrlParam(RADIO_URL_PARAM, String(radio));
 		dispatchRadioChange(radio);
 		announce(`Radio de búsqueda activado: ${radioLabel(radio)}`);
 	}, [announce]);
@@ -109,7 +82,6 @@ export default function RadioFilter() {
 			}
 			scopeRef.current = next;
 			setScope(next);
-			setUrlParam(RADIO_URL_PARAM, null);
 			dispatchRadioChange(null);
 			// El modo mapa no tiene punto de referencia: se descarta la
 			// ubicación marcada y desaparecen las distancias.
@@ -125,7 +97,6 @@ export default function RadioFilter() {
 		}
 		selectedRef.current = radio;
 		setSelected(radio);
-		setUrlParam(RADIO_URL_PARAM, String(radio));
 		dispatchRadioChange(radio);
 		setAnnouncement(`Radio: ${radioLabel(radio)}`);
 	}, []);
@@ -151,7 +122,6 @@ export default function RadioFilter() {
 			setDisabled(true);
 			scopeRef.current = 'mapa';
 			setScope('mapa');
-			setUrlParam(RADIO_URL_PARAM, null);
 			dispatchRadioChange(null);
 		}
 		window.addEventListener(LOCATION_CLEAR_EVENT, onLocationClear);

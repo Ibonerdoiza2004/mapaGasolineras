@@ -17,8 +17,6 @@ export const DEFAULT_RADIO: number | null = null;
 /** Radio que se aplica al activar el interruptor si no había uno elegido. */
 export const DEFAULT_RADIUS_KM = 10;
 
-export const RADIO_URL_PARAM = 'radio';
-
 const VALID_RADII = new Set<number>(RADIO_OPTIONS.map((option) => option.value));
 
 /** Acepta solo los radios canónicos (o null para "sin radio"); cualquier otro se rechaza. */

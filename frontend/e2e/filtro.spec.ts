@@ -171,7 +171,6 @@ test.describe('filtro de combustible — buscar, comparar y ver detalle', () => 
 		await expect.poll(() => requests.length).toBe(3);
 		expect(requests[1]).toContain('radio=10');
 		expect(requests[2]).toContain('radio=10');
-		expect(new URL(page.url()).searchParams.get('radio')).toBe('10');
 		await expect(page.locator('.radius-circle')).toBeVisible();
 
 		// Elegir 50 km vuelve a consultar con el nuevo valor.
@@ -182,10 +181,9 @@ test.describe('filtro de combustible — buscar, comparar y ver detalle', () => 
 		);
 		await expect.poll(() => requests.length).toBe(4);
 		expect(requests[3]).toContain('radio=50');
-		expect(new URL(page.url()).searchParams.get('radio')).toBe('50');
 		await expect(page.locator('.radius-circle')).toBeVisible();
 
-		// Volver al área visible quita el parámetro, vuelve al viewport y
+		// Volver al área visible vuelve al viewport y
 		// elimina la circunferencia.
 		await page.getByRole('radio', { name: 'Área visible en el mapa' }).click();
 		await expect(page.getByRole('radio', { name: 'Área visible en el mapa' })).toHaveAttribute(
@@ -196,11 +194,10 @@ test.describe('filtro de combustible — buscar, comparar y ver detalle', () => 
 		await expect.poll(() => requests.length).toBe(5);
 		expect(requests[4]).not.toContain('radio=');
 		expect(requests[4]).toContain('minLat=');
-		expect(new URL(page.url()).searchParams.get('radio')).toBeNull();
 		await expect(page.locator('.radius-circle')).not.toBeVisible();
 	});
 
-	test('descarta el radio de la URL si no hay ubicación', async ({ page }) => {
+	test('no persiste ni restaura el radio desde la URL', async ({ page }) => {
 		stubNearby(page, NEARBY);
 		await page.goto('/?radio=25');
 
