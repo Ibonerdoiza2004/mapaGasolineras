@@ -6,7 +6,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.ClientHttpRequestInterceptor;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.web.client.RestTemplate;
 
 import java.time.Duration;
@@ -18,11 +18,19 @@ import java.util.List;
 @Configuration
 public class GeoportalClientConfig {
 
+	/**
+	 * Cliente moderno {@link java.net.http.HttpClient}: el WAF del Ministerio
+	 * resetea de forma intermitente el {@link java.net.HttpURLConnection}
+	 * (huella TLS de cliente nativo); java.net.http negocia con ALPN (HTTP/2
+	 * con degradación a HTTP/1.1) y presenta una huella TLS distinta.
+	 */
 	@Bean
 	public RestTemplate geoportalRestTemplate(
 		@Value("${app.geoportal.timeout-seconds:30}") int timeoutSeconds) {
-		SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
-		factory.setConnectTimeout(Duration.ofSeconds(10));
+		java.net.http.HttpClient httpClient = java.net.http.HttpClient.newBuilder()
+				.connectTimeout(Duration.ofSeconds(10))
+				.build();
+		JdkClientHttpRequestFactory factory = new JdkClientHttpRequestFactory(httpClient);
 		factory.setReadTimeout(Duration.ofSeconds(timeoutSeconds));
 		RestTemplate restTemplate = new RestTemplate(factory);
 		restTemplate.setInterceptors(List.of(geoportalRequestInterceptor()));

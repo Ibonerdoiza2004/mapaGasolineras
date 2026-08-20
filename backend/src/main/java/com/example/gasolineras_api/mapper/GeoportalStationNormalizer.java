@@ -87,6 +87,18 @@ public class GeoportalStationNormalizer {
 			return java.util.Optional.empty();
 		}
 
+		// El Geoportal a veces publica latitud y longitud intercambiadas. Como
+		// los rangos de lat y lon son disjuntos (ver SPAIN_LAT_*/SPAIN_LON_*),
+		// si (lat, lon) queda fuera pero (lon, lat) cae dentro es inequívoco
+		// que estaban intercambiadas: se corrigen en vez de descartar.
+		if (!isWithinSpain(lat, lon) && isWithinSpain(lon, lat)) {
+			log.warn("Estación {}: latitud y longitud intercambiadas, se corrigen a ({}, {})",
+					raw.id(), lon, lat);
+			double correctedLat = lon;
+			lon = lat;
+			lat = correctedLat;
+		}
+
 		if (!isWithinSpain(lat, lon)) {
 			log.warn("Estación {}: coordenadas ({}, {}) fuera del área de España, se descarta",
 					raw.id(), lat, lon);
