@@ -11,6 +11,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
+import org.springframework.test.web.client.ResponseActions;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestTemplate;
 
@@ -46,7 +47,7 @@ class GeoportalFuelStationClientTest {
 		server.verify();
 	}
 
-	private MockRestServiceServer.RequestExpectationBuilder expectGeoportalRequest() {
+	private ResponseActions expectGeoportalRequest() {
 		return server.expect(requestTo(BASE_URL))
 				.andExpect(method(HttpMethod.GET))
 				.andExpect(header(HttpHeaders.USER_AGENT,
