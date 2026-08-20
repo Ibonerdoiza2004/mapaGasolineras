@@ -1,0 +1,499 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import SiteHeader from '../components/SiteHeader.astro';
+import { seo } from '../config/seo';
+import municipios from '../data/municipios.json';
+
+interface Props {
+	municipio: {
+		id: string;
+		name: string;
+		province: string;
+		population: number;
+		lat: number;
+		lon: number;
+		slug: string;
+	};
+}
+
+export function getStaticPaths() {
+	// Páginas SEO para los municipios con más habitantes (long-tail local).
+	// Umbral configurable: subirlo reduce el build, bajarlo lo amplía.
+	const MIN_POPULATION = 10000;
+	return municipios
+		.filter((m) => m.population >= MIN_POPULATION)
+		.sort((a, b) => b.population - a.population)
+		.map((municipio) => ({ params: { slug: municipio.slug }, props: { municipio } }));
+}
+
+const { municipio } = Astro.props;
+const siteUrl = (import.meta.env.PUBLIC_SITE_URL as string | undefined ?? 'https://example.com').replace(
+	/\/$/,
+	'',
+);
+const title = `Gasolineras baratas en ${municipio.name} | ${seo.siteName}`;
+const description = `Compara los precios de las gasolineras de ${municipio.name} (${municipio.province}) y encuentra dónde repostar más barato. Precios oficiales actualizados cada hora.`;
+const deepLink = `/?lugar=${encodeURIComponent(municipio.name)}&lat=${municipio.lat}&lon=${municipio.lon}`;
+const pageUrl = new URL(Astro.url.pathname, siteUrl).href;
+const population = municipio.population.toLocaleString('es-ES');
+const fuels = [
+	{
+		label: 'Diésel',
+		description: 'El carburante más usado por los conductores diarios.',
+		className: 'municipio-fuel--diesel',
+	},
+	{
+		label: 'Gasolina 95',
+		description: 'La gasolina habitual para la mayoría de turismos.',
+		className: 'municipio-fuel--gasolina-95',
+	},
+	{
+		label: 'Gasolina 98',
+		description: 'Mayor octanaje para motores que lo requieren.',
+		className: 'municipio-fuel--gasolina-98',
+	},
+];
+const steps = [
+	{
+		title: 'Elige tu ubicación',
+		description: `Comparte la ubicación del dispositivo o busca ${municipio.name} directamente.`,
+	},
+	{
+		title: 'Filtra y compara',
+		description: 'Selecciona el carburante y el radio, y ordena por precio, distancia o ahorro.',
+	},
+	{
+		title: 'Reposta mejor',
+		description: 'Encuentra la gasolinera más barata cerca de ti y llega con un toque.',
+	},
+];
+const faqs = [
+	{
+		question: `¿De dónde salen los precios de las gasolineras de ${municipio.name}?`,
+		answer:
+			'Del Geoportal del Ministerio para la Transición Ecológica y el Reto Demográfico, la fuente oficial de precios de carburantes en España. Los datos se actualizan cada hora.',
+	},
+	{
+		question: `¿Cuánto cuesta usar ${seo.siteName}?`,
+		answer: 'Nada. Es gratuito y no requiere cuenta ni registro.',
+	},
+	{
+		question: `¿Qué carburantes puedo comparar en ${municipio.name}?`,
+		answer: 'Diésel, gasolina 95 y gasolina 98.',
+	},
+	{
+		question: `¿Veré las gasolineras reales de ${municipio.name}?`,
+		answer: `Sí. Al abrir el mapa se consultan las gasolineras en un radio de 10 km alrededor de ${municipio.name} con sus precios actuales, ordenables por precio, distancia o ahorro.`,
+	},
+];
+const jsonLd = [
+	{
+		'@context': 'https://schema.org',
+		'@type': 'WebPage',
+		name: title,
+		description,
+		url: pageUrl,
+		inLanguage: 'es',
+		mainEntity: {
+			'@type': 'Place',
+			name: municipio.name,
+			address: {
+				'@type': 'PostalAddress',
+				addressLocality: municipio.name,
+				addressRegion: municipio.province,
+				addressCountry: 'ES',
+			},
+			geo: {
+				'@type': 'GeoCoordinates',
+				latitude: municipio.lat,
+				longitude: municipio.lon,
+			},
+		},
+	},
+	{
+		'@context': 'https://schema.org',
+		'@type': 'FAQPage',
+		mainEntity: faqs.map((faq) => ({
+			'@type': 'Question',
+			name: faq.question,
+			acceptedAnswer: { '@type': 'Answer', text: faq.answer },
+		})),
+	},
+];
+---
+
+<BaseLayout title={title} description={description} jsonLd={jsonLd}>
+	<SiteHeader />
+	<main class="municipio-landing">
+		<section class="municipio-hero">
+			<div class="municipio-hero__content">
+				<p class="municipio-hero__eyebrow">Gasolineras en {municipio.province}</p>
+				<h1>Las gasolineras más baratas de {municipio.name}</h1>
+				<p class="municipio-hero__lead">
+					Compara los precios de diésel, gasolina 95 y gasolina 98 de las gasolineras
+					de {municipio.name} y encuentra dónde repostar mejor.
+				</p>
+				<div class="municipio-hero__actions">
+					<a class="municipio-cta" href={deepLink}>
+						Ver gasolineras en {municipio.name}
+					</a>
+					<p class="municipio-hero__note">
+						Datos oficiales actualizados cada hora · Sin cuenta ni registro
+					</p>
+				</div>
+			</div>
+
+			<dl class="municipio-stats" aria-label="Datos de {municipio.name}">
+				<div class="municipio-stats__item">
+					<dt>Provincia</dt>
+					<dd>{municipio.province}</dd>
+				</div>
+				<div class="municipio-stats__item">
+					<dt>Población</dt>
+					<dd>{population} hab.</dd>
+				</div>
+				<div class="municipio-stats__item">
+					<dt>Carburantes</dt>
+					<dd>Diésel · 95 · 98</dd>
+				</div>
+				<div class="municipio-stats__item">
+					<dt>Datos</dt>
+					<dd>Cada hora</dd>
+				</div>
+			</dl>
+		</section>
+
+		<section class="municipio-section" aria-labelledby="municipio-fuels-title">
+			<h2 id="municipio-fuels-title">Qué puedes comparar</h2>
+			<ul class="municipio-fuels">
+				{
+					fuels.map((fuel) => (
+						<li class={`municipio-fuel ${fuel.className}`}>
+							<h3>{fuel.label}</h3>
+							<p>{fuel.description}</p>
+						</li>
+					))
+				}
+			</ul>
+		</section>
+
+		<section class="municipio-section" aria-labelledby="municipio-how-title">
+			<h2 id="municipio-how-title">Cómo funciona</h2>
+			<ol class="municipio-steps">
+				{
+					steps.map((step, index) => (
+						<li class="municipio-step">
+							<span class="municipio-step__number" aria-hidden="true">{index + 1}</span>
+							<div>
+								<h3>{step.title}</h3>
+								<p>{step.description}</p>
+							</div>
+						</li>
+					))
+				}
+			</ol>
+		</section>
+
+		<section class="municipio-section" aria-labelledby="municipio-faq-title">
+			<h2 id="municipio-faq-title">Preguntas frecuentes</h2>
+			<div class="municipio-faq">
+				{
+					faqs.map((faq) => (
+						<details class="municipio-faq__item">
+							<summary>{faq.question}</summary>
+							<p>{faq.answer}</p>
+						</details>
+					))
+				}
+			</div>
+		</section>
+
+		<section class="municipio-final">
+			<h2>¿Repostando cerca de {municipio.name}?</h2>
+			<p>Mira qué gasolineras hay alrededor y ahorra en tu próximo llenado.</p>
+			<a class="municipio-cta" href={deepLink}>
+				Ver gasolineras en {municipio.name}
+			</a>
+		</section>
+	</main>
+</BaseLayout>
+
+<style>
+	.municipio-landing {
+		margin: 0 auto;
+		max-width: 64rem;
+		padding: 0 var(--space-6) var(--space-12);
+	}
+
+	.municipio-hero {
+		background: linear-gradient(
+			160deg,
+			var(--color-brand-900),
+			var(--color-brand-700)
+		);
+		border-radius: var(--radius-lg);
+		color: var(--color-text-on-brand);
+		display: grid;
+		gap: var(--space-8);
+		margin-top: var(--space-6);
+		padding: clamp(var(--space-8), 6vw, var(--space-12));
+	}
+
+	@media (min-width: 48rem) {
+		.municipio-hero {
+			grid-template-columns: 1fr auto;
+			align-items: center;
+		}
+	}
+
+	.municipio-hero__eyebrow {
+		color: color-mix(in srgb, var(--color-text-on-brand) 78%, transparent);
+		font-size: var(--font-size-sm);
+		font-weight: 700;
+		letter-spacing: 0.08em;
+		margin: 0 0 var(--space-3);
+		text-transform: uppercase;
+	}
+
+	.municipio-hero h1 {
+		color: var(--color-text-on-brand);
+		font-size: clamp(var(--font-size-xl), 5vw, var(--font-size-2xl));
+		line-height: var(--line-height-tight);
+		margin: 0 0 var(--space-4);
+		max-width: 24ch;
+	}
+
+	.municipio-hero__lead {
+		color: color-mix(in srgb, var(--color-text-on-brand) 88%, transparent);
+		font-size: var(--font-size-lg);
+		margin: 0 0 var(--space-6);
+		max-width: 48ch;
+	}
+
+	.municipio-hero__actions {
+		align-items: flex-start;
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-4);
+	}
+
+	.municipio-hero__note {
+		color: color-mix(in srgb, var(--color-text-on-brand) 72%, transparent);
+		font-size: var(--font-size-sm);
+		margin: 0;
+	}
+
+	.municipio-cta {
+		background: var(--color-success);
+		border-radius: var(--radius-md);
+		color: #ffffff;
+		display: inline-block;
+		font-weight: 700;
+		padding: var(--space-3) var(--space-6);
+		text-decoration: none;
+		transition: filter var(--transition-fast), transform var(--transition-fast);
+	}
+
+	.municipio-cta:hover {
+		filter: brightness(1.06);
+		transform: translateY(-1px);
+	}
+
+	.municipio-cta:focus-visible {
+		box-shadow: var(--focus-ring);
+		outline: none;
+	}
+
+	.municipio-stats {
+		display: grid;
+		gap: var(--space-6);
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		margin: 0;
+	}
+
+	@media (min-width: 48rem) {
+		.municipio-stats {
+			grid-template-columns: repeat(2, minmax(0, 10rem));
+		}
+	}
+
+	.municipio-stats__item {
+		background: color-mix(in srgb, var(--color-text-on-brand) 10%, transparent);
+		border-radius: var(--radius-md);
+		padding: var(--space-4) var(--space-5);
+	}
+
+	.municipio-stats dt {
+		color: color-mix(in srgb, var(--color-text-on-brand) 70%, transparent);
+		font-size: var(--font-size-xs);
+		letter-spacing: 0.06em;
+		margin-bottom: var(--space-1);
+		text-transform: uppercase;
+	}
+
+	.municipio-stats dd {
+		color: var(--color-text-on-brand);
+		font-size: var(--font-size-lg);
+		font-weight: 700;
+		margin: 0;
+	}
+
+	.municipio-section {
+		margin-top: var(--space-12);
+	}
+
+	.municipio-section h2,
+	.municipio-final h2 {
+		color: var(--color-text);
+		font-size: var(--font-size-xl);
+		margin: 0 0 var(--space-6);
+	}
+
+	.municipio-fuels {
+		display: grid;
+		gap: var(--space-4);
+		list-style: none;
+		margin: 0;
+		padding: 0;
+	}
+
+	@media (min-width: 48rem) {
+		.municipio-fuels {
+			grid-template-columns: repeat(3, minmax(0, 1fr));
+		}
+	}
+
+	.municipio-fuel {
+		background: var(--color-surface);
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-md);
+		border-top: 4px solid var(--color-diesel);
+		padding: var(--space-5);
+	}
+
+	.municipio-fuel--gasolina-95 {
+		border-top-color: var(--color-gasoline-95);
+	}
+
+	.municipio-fuel--gasolina-98 {
+		border-top-color: var(--color-gasoline-98);
+	}
+
+	.municipio-fuel h3 {
+		color: var(--color-text);
+		font-size: var(--font-size-lg);
+		margin: 0 0 var(--space-2);
+	}
+
+	.municipio-fuel p {
+		color: var(--color-text-muted);
+		font-size: var(--font-size-sm);
+		margin: 0;
+	}
+
+	.municipio-steps {
+		counter-reset: step;
+		list-style: none;
+		margin: 0;
+		padding: 0;
+	}
+
+	.municipio-step {
+		align-items: flex-start;
+		display: flex;
+		gap: var(--space-4);
+		padding-block: var(--space-4);
+	}
+
+	.municipio-step + .municipio-step {
+		border-top: 1px solid var(--color-border);
+	}
+
+	.municipio-step__number {
+		align-items: center;
+		background: var(--color-brand-700);
+		border-radius: var(--radius-pill);
+		color: var(--color-text-on-brand);
+		display: inline-flex;
+		flex-shrink: 0;
+		font-size: var(--font-size-md);
+		font-weight: 700;
+		height: 2.25rem;
+		justify-content: center;
+		width: 2.25rem;
+	}
+
+	.municipio-step h3 {
+		color: var(--color-text);
+		font-size: var(--font-size-lg);
+		margin: 0 0 var(--space-1);
+	}
+
+	.municipio-step p {
+		color: var(--color-text-muted);
+		margin: 0;
+		max-width: 48ch;
+	}
+
+	.municipio-faq {
+		display: grid;
+		gap: var(--space-3);
+	}
+
+	.municipio-faq__item {
+		background: var(--color-surface);
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-md);
+		padding: var(--space-3) var(--space-5);
+	}
+
+	.municipio-faq__item summary {
+		color: var(--color-text);
+		cursor: pointer;
+		font-weight: 600;
+		list-style: none;
+		padding-block: var(--space-2);
+	}
+
+	.municipio-faq__item summary::-webkit-details-marker {
+		display: none;
+	}
+
+	.municipio-faq__item summary::after {
+		content: '+';
+		color: var(--color-brand-700);
+		float: right;
+		font-size: var(--font-size-xl);
+		font-weight: 400;
+		line-height: 1;
+		margin-left: var(--space-4);
+	}
+
+	.municipio-faq__item[open] summary::after {
+		content: '−';
+	}
+
+	.municipio-faq__item summary:focus-visible {
+		box-shadow: var(--focus-ring);
+		outline: none;
+	}
+
+	.municipio-faq__item p {
+		color: var(--color-text-muted);
+		margin: 0 0 var(--space-2);
+	}
+
+	.municipio-final {
+		background: var(--color-surface-muted);
+		border-radius: var(--radius-lg);
+		margin-top: var(--space-12);
+		padding: var(--space-8);
+		text-align: center;
+	}
+
+	.municipio-final p {
+		color: var(--color-text-muted);
+		margin: 0 auto var(--space-6);
+		max-width: 40ch;
+	}
+</style>

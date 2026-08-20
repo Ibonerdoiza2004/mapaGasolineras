@@ -556,6 +556,33 @@ test.describe('filtro de combustible — buscar, comparar y ver detalle', () => 
 			.toBe(true);
 	});
 
+	test('el enlace de la landing aterriza en el radio 10 km con su circunferencia', async ({
+		page,
+	}) => {
+		const requests: string[] = [];
+		page.route('**/api/stations/nearby*', (route) => {
+			requests.push(route.request().url());
+			route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(NEARBY) });
+		});
+		await page.goto('/?lugar=Bilbao&lat=43.25696&lon=-2.923441');
+		await expect(page.getByRole('button', { name: 'Acercar mapa' })).toBeVisible();
+
+		// El deep-link activa el radio de búsqueda a 10 km alrededor de Bilbao.
+		await expect(page.getByRole('radio', { name: 'Radio de búsqueda' })).toHaveAttribute(
+			'aria-checked',
+			'true',
+		);
+		await expect(page.getByRole('radio', { name: '10 km' })).toHaveAttribute('aria-checked', 'true');
+		await expect(page.getByRole('listitem')).toHaveCount(3);
+
+		// Al menos una consulta se acota por radio de 10 km (no por el viewport
+		// de toda España que emite el mapa al hidratarse).
+		await expect.poll(() => requests.some((url) => url.includes('radio=10'))).toBe(true);
+
+		// La circunferencia del radio queda dibujada sobre el mapa.
+		await expect(page.locator('.radius-circle')).toBeVisible();
+	});
+
 	test('flujo MVP completo: buscar, filtrar, ordenar, abrir ficha e indicaciones', async ({
 		page,
 		isMobile,

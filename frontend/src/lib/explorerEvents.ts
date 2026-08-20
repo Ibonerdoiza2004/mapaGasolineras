@@ -53,6 +53,7 @@ export interface ViewportBounds {
 }
 
 let lastViewport: ViewportBounds | null = null;
+let lastRadio: number | null = null;
 
 export function dispatchFuelChange(combustible: FuelType): void {
 	window.dispatchEvent(
@@ -60,9 +61,24 @@ export function dispatchFuelChange(combustible: FuelType): void {
 	);
 }
 
-/** Notifica el radio en kilómetros; null significa "lo visible en el mapa". */
+/**
+ * Notifica el radio en kilómetros; null significa "lo visible en el mapa".
+ * El último valor queda disponible para las islas que se hidraten después
+ * del primer evento (el radio se emite al montar el filtro o al activarlo).
+ */
 export function dispatchRadioChange(radio: number | null): void {
+	lastRadio = radio;
 	window.dispatchEvent(new CustomEvent<{ radio: number | null }>(RADIO_EVENT, { detail: { radio } }));
+}
+
+/** Último radio notificado, o null si aún no se ha emitido. */
+export function getLastRadio(): number | null {
+	return lastRadio;
+}
+
+/** Limpia el último radio recordado (solo para aislamiento de pruebas). */
+export function resetLastRadio(): void {
+	lastRadio = null;
 }
 
 /** Notifica el criterio de ordenación elegido (precio, distancia o ahorro). */

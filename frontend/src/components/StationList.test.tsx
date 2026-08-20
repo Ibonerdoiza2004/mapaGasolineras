@@ -3,12 +3,14 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import StationList from './StationList';
 import {
+	dispatchRadioChange,
 	dispatchViewportChange,
 	FUEL_EVENT,
 	MARCAS_EVENT,
 	ORDEN_EVENT,
 	PRICE_FILTER_EVENT,
 	RADIO_EVENT,
+	resetLastRadio,
 	resetLastViewport,
 	COMPARE_EVENT,
 	STATION_DETAIL_EVENT,
@@ -17,7 +19,7 @@ import {
 	STATIONS_EVENT,
 	VIEWPORT_EVENT,
 } from '../lib/explorerEvents';
-import { LOCATION_EVENT } from '../lib/geolocation';
+import { dispatchUserLocation, LOCATION_EVENT, resetLastLocation } from '../lib/geolocation';
 import type { NearbyStation } from '../lib/stations';
 import { MOBILE_MEDIA_QUERY } from '../lib/useMediaQuery';
 
@@ -96,6 +98,8 @@ afterEach(() => {
 	vi.unstubAllGlobals();
 	vi.restoreAllMocks();
 	resetLastViewport();
+	resetLastRadio();
+	resetLastLocation();
 	window.history.replaceState(null, '', '/explorar');
 	document.body.innerHTML = '';
 });
@@ -132,6 +136,26 @@ describe('StationList — listado de estaciones cercanas', () => {
 		await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
 		const [url] = fetchMock.mock.calls[0];
 		expect(String(url)).toContain('minLat=36.5');
+	});
+
+	it('recupera el radio y la ubicación emitidos antes de hidratarse (deep-link)', async () => {
+		const fetchMock = vi.fn().mockResolvedValue(jsonResponse([station()]));
+		vi.stubGlobal('fetch', fetchMock);
+
+		// Un aterrizaje desde una landing de municipio emite la ubicación y
+		// activa el radio antes de que esta isla se hidrate: sin recuperar el
+		// último valor se quedaría consultando el área visible (toda España).
+		dispatchUserLocation(40.4168, -3.7038);
+		dispatchRadioChange(10);
+
+		render(<StationList />);
+
+		await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+		const [url] = fetchMock.mock.calls[0];
+		expect(String(url)).toContain('radio=10');
+		expect(String(url)).toContain('lat=40.4168');
+		expect(String(url)).toContain('lon=-3.7038');
+		expect(String(url)).not.toContain('minLat=');
 	});
 
 	it('sin viewport no consulta con «todas» aunque haya ubicación', async () => {

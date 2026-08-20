@@ -125,7 +125,7 @@ test.describe('teclado — orden de foco y operación', () => {
 		await expect(page.getByRole('radio', { name: 'Radio de búsqueda' })).toBeDisabled();
 
 		const panelOrder = [
-			['link', 'Mapa de Gasolineras, inicio'],
+			['link', 'Ahorra Repostando, inicio'],
 			['link', 'Explorar'],
 			['link', 'Rutas'],
 			['button', 'Activar modo oscuro'],
@@ -165,6 +165,26 @@ test.describe('teclado — orden de foco y operación', () => {
 
 		await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
 		await expect(page.getByRole('button', { name: 'Activar modo claro' })).toBeFocused();
+	});
+
+	test('el selector de tema muestra un único icono según el tema', async ({ page }) => {
+		await page.goto('/');
+		await expect(page.getByRole('button', { name: 'Acercar mapa' })).toBeVisible();
+
+		// Modo claro: solo la luna es visible y el texto del botón no se
+		// duplica dentro del área de iconos.
+		await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+		await expect(page.locator('[data-theme-icon]')).toHaveCount(2);
+		await expect(page.locator('[data-theme-icon="moon"]')).toBeVisible();
+		await expect(page.locator('[data-theme-icon="sun"]')).toBeHidden();
+		await expect(page.getByRole('button', { name: 'Activar modo oscuro' })).toHaveText('Oscuro');
+
+		// Al pasar a oscuro se intercambia el icono: solo el sol queda visible.
+		await page.getByRole('button', { name: 'Activar modo oscuro' }).click();
+		await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+		await expect(page.locator('[data-theme-icon="sun"]')).toBeVisible();
+		await expect(page.locator('[data-theme-icon="moon"]')).toBeHidden();
+		await expect(page.getByRole('button', { name: 'Activar modo claro' })).toHaveText('Claro');
 	});
 
 	test('el selector de combustible se opera con el teclado', async ({ page }) => {

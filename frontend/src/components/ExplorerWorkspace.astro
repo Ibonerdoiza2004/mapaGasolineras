@@ -40,11 +40,11 @@ import { SPAIN_BOUNDS } from '../lib/spainBounds';
 
 			<RadioFilter client:load />
 
-			<BrandFilter client:load />
+			<BrandFilter client:idle />
 
 			<FuelFilter client:load />
 
-			<PriceFilter client:load />
+			<PriceFilter client:idle />
 		</form>
 
 		<div class="explorer__list-heading">
@@ -63,16 +63,16 @@ import { SPAIN_BOUNDS } from '../lib/spainBounds';
 
 	<div class="explorer__map">
 		<LeafletMap
-			client:load
+			client:idle
 			stations={[]}
 			center={[40.4168, -3.7038]}
 			zoom={13}
 			bounds={SPAIN_BOUNDS}
 		/>
-		<StationDetail client:load />
+		<StationDetail client:idle />
 	</div>
 
-	<ComparePanel client:load />
+	<ComparePanel client:idle />
 </section>
 
 <script>
