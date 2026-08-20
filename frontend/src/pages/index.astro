@@ -2,15 +2,26 @@
 import BaseLayout from '../layouts/BaseLayout.astro';
 import SiteHeader from '../components/SiteHeader.astro';
 import ExplorerWorkspace from '../components/ExplorerWorkspace.astro';
+import DeepLinkLocation from '../components/DeepLinkLocation';
 import { seo } from '../config/seo';
+
+const homeJsonLd = {
+	'@context': 'https://schema.org',
+	'@type': 'WebSite',
+	name: seo.siteName,
+	description: seo.home.description,
+	inLanguage: 'es',
+};
 ---
 
 <BaseLayout
 	title={seo.home.title}
 	description={seo.home.description}
+	jsonLd={homeJsonLd}
 >
 	<SiteHeader />
 	<main id="explorar">
 		<ExplorerWorkspace />
 	</main>
+	<DeepLinkLocation client:load />
 </BaseLayout>

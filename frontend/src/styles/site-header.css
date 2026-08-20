@@ -21,8 +21,9 @@
 }
 
 .site-header__brand-mark {
-	font-size: var(--font-size-xl);
-	line-height: 1;
+	color: var(--color-brand-700);
+	height: 1.25rem;
+	width: 1.25rem;
 }
 
 .site-header__nav {

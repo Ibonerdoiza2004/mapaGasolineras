@@ -12,7 +12,34 @@ sus pruebas han terminado correctamente.
 - **Tarea pendiente:** T-23.1 — Crear página y formulario de planificación de ruta
 - **Última tarea completada:** MVP completo (US-13 a US-22) — ficha detallada, frescura, estados/errores, indicaciones y validación del flujo
 - **Porcentaje de tareas completadas:** 88 / 150
-- **Pruebas automatizadas:** 590 unitarias (184 backend + 406 frontend) y 51 E2E (11 skipped)
+- **Pruebas automatizadas:** 600 unitarias (184 backend + 416 frontend) y 55 E2E (11 skipped)
+
+## Mejoras de calidad (Lighthouse/SEO)
+
+- **Reintentos de importación Geoportal:** 4 intentos con 30 s de espera ante
+  cortes transitorios del WAF (configurable: `APP_GEOPORTAL_RETRY_MAX_ATTEMPTS`
+  y `APP_GEOPORTAL_RETRY_DELAY_MS`).
+- **SEO:** `robots.txt` propio, sitemap (`@astrojs/sitemap`, 434 páginas),
+  JSON-LD (`WebSite`/`Place`), canonical, OG y preconnect; `PUBLIC_SITE_URL`
+  configura por entorno la URL del sitio.
+- **Rendimiento:** carga diferida del mapa y de las islas no críticas
+  (`client:idle`), `detectRetina`, y compresión gzip de la API
+  (`server.compression.enabled`); proxy de teselas a WebP autocontenido en
+  `tile-proxy/` (Node + sharp) expuesto vía `PUBLIC_MAP_TILE_URL` y
+  `preconnect` dinámico en `BaseLayout` (pendiente de desplegar).
+- **Accesibilidad:** clústeres del mapa con área táctil ≥44 px y `aria-label`.
+- **Seguridad:** CSP/HSTS/COOP en `_headers` de Cloudflare Pages y
+  `SecurityHeadersFilter` en el backend.
+- **SEO estructural:** 432 landing pages `gasolineras-baratas-[slug].astro`
+  (municipios ≥20 000 hab.) con `DeepLinkLocation` para aterrizar en
+  «Radio de búsqueda: 10 km».
+- **Marca y limpieza:** rebranding aplicado a «Ahorra Repostando» (`seo.ts`,
+  cabecera, og:site_name, JSON-LD, favicon y landing pages); eliminados los
+  emojis de la interfaz y del README (iconos SVG en su lugar). El selector de
+  tema muestra un solo icono según el tema (CSS + `data-theme`, sin parcheo de
+  React).
+- **E2E estable:** workers limitados a 2 en local para evitar flakiness por
+  paralelismo en el contenedor.
 
 ## Historias
 
@@ -215,3 +242,6 @@ sus pruebas han terminado correctamente.
 | 2026-08-20 | Fix — saneo de coordenadas intercambiadas en la importación | Datos del Geoportal | MITECO publica a veces latitud y longitud intercambiadas (p. ej. la estación 16268, gallega, como `(-8.659, 42.037)`). Como los rangos de lat `[27, 44.5]` y lon `[-18.5, 5]` son disjuntos, si `(lat, lon)` queda fuera de España pero `(lon, lat)` cae dentro es inequívoco que estaban intercambiadas: el normalizador las corrige y acepta la estación en vez de descartarla; los puntos que no son un intercambio válido (p. ej. `(0,0)`) siguen rechazándose | Verificado en prod: la estación 16268 pasaría de rechazada a válida; backend 181/181 (test del caso gallego corregido a positivo + caso negativo de no-intercambio) |
 | 2026-08-20 | Fix — cliente HTTP moderno en el cliente del Geoportal | Conexión al proveedor MITECO | El WAF del Ministerio sigue cortando de forma intermitente el `HttpURLConnection` de Java (`Connection reset` ~50 % de los ciclos en Oracle) aunque las cabeceras sean de navegador; `curl` desde el mismo contenedor responde 200 estable. `GeoportalClientConfig` sustituye `SimpleClientHttpRequestFactory` por `JdkClientHttpRequestFactory` (cliente `java.net.http`): negocia TLS/ALPN (HTTP/2 con degradación a HTTP/1.1) y presenta una huella TLS distinta. En Spring 7.0.8 no existe `builder()`: se inyecta un `HttpClient.newBuilder().connectTimeout(10s)` y se fija `setReadTimeout` | Backend 181/181 (BUILD SUCCESS); pendiente de redeploy y verificación de varios ciclos en prod |
 | 2026-08-20 | Fix — reintentos en la obtención de datos | Conexión al proveedor MITECO | Verificado en prod: con el cliente moderno el WAF corta el handshake TLS del cliente Java (`Remote host terminated the handshake`) — la huella TLS de Java se bloquea igualmente; `curl`/OpenSSL pasa siempre. La solución robusta es reintentar dentro del ciclo: `GeoportalFuelStationClient` reintenta la obtención hasta `app.geoportal.retry-max-attempts` (4 por defecto) con espera `app.geoportal.retry-delay-ms` (30 s por defecto) cuando el fallo es transitorio (`providerUnavailable`), y falla al instante en errores de procesamiento no transitorios. Dos constructores (el de Spring con `@Autowired` + `@Qualifier`, y uno de 2 args sin reintentos para tests) | Backend 184/184 (3 tests nuevos: reintento hasta éxito, agotamiento de reintentos, no-reintento de errores no transitorios); pendiente de redeploy y verificación en prod |
+| 2026-08-20 | Fix — aterrizaje desde las landing pages | Deep-link: radio 10 km sin circunferencia y estaciones de toda España | Al entrar con `?lugar=&lat=&lon=` (enlace de una landing de municipio) el listado y el mapa consultaban el área visible de toda España y la circunferencia del radio no se dibujaba. Causa: las islas se hidratan después de que `RadioFilter`/`DeepLinkLocation` ya dispararon sus eventos y no había caché del último radio (a diferencia de viewport/ubicación), por lo que `StationList` y `LeafletMap` se quedaban en modo «área visible» con radio `null`; además el mapa emitía el viewport de España entera antes de aplicar la ubicación. Fix: caché del último radio (`getLastRadio`/`resetLastRadio` en `explorerEvents`), inicialización perezosa de `radio` y `location` desde las cachés en `StationList`, inicialización de `radio` desde la caché en `LeafletMap`, y en la hidratación del mapa se aplica primero la ubicación pendiente y solo se emite el viewport inicial si no la hay (el primer viewport llega del `moveend` ya acotado) | 184/184 backend, 416/416 frontend (4 tests nuevos: caché de radio, recuperación de radio+ubicación en StationList, circunferencia con radio previo y no-emisión del viewport de España en LeafletMap), E2E 55/55 (11 skipped, nuevo test de deep-link en móvil y escritorio), lint, typecheck y build limpios |
+| 2026-08-20 | Auditoría Lighthouse local — aclaración dev vs prod + 2 fixes | Informe sobre `localhost:4321` (servidor dev) | El informe (rendimiento 30/100, 7,4 MB) mide el **servidor de desarrollo** (`npm run dev`), que sirve el grafo de módulos sin minificar ni comprimir ni con `_headers`: los 5,1 MB y las «duplicaciones» son scripts de dev de Astro/Vite (`/dev-toolbar/`, `?t=…`). El build real de producción son ~380 KB de JS minificado (184 KB `client.js` + 148 KB `leaflet-src` diferida por `client:idle` + islas). Las cabeceras de seguridad (CSP/HSTS/COOP/X-Frame-Options) existen en producción (`_headers` + `SecurityHeadersFilter`) y el HTTP a `192.168.1.115` es la API de dev por LAN (en prod es HTTPS); ambos no aparecen en dev por diseño. **Fixes reales aplicados:** (1) atributos SVG en JSX de `ThemeToggle` en camelCase (`strokeWidth`/`strokeLinecap`/`strokeLinejoin`) para eliminar los errores de consola de React; (2) clúster del mapa de 44 → 48 px (icono `[48,48]`, ancla `[24,24]`, CSS y test) para cumplir el área táctil mínima de Lighthouse. Pendiente real en prod: proxy de teselas WebP/AVIF y re-ejecutar Lighthouse contra el build/preview o el despliegue | 416/416 frontend, E2E 55/55 (11 skipped), lint, typecheck y build limpios |
+| 2026-08-20 | Proxy de teselas WebP autocontenido | Teselas en WebP (opción gratuita) | `tile-proxy/` (Node 22 + sharp): convierte al vuelo las teselas PNG de OSM a WebP (calidad 72), con caché LRU (5000), `User-Agent` identificativo (política de uso OSM), `Cache-Control`/CORS y 502 si el origen falla. `docker-compose.prod.yml` añade el servicio `tile-proxy` en la red `app`; el `Caddyfile` expone `https://tiles.{$DOMAIN}` → `tile-proxy:8080` (requiere crear el registro DNS `tiles` antes de recargar Caddy). `BaseLayout` emite el `preconnect` del origen que define `PUBLIC_MAP_TILE_URL` (fallback `tile.openstreetmap.org`). `.env.example` y `PLAN_MEJORAS.md` documentan el despliegue y la variable. Pendiente de hacerlo tú: DNS `tiles`, `docker compose up -d --build`, verificar `Content-Type: image/webp` y fijar `PUBLIC_MAP_TILE_URL` en Cloudflare Pages | lint, typecheck y build limpios (verificación del proxy en la VM) |

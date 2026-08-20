@@ -1,16 +1,43 @@
 ---
 import '../styles/tokens.css';
 import '../styles/layout.css';
+import { seo } from '../config/seo';
 
 interface Props {
 	title: string;
 	description?: string;
+	/** Objeto o lista de objetos JSON-LD (datos estructurados para SEO). */
+	jsonLd?: object | object[];
+	/** Impide la indexación de la página (p. ej. páginas internas sin valor SEO). */
+	noindex?: boolean;
 }
 
 const {
 	title,
 	description = 'Encuentra y compara gasolineras cercanas.',
+	jsonLd,
+	noindex = false,
 } = Astro.props;
+
+const siteUrl = (import.meta.env.PUBLIC_SITE_URL as string | undefined ?? 'https://example.com').replace(
+	/\/$/,
+	'',
+);
+const canonical = new URL(Astro.url.pathname, siteUrl).href;
+const jsonLdList = Array.isArray(jsonLd) ? jsonLd : jsonLd ? [jsonLd] : [];
+const ldJson = jsonLdList.length > 0 ? JSON.stringify(jsonLdList) : null;
+
+// El origen de las teselas (para preconnect) sigue al proveedor configurado
+// con PUBLIC_MAP_TILE_URL; si no está definido, OpenStreetMap por defecto.
+const rawTileUrl = (import.meta.env.PUBLIC_MAP_TILE_URL as string | undefined)?.trim();
+let tileOrigin = 'https://tile.openstreetmap.org';
+if (rawTileUrl && /^https?:\/\//.test(rawTileUrl)) {
+	try {
+		tileOrigin = new URL(rawTileUrl).origin;
+	} catch {
+		// URL inválida: se mantiene el preconnect por defecto.
+	}
+}
 ---
 
 <!doctype html>
@@ -21,10 +48,19 @@ const {
 		<meta name="viewport" content="width=device-width" />
 		<meta name="generator" content={Astro.generator} />
 		<meta name="description" content={description} />
+		<link rel="canonical" href={canonical} />
 		<meta property="og:locale" content="es_ES" />
 		<meta property="og:type" content="website" />
+		<meta property="og:site_name" content={seo.siteName} />
 		<meta property="og:title" content={title} />
 		<meta property="og:description" content={description} />
+		<meta property="og:url" content={canonical} />
+		<meta name="twitter:card" content="summary" />
+		<meta name="twitter:title" content={title} />
+		<meta name="twitter:description" content={description} />
+		{noindex && <meta name="robots" content="noindex, nofollow" />}
+		<link rel="preconnect" href={tileOrigin} />
+		<link rel="preconnect" href={siteUrl} crossorigin />
 		<script is:inline>
 			try {
 				const savedTheme = localStorage.getItem('gasolineras-theme');
@@ -42,6 +78,7 @@ const {
 				// El tema del sistema se aplica mediante CSS si el almacenamiento no está disponible.
 			}
 		</script>
+		{ldJson && <script type="application/ld+json" set:html={ldJson} />}
 		<title>{title}</title>
 	</head>
 	<body>
@@ -61,8 +98,12 @@ const {
 				button.setAttribute('aria-label', label);
 				button.setAttribute('title', label);
 				button.setAttribute('aria-pressed', String(dark));
-				const [icon, text] = button.querySelectorAll('span');
-				if (icon) icon.textContent = dark ? '☀' : '☾';
+				// El icono del selector se muestra según el tema mediante CSS
+				// (`[data-theme="dark"]` en <html>); aquí solo se corrige el texto.
+				// La etiqueta es el segundo hijo directo del botón (el primero es
+				// el contenedor de iconos).
+				const spans = button.querySelectorAll(':scope > span');
+				const text = spans[1];
 				if (text) text.textContent = dark ? 'Claro' : 'Oscuro';
 			})();
 		</script>

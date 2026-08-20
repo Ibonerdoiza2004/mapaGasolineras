@@ -12,6 +12,7 @@ import {
 } from '../lib/geolocation';
 import {
 	COMPARE_EVENT,
+	getLastRadio,
 	RADIO_EVENT,
 	STATIONS_EVENT,
 	STATION_FOCUS_EVENT,
@@ -150,9 +151,10 @@ function buildStationPopup(station: MapStation, isSelected: boolean): string {
 function buildClusterIcon(L: typeof import('leaflet'), count: number) {
 	return L.divIcon({
 		className: 'station-cluster',
-		html: `<span class="station-cluster__count">${count}</span>`,
-		iconSize: [34, 34],
-		iconAnchor: [17, 17],
+		html: `<span class="station-cluster__count" role="button" aria-label="${count} gasolineras agrupadas">${count}</span>`,
+		// Área táctil mínima de 48 px (Lighthouse 48×48 px); el círculo visual queda centrado.
+		iconSize: [48, 48],
+		iconAnchor: [24, 24],
 	});
 }
 
@@ -258,7 +260,14 @@ export default function LeafletMap({
 	const [nearbyStations, setNearbyStations] = useState<MapStation[]>(stations);
 	const [querySettled, setQuerySettled] = useState(false);
 	const [reference, setReference] = useState<UserLocation | null>(null);
-	const [radio, setRadio] = useState<number | null>(null);
+	// El radio se recupera del último valor notificado: el mapa puede hidratarse
+	// (client:idle) después de que el filtro ya haya activado el radio al
+	// aterrizar desde una página de municipio, y sin esa caché perdería la
+	// circunferencia del radio sobre el punto de referencia.
+	const [radio, setRadio] = useState<number | null>(() => {
+		const last = getLastRadio();
+		return last === null || typeof last === 'number' ? last : null;
+	});
 	const [selectedIds, setSelectedIds] = useState<string[]>([]);
 	// Estación resaltada desde el listado; puede no estar en el comparador.
 	const [focusedId, setFocusedId] = useState<string | null>(null);
@@ -437,6 +446,9 @@ export default function LeafletMap({
 			L.tileLayer(configuredTileUrl(), {
 				attribution: OSM_ATTRIBUTION,
 				maxZoom: 19,
+				// En pantallas de alta densidad se solicitan teselas @2x (512 px)
+				// en lugar de escalar las de 256 px, evitando pérdida de nitidez.
+				detectRetina: true,
 			}).addTo(map);
 
 			// La rueda nativa de Leaflet acumula el delta del navegador y
@@ -673,12 +685,18 @@ export default function LeafletMap({
 					clearTimeout(viewportTimer);
 					viewportTimer = setTimeout(emitViewport, VIEWPORT_DEBOUNCE_MS);
 				});
-				emitViewport();
-
-			if (pendingLocationRef.current || getLastLocation()) {
-				applyLocation(pendingLocationRef.current ?? getLastLocation()!);
-				pendingLocationRef.current = null;
-			}
+				// Con ubicación pendiente (deep-link de una página de municipio)
+				// no se emite el viewport de toda España: el re-encuadre hacia
+				// el punto la descartaría y el listado consultaría todo el país.
+				// El primer viewport llega entonces del `moveend` (debounced),
+				// ya acotado a la zona. Sin ubicación se notifica el encuadre
+				// inicial, que es el área visible por defecto.
+				if (pendingLocationRef.current || getLastLocation()) {
+					applyLocation(pendingLocationRef.current ?? getLastLocation()!);
+					pendingLocationRef.current = null;
+				} else {
+					emitViewport();
+				}
 
 			// El nivel de zoom decide la agrupación de marcadores: cada cambio
 			// re-dibuja los pines para fundir o separar los grupos.

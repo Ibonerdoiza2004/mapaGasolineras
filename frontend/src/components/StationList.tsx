@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
 	COMPARE_EVENT,
 	FUEL_EVENT,
+	getLastRadio,
 	getLastViewport,
 	MARCAS_EVENT,
 	ORDEN_EVENT,
@@ -22,6 +23,7 @@ import { DEFAULT_FUEL, fuelLabel, isFuelType, type FuelType } from '../lib/fuel'
 import {
 	LOCATION_CLEAR_EVENT,
 	LOCATION_EVENT,
+	getLastLocation,
 	type UserLocation,
 	isValidCoordinates,
 } from '../lib/geolocation';
@@ -90,9 +92,18 @@ const FUEL_CLASS: Record<FuelType, string> = {
  * pantalla y mover o alejar el mapa vuelve a consultar.
  */
 export default function StationList() {
-	const [location, setLocation] = useState<UserLocation | null>(null);
+	// La isla puede hidratarse después de que el filtro y el deep-link hayan
+	// emitido sus eventos: se recupera el último valor notificado (como con el
+	// viewport) para no quedarse en modo "área visible" ni sin punto de
+	// referencia al aterrizar desde una página de municipio.
+	const [location, setLocation] = useState<UserLocation | null>(() => {
+		const last = getLastLocation();
+		return last && isValidCoordinates(last.lat, last.lon) ? last : null;
+	});
 	const [fuel, setFuel] = useState<FuelType>(readFuelFromUrl);
-	const [radio, setRadio] = useState<number | null>(DEFAULT_RADIO);
+	const [radio, setRadio] = useState<number | null>(() =>
+		isRadioValue(getLastRadio()) ? getLastRadio() : DEFAULT_RADIO,
+	);
 	const [orden, setOrden] = useState<OrderBy>(readOrdenFromUrl);
 	const [viewport, setViewport] = useState<ViewportBounds | null>(null);
 	const [status, setStatus] = useState<Status>('idle');

@@ -188,10 +188,17 @@
 	transform-origin: bottom center;
 }
 
-/* Clúster de estaciones: insignia circular con el número de pines agrupados. */
+/* Clúster de estaciones: insignia circular con el número de pines agrupados.
+   El contenedor mide 48 px para cumplir el área táctil mínima de los
+   elementos interactivos (Lighthouse/Android, 48×48 px). */
 .station-cluster {
+	align-items: center;
 	background: transparent;
 	border: 0;
+	display: flex;
+	height: 48px;
+	justify-content: center;
+	width: 48px;
 }
 
 .station-cluster__count {

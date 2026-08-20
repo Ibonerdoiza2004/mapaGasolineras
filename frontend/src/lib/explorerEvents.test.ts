@@ -9,10 +9,12 @@ import {
 	dispatchStationFocus,
 	dispatchViewportChange,
 	FUEL_EVENT,
+	getLastRadio,
 	getLastViewport,
 	MARCAS_EVENT,
 	ORDEN_EVENT,
 	RADIO_EVENT,
+	resetLastRadio,
 	resetLastViewport,
 	STATIONS_EVENT,
 	STATION_FOCUS_EVENT,
@@ -21,6 +23,7 @@ import {
 
 afterEach(() => {
 	resetLastViewport();
+	resetLastRadio();
 	vi.restoreAllMocks();
 });
 
@@ -50,6 +53,22 @@ describe('explorerEvents — eventos entre islas', () => {
 		);
 		expect(events).toEqual([50, null]);
 		window.removeEventListener(RADIO_EVENT, listener);
+	});
+
+	it('conserva el último radio para las islas que se hidraten después', () => {
+		expect(getLastRadio()).toBeNull();
+
+		dispatchRadioChange(10);
+
+		expect(getLastRadio()).toBe(10);
+
+		// El modo "todas" (área visible) también se recuerda como radio nulo.
+		dispatchRadioChange(null);
+		expect(getLastRadio()).toBeNull();
+
+		dispatchRadioChange(25);
+		resetLastRadio();
+		expect(getLastRadio()).toBeNull();
 	});
 
 	it('notifica el cambio de ordenación con el criterio elegido', () => {

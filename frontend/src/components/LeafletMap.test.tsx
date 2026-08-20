@@ -4,12 +4,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import LeafletMap, { type MapStation } from './LeafletMap';
 import {
 	COMPARE_EVENT,
+	dispatchRadioChange,
 	RADIO_EVENT,
 	STATION_DETAIL_EVENT,
 	STATION_FOCUS_EVENT,
 	STATION_SELECT_EVENT,
 	STATIONS_EVENT,
 	VIEWPORT_EVENT,
+	resetLastRadio,
 } from '../lib/explorerEvents';
 import { dispatchUserLocation, LOCATION_EVENT, resetLastLocation } from '../lib/geolocation';
 import { SPAIN_BOUNDS, PENINSULA_CENTER } from '../lib/spainBounds';
@@ -138,6 +140,7 @@ describe('LeafletMap', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
 		resetLastLocation();
+		resetLastRadio();
 		mapState.size = { x: 1580, y: 1024 };
 		mapState.zoom = 5.25;
 		mapState.southWest = { x: 50, y: 1016 };
@@ -200,6 +203,8 @@ describe('LeafletMap', () => {
 			'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
 			expect.objectContaining({
 				maxZoom: 19,
+				// En pantallas de alta densidad se piden teselas @2x (nitidez).
+				detectRetina: true,
 				attribution: expect.stringContaining('OpenStreetMap'),
 			}),
 		);
@@ -255,10 +260,14 @@ describe('LeafletMap', () => {
 		// Tres estaciones en la misma celda se funden en un único clúster.
 		await waitFor(() => expect(leafletMock.marker).toHaveBeenCalledTimes(1));
 		const clusterIcon = leafletMock.divIcon.mock.calls
-			.map((call) => call[0] as { className?: string; html?: string })
+			.map((call) => call[0] as { className?: string; html?: string; iconSize?: number[] })
 			.find((opts) => opts?.className === 'station-cluster');
 		expect(clusterIcon).toBeDefined();
 		expect(clusterIcon?.html).toContain('>3<');
+		// Área táctil mínima de 48 px y nombre accesible (Lighthouse 48×48 px / WCAG 2.5.3).
+		expect(clusterIcon?.html).toContain('role="button"');
+		expect(clusterIcon?.html).toContain('aria-label="3 gasolineras agrupadas"');
+		expect(clusterIcon?.iconSize).toEqual([48, 48]);
 
 		// Pulsar el clúster acerca el zoom un paso, centrado en su centroide.
 		const clickHandler = markerInstance.on.mock.calls.find(
@@ -958,6 +967,27 @@ describe('LeafletMap', () => {
 		);
 	});
 
+	it('dibuja la circunferencia del radio emitido antes de que el mapa se inicialice', async () => {
+		// El filtro activó el radio antes de que el mapa se hidrate (client:idle):
+		// se recupera el último radio notificado para que la circunferencia
+		// aparezca aunque el evento de radio ya haya pasado.
+		dispatchRadioChange(10);
+		render(<LeafletMap stations={[]} center={[40.4168, -3.7038]} zoom={13} />);
+
+		await waitFor(() => expect(leafletMock.map).toHaveBeenCalledTimes(1));
+
+		dispatchUserLocation(40.4168, -3.7038, 'device');
+
+		await waitFor(() => expect(leafletMock.circle).toHaveBeenCalledTimes(1));
+		const [circleCoords, circleOptions] = leafletMock.circle.mock.calls[0] as unknown as [
+			[number, number],
+			{ radius: number; className: string },
+		];
+		expect(circleCoords).toEqual([40.4168, -3.7038]);
+		expect(circleOptions.radius).toBe(10_000);
+		expect(circleOptions.className).toBe('radius-circle');
+	});
+
 	it('dibuja el marcador cuando la ubicación llega antes de que el mapa se inicialice', async () => {
 		// El evento se emite antes de que el mapa se monte (hidratación tardía):
 		// la ubicación se conserva y se aplica al inicializarse el mapa.
@@ -1207,6 +1237,34 @@ describe('LeafletMap', () => {
 			minLon: -9.5,
 			maxLon: 3.5,
 		});
+		window.removeEventListener(VIEWPORT_EVENT, listener);
+	});
+
+	it('con ubicación al inicializar no emite el viewport inicial de toda España', async () => {
+		const listener = vi.fn();
+		window.addEventListener(VIEWPORT_EVENT, listener);
+
+		// Aterrizaje desde una landing: la ubicación ya está marcada cuando el
+		// mapa se hidrata. El encuadre inicial (toda España) no se notifica para
+		// no lanzar una consulta de todo el país; el primer viewport llega del
+		// re-encuadre hacia el punto (moveend).
+		dispatchUserLocation(40.4168, -3.7038, 'search');
+		render(<LeafletMap stations={stations} center={[40.4168, -3.7038]} zoom={13} />);
+		await waitFor(() => expect(leafletMock.map).toHaveBeenCalledTimes(1));
+
+		expect(listener).not.toHaveBeenCalled();
+
+		const mapInstance = leafletMock.map.mock.results[0].value as {
+			on: ReturnType<typeof vi.fn>;
+		};
+		const moveendHandler = mapInstance.on.mock.calls.find(
+			([event]) => event === 'moveend',
+		)?.[1] as () => void;
+		expect(moveendHandler).toBeDefined();
+
+		act(() => moveendHandler());
+		await new Promise((resolve) => setTimeout(resolve, 400));
+		expect(listener).toHaveBeenCalledOnce();
 		window.removeEventListener(VIEWPORT_EVENT, listener);
 	});
 

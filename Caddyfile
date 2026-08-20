@@ -7,3 +7,16 @@ https://{$DOMAIN} {
 	encode zstd gzip
 	reverse_proxy backend:8080
 }
+
+# Teselas del mapa convertidas a WebP. Requiere un registro DNS `tiles` que
+# apunte a la IP de la VM ANTES de recargar Caddy (si no, no puede emitir el
+# certificado). El frontend las consume vía PUBLIC_MAP_TILE_URL.
+https://tiles.{$DOMAIN} {
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options nosniff
+	}
+
+	encode zstd gzip
+	reverse_proxy tile-proxy:8080
+}
