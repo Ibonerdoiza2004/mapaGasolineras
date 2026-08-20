@@ -165,6 +165,95 @@ class GeoportalFuelStationClientTest {
 	}
 
 	@Test
+	@DisplayName("Reintenta cuando el proveedor no está disponible y acaba teniendo éxito")
+	void retriesTransientFailureUntilSuccess() {
+		RestTemplate retryingTemplate = new RestTemplate();
+		retryingTemplate.setInterceptors(
+				List.of(GeoportalClientConfig.geoportalRequestInterceptor()));
+		MockRestServiceServer retryServer = MockRestServiceServer.createServer(retryingTemplate);
+		GeoportalFuelStationClient retryingClient =
+				new GeoportalFuelStationClient(retryingTemplate, BASE_URL, 3, 0);
+
+		retryServer.expect(requestTo(BASE_URL))
+				.andRespond(request -> {
+					throw new ResourceAccessException("Connection reset");
+				});
+		retryServer.expect(requestTo(BASE_URL))
+				.andRespond(request -> {
+					throw new ResourceAccessException("Connection reset");
+				});
+		retryServer.expect(requestTo(BASE_URL))
+				.andRespond(withSuccess("""
+						{
+						  "Fecha": "17/08/2026 15:43:34",
+						  "ResultadoConsulta": "OK",
+						  "ListaEESSPrecio": []
+						}
+						""", MediaType.APPLICATION_JSON));
+
+		GeoportalResponse response = retryingClient.fetchAllStations();
+
+		assertThat(response.estaciones()).isEmpty();
+		retryServer.verify();
+	}
+
+	@Test
+	@DisplayName("Agota los reintentos y lanza la excepción del proveedor")
+	void retriesExhaustedThrowsProviderUnavailable() {
+		RestTemplate retryingTemplate = new RestTemplate();
+		retryingTemplate.setInterceptors(
+				List.of(GeoportalClientConfig.geoportalRequestInterceptor()));
+		MockRestServiceServer retryServer = MockRestServiceServer.createServer(retryingTemplate);
+		GeoportalFuelStationClient retryingClient =
+				new GeoportalFuelStationClient(retryingTemplate, BASE_URL, 3, 0);
+
+		retryServer.expect(requestTo(BASE_URL))
+				.andRespond(request -> {
+					throw new ResourceAccessException("Connection reset");
+				});
+		retryServer.expect(requestTo(BASE_URL))
+				.andRespond(request -> {
+					throw new ResourceAccessException("Connection reset");
+				});
+		retryServer.expect(requestTo(BASE_URL))
+				.andRespond(request -> {
+					throw new ResourceAccessException("Connection reset");
+				});
+
+		assertThatThrownBy(retryingClient::fetchAllStations)
+				.isInstanceOf(FuelStationDataClientException.class)
+				.satisfies(ex -> {
+					FuelStationDataClientException exception = (FuelStationDataClientException) ex;
+					assertThat(exception.isProviderUnavailable()).isTrue();
+				});
+		retryServer.verify();
+	}
+
+	@Test
+	@DisplayName("Un error de procesamiento no transitorio no se reintenta")
+	void nonTransientFailureIsNotRetried() {
+		String json = """
+				{
+				  "Fecha": "17/08/2026 15:43:34",
+				  "ListaEESSPrecio": "esto-no-es-una-lista"
+				}
+				""";
+		RestTemplate retryingTemplate = new RestTemplate();
+		retryingTemplate.setInterceptors(
+				List.of(GeoportalClientConfig.geoportalRequestInterceptor()));
+		MockRestServiceServer retryServer = MockRestServiceServer.createServer(retryingTemplate);
+		GeoportalFuelStationClient retryingClient =
+				new GeoportalFuelStationClient(retryingTemplate, BASE_URL, 3, 0);
+
+		retryServer.expect(requestTo(BASE_URL))
+				.andRespond(withSuccess(json, MediaType.APPLICATION_JSON));
+
+		assertThatThrownBy(retryingClient::fetchAllStations)
+				.isInstanceOf(FuelStationDataClientException.class);
+		retryServer.verify();
+	}
+
+	@Test
 	@DisplayName("Una respuesta con múltiples estaciones las devuelve todas")
 	void multipleStationsReturnsAll() {
 		String json = """
