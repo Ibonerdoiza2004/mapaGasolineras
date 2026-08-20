@@ -10,4 +10,7 @@ const site = (process.env.PUBLIC_SITE_URL || 'https://example.com').replace(/\/$
 export default defineConfig({
   site,
   integrations: [react(), sitemap()],
+  build: {
+    inlineStylesheets: 'always',
+  },
 });

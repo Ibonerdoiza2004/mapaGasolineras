@@ -5,6 +5,11 @@ accesibilidad 97, buenas prácticas 96, SEO 92) y de la estrategia de
 indexación. Cada cambio debe acompañarse de sus pruebas (unitarias/E2E) y
 registrarse en `PROGRESS.md`.
 
+**Estado actual (medido en producción, `mapagasolineras.pages.dev`):**
+rendimiento **75**, accesibilidad **97**, buenas prácticas **100**, SEO **100**.
+El proxy de teselas WebP está desplegado y sirve `image/webp`; quedan las
+mejoras de la sección C.3.
+
 ## A. Ya implementado — pendiente de desplegar
 
 - [x] Saneo de coordenadas invertidas (la estación 16268 deja de rechazarse).
@@ -34,22 +39,33 @@ registrarse en `PROGRESS.md`.
 - [x] Proxy de teselas en WebP: `tile-proxy/` (Node + sharp) autocontenido que
       convierte las teselas de OSM a WebP y las cachea. `BaseLayout` emite el
       `preconnect` del proveedor configurado con `PUBLIC_MAP_TILE_URL`.
-- [ ] **HACERLO TÚ (despliegue del proxy):** crear el registro DNS `tiles`
-      apuntando a la IP de la VM, redesplegar en Oracle (`docker compose up -d
-      --build` en `docker-compose.prod.yml`), comprobar
-      `curl -sI https://tiles.DOMINIO/16/34684/22495.png | grep -i content-type`
-      (debe devolver `image/webp`) y fijar
-      `PUBLIC_MAP_TILE_URL=https://tiles.DOMINIO/{z}/{x}/{y}.png` en Cloudflare
-      Pages. No recargar Caddy antes de que exista el DNS.
+      **Desplegado y verificado en prod** (teselas `image/webp` desde
+      `tiles.api.51.170.52.206.nip.io`).
+- [x] CSS inline en el HTML (`build.inlineStylesheets: 'always'`) — elimina el
+      CSS bloqueante (Lighthouse estimaba −330 ms).
+- [x] `Cache-Control` de las teselas a 30 días con `stale-while-revalidate` en
+      `tile-proxy/server.js` — las revisitas se sirven de caché.
 - [x] `detectRetina: true` en el tile layer (nitidez en pantallas de alta densidad).
 - [x] `preconnect`/`dns-prefetch` a los dominios de teselas y la API.
 - [x] Compresión gzip habilitada en la API (`server.compression.enabled=true`;
       brotli lo aplica Cloudflare en el borde).
+- [ ] (Opcional, fase siguiente) LCP 3,7 s y TBT 560 ms: el primer teselado del
+      mapa no es descubrible en el HTML inicial (carga tras la hidratación
+      `client:idle` de Leaflet) y `client.js` evalúa una tarea larga de ~513 ms.
+      Opciones: reducir el JS sin usar (leaflet 61 % / client 42 %), precargar
+      las teselas del viewport inicial o `fetchpriority="high"` sobre la primera
+      tesela.
 
-## D. Accesibilidad (97)
+## D. Accesibilidad (97 → objetivo 100)
 
 - [x] Touch targets de clústeres ≥44 px + `aria-label` descriptivo y test
       (requisito de altura mínima de AGENTS.md).
+- [x] `<summary>` de la hoja inferior con nombre accesible que incluye el texto
+      visible: `aria-label` sustituido por un `span.visually-hidden`
+      «Gasolineras cercanas» (corrige `label-content-name-mismatch`).
+- [ ] (Parcial) `target-size`: los clústeres miden 48 px pero Lighthouse
+      puntúa que hay marcadores solapados (área clicable segura < 24 px). Los
+      clústeres cercanos se solapan visualmente en el zoom de España entera.
 
 ## E. Seguridad / Buenas prácticas (96)
 
@@ -85,8 +101,12 @@ registrarse en `PROGRESS.md`.
 
 ## Verificación transversal
 
-- [ ] **HACERLO TÚ:** Reejecutar Lighthouse en móvil y escritorio tras el
-      despliegue para confirmar la mejora real.
+- [x] Lighthouse de producción (móvil, `?combustible=DIESEL`): rendimiento 75,
+      accesibilidad 97, buenas prácticas 100, SEO 100; teselas WebP verificadas
+      en `network-requests`.
+- [ ] **HACERLO TÚ:** Reejecutar Lighthouse en móvil y escritorio tras
+      desplegar las mejoras C (CSS inline, caché 30 días) para confirmar la
+      subida.
 - [x] Cada cambio con sus pruebas (unitarias/E2E) y registro en `PROGRESS.md`:
       backend 184/184, frontend unitario 416/416, E2E 55 passed + 11 skipped,
       lint, typecheck y build limpios.

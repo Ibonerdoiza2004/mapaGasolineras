@@ -32,7 +32,7 @@ http.createServer(async (req, res) => {
 		const img = await serveTile(z, x, y);
 		res.writeHead(200, {
 			'Content-Type': 'image/webp',
-			'Cache-Control': 'public, max-age=86400, stale-while-revalidate=604800',
+			'Cache-Control': 'public, max-age=2592000, stale-while-revalidate=604800',
 			'Access-Control-Allow-Origin': '*',
 		});
 		res.end(img);

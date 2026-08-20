@@ -241,7 +241,8 @@ describe('ExplorerWorkspace — áreas táctiles y límites', () => {
 describe('ExplorerWorkspace — contrato de marcado responsive', () => {
 	it('expone una hoja inferior deslizable mediante details/summary', () => {
 		expect(workspaceAstro).toContain('<details class="explorer__sidebar" open>');
-		expect(workspaceAstro).toContain('<summary aria-label="Gasolineras cercanas">');
+		expect(workspaceAstro).toContain('<summary>');
+		expect(workspaceAstro).toContain('Gasolineras cercanas');
 	});
 
 	it('incluye mapa, filtros, resultados y las islas React', () => {

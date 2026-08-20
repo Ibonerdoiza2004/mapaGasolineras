@@ -106,7 +106,8 @@ describe('ExplorerWorkspace — nombres accesibles de controles y filtros', () =
 describe('ExplorerWorkspace — paneles y marcadores alternativos', () => {
 	it('expone el panel inferior con un nombre accesible en su resumen', () => {
 		expect(workspaceAstro).toContain('<details class="explorer__sidebar" open>');
-		expect(workspaceAstro).toContain('<summary aria-label="Gasolineras cercanas">');
+		expect(workspaceAstro).toContain('<summary>');
+		expect(workspaceAstro).toContain('visually-hidden">Gasolineras cercanas');
 	});
 
 	it('contiene el contenedor del mapa', () => {
