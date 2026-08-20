@@ -2,18 +2,24 @@ package com.example.gasolineras_api.client;
 
 import com.example.gasolineras_api.client.dto.GeoportalResponse;
 import com.example.gasolineras_api.client.dto.GeoportalStation;
+import com.example.gasolineras_api.config.GeoportalClientConfig;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
+import org.springframework.test.web.client.ResponseActions;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestTemplate;
 
+import java.util.List;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withServerError;
@@ -30,6 +36,8 @@ class GeoportalFuelStationClientTest {
 	@BeforeEach
 	void setUp() {
 		restTemplate = new RestTemplate();
+		restTemplate.setInterceptors(
+				List.of(GeoportalClientConfig.geoportalRequestInterceptor()));
 		server = MockRestServiceServer.createServer(restTemplate);
 		client = new GeoportalFuelStationClient(restTemplate, BASE_URL);
 	}
@@ -37,6 +45,14 @@ class GeoportalFuelStationClientTest {
 	@AfterEach
 	void tearDown() {
 		server.verify();
+	}
+
+	private ResponseActions expectGeoportalRequest() {
+		return server.expect(requestTo(BASE_URL))
+				.andExpect(method(HttpMethod.GET))
+				.andExpect(header(HttpHeaders.USER_AGENT,
+						"Mozilla/5.0 (Windows NT 10.0; Win64; x64)"))
+				.andExpect(header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE));
 	}
 
 	@Test
@@ -75,8 +91,7 @@ class GeoportalFuelStationClientTest {
 				}
 				""";
 
-		server.expect(requestTo(BASE_URL))
-				.andExpect(method(HttpMethod.GET))
+		expectGeoportalRequest()
 				.andRespond(withSuccess(json, MediaType.APPLICATION_JSON));
 
 		GeoportalResponse response = client.fetchAllStations();
@@ -110,8 +125,7 @@ class GeoportalFuelStationClientTest {
 				}
 				""";
 
-		server.expect(requestTo(BASE_URL))
-				.andExpect(method(HttpMethod.GET))
+		expectGeoportalRequest()
 				.andRespond(withSuccess(json, MediaType.APPLICATION_JSON));
 
 		GeoportalResponse response = client.fetchAllStations();
@@ -123,8 +137,7 @@ class GeoportalFuelStationClientTest {
 	@Test
 	@DisplayName("Un error 5xx del proveedor lanza excepción con providerUnavailable")
 	void serverErrorThrowsExceptionWithProviderUnavailable() {
-		server.expect(requestTo(BASE_URL))
-				.andExpect(method(HttpMethod.GET))
+		expectGeoportalRequest()
 				.andRespond(withServerError());
 
 		assertThatThrownBy(() -> client.fetchAllStations())
@@ -138,8 +151,7 @@ class GeoportalFuelStationClientTest {
 	@Test
 	@DisplayName("Un fallo de red lanza excepción con providerUnavailable")
 	void networkFailureThrowsExceptionWithProviderUnavailable() {
-		server.expect(requestTo(BASE_URL))
-				.andExpect(method(HttpMethod.GET))
+		expectGeoportalRequest()
 				.andRespond(request -> {
 					throw new ResourceAccessException("Timeout de conexión");
 				});
@@ -167,8 +179,7 @@ class GeoportalFuelStationClientTest {
 				}
 				""";
 
-		server.expect(requestTo(BASE_URL))
-				.andExpect(method(HttpMethod.GET))
+		expectGeoportalRequest()
 				.andRespond(withSuccess(json, MediaType.APPLICATION_JSON));
 
 		GeoportalResponse response = client.fetchAllStations();
@@ -201,8 +212,7 @@ class GeoportalFuelStationClientTest {
 				}
 				""";
 
-		server.expect(requestTo(BASE_URL))
-				.andExpect(method(HttpMethod.GET))
+		expectGeoportalRequest()
 				.andRespond(withSuccess(json, MediaType.APPLICATION_JSON));
 
 		GeoportalResponse response = client.fetchAllStations();
