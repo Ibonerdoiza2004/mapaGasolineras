@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import 'maplibre-gl/dist/maplibre-gl.css';
+import mapLibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 import '../styles/vector-map.css';
 
 import {
@@ -568,6 +569,10 @@ export default function VectorMap({ stations, center, zoom, bounds, onSelect }: 
 			try {
 				const [maplibre, pmtiles] = await Promise.all([import('maplibre-gl'), import('pmtiles')]);
 				if (disposed || !containerRef.current) return;
+				// MapLibre 6 no incorpora automáticamente su worker al build estático
+				// de Vite. Si no se fija esta URL, Cloudflare Pages deja el mapa en
+				// estado de carga (fondo azul, sin capas ni controles) sin un error útil.
+				maplibre.setWorkerUrl(mapLibreWorkerUrl);
 				const base = window.location.href;
 				const rawPmtiles = import.meta.env.PUBLIC_MAP_PMTILES_URL as string | undefined;
 				const config = readVectorMapConfig(
