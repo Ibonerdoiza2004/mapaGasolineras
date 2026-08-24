@@ -1,5 +1,9 @@
 import { expect, test, type Page } from '@playwright/test';
 
+// El criterio «Mejor opción» solo se muestra con un precio vigente. No usamos
+// una fecha fija para que este flujo E2E no caduque con el paso de los días.
+const FRESH_DATE = new Date().toISOString();
+
 const NEARBY = [
 	{
 		id: 'st-1',
@@ -12,7 +16,7 @@ const NEARBY = [
 		distanciaKm: 1.2,
 		precio: 1.459,
 		ahorro: 0,
-		fechaActualizacion: '2026-08-17T10:00:00Z',
+		fechaActualizacion: FRESH_DATE,
 	},
 	{
 		id: 'st-2',
@@ -25,7 +29,7 @@ const NEARBY = [
 		distanciaKm: 2.4,
 		precio: 1.479,
 		ahorro: 0.02,
-		fechaActualizacion: '2026-08-17T10:00:00Z',
+		fechaActualizacion: FRESH_DATE,
 	},
 	{
 		id: 'st-3',
@@ -38,7 +42,7 @@ const NEARBY = [
 		distanciaKm: 3.8,
 		precio: null,
 		ahorro: null,
-		fechaActualizacion: '2026-08-17T10:00:00Z',
+		fechaActualizacion: FRESH_DATE,
 	},
 ];
 
