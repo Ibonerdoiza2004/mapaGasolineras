@@ -3,7 +3,7 @@ import '../styles/explorer.css';
 import BrandFilter from './BrandFilter';
 import ComparePanel from './ComparePanel';
 import FuelFilter from './FuelFilter';
-import LeafletMap from './LeafletMap';
+import VectorMap from './VectorMap';
 import LocationButton from './LocationButton';
 import PriceFilter from './PriceFilter';
 import RadioFilter from './RadioFilter';
@@ -16,7 +16,8 @@ import { SPAIN_BOUNDS } from '../lib/spainBounds';
 
 <section class="explorer" aria-label="Explorador de gasolineras">
 	<details class="explorer__sidebar" open>
-		<summary aria-label="Gasolineras cercanas">
+		<summary>
+			<span class="visually-hidden">Gasolineras cercanas</span>
 			<span class="explorer__summary-toggle">
 				<span class="explorer__summary-arrow" aria-hidden="true">▾</span>
 				<span class="explorer__summary-count"><small>0 resultados</small></span>
@@ -62,17 +63,17 @@ import { SPAIN_BOUNDS } from '../lib/spainBounds';
 	</details>
 
 	<div class="explorer__map">
-		<LeafletMap
-			client:idle
+		<VectorMap
+			client:load
 			stations={[]}
 			center={[40.4168, -3.7038]}
 			zoom={13}
 			bounds={SPAIN_BOUNDS}
 		/>
-		<StationDetail client:idle />
+		<StationDetail client:load />
 	</div>
 
-	<ComparePanel client:idle />
+	<ComparePanel client:load />
 </section>
 
 <script>

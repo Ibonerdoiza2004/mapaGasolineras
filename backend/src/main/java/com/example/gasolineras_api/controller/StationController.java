@@ -2,6 +2,7 @@ package com.example.gasolineras_api.controller;
 
 import com.example.gasolineras_api.domain.FuelType;
 import com.example.gasolineras_api.dto.BrandDto;
+import com.example.gasolineras_api.dto.MapStationDto;
 import com.example.gasolineras_api.dto.NearbyStationDto;
 import com.example.gasolineras_api.dto.PriceRangeDto;
 import com.example.gasolineras_api.dto.StationDetailDto;
@@ -16,6 +17,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.Duration;
 import java.util.List;
 
 /**
@@ -73,6 +75,24 @@ public class StationController {
 		return stationService.findNearby(context.lat(), context.lon(), context.radioKm(),
 				context.bounds(), combustible, orderBy, effectiveLimit, offset, minPrecio, maxPrecio,
 				validMarcas);
+	}
+
+	/**
+	 * Conjunto completo y ligero para el mapa. Se separa del listado para que
+	 * este pueda seguir limitado sin perder puntos al alejar o desplazar el mapa.
+	 */
+	@GetMapping("/map")
+	public ResponseEntity<List<MapStationDto>> map(
+			@RequestParam("combustible") FuelType combustible,
+			@RequestParam(value = "minPrecio", required = false) Double minPrecio,
+			@RequestParam(value = "maxPrecio", required = false) Double maxPrecio,
+			@RequestParam(value = "marcas", required = false) List<String> marcas
+	) {
+		validatePriceRange(minPrecio, maxPrecio);
+		List<String> validMarcas = validateMarcas(marcas);
+		return ResponseEntity.ok()
+				.cacheControl(CacheControl.maxAge(Duration.ofMinutes(5)).cachePublic())
+				.body(stationService.findAllForMap(combustible, minPrecio, maxPrecio, validMarcas));
 	}
 
 	/**
@@ -149,6 +169,12 @@ public class StationController {
 	}
 
 	private void validatePriceRange(Double minPrecio, Double maxPrecio) {
+		if (minPrecio != null && !Double.isFinite(minPrecio)) {
+			throw new InvalidParameterException("minPrecio", "El precio mínimo debe ser un número finito");
+		}
+		if (maxPrecio != null && !Double.isFinite(maxPrecio)) {
+			throw new InvalidParameterException("maxPrecio", "El precio máximo debe ser un número finito");
+		}
 		if (minPrecio != null && minPrecio < 0) {
 			throw new InvalidParameterException("minPrecio", "El precio mínimo no puede ser negativo");
 		}

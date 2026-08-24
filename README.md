@@ -49,7 +49,7 @@
 - **Node.js 22** - Runtime JavaScript
 - **Astro 4.x** + **React 18** - Framework moderno con SSR
 - **TypeScript** - Tipado estático
-- **Leaflet / Mapbox** - Librerías de mapas
+- **MapLibre GL JS + PMTiles** - mapa vectorial propio acelerado por GPU
 
 ### **Infraestructura**
 - **Docker & Docker Compose** - Containerización
@@ -95,9 +95,10 @@ Edita `backend/.env.local` y configura el usuario, contraseña, base de datos,
 host y puerto que utilizará este entorno. El mismo usuario y contraseña se
 utilizarán para crear PostgreSQL y para conectar el backend.
 
-Para abrir la aplicación desde un móvil conectado a la misma red, crea también
-`frontend/.env.local` a partir de su plantilla y añade `PUBLIC_API_URL` con la
-IP local del ordenador (`ip addr` en Linux):
+El mapa no añade ninguna variable al backend. Crea también
+`frontend/.env.local` a partir de su plantilla y configura en él la API, el
+PMTiles y las fuentes. Para abrir la aplicación desde un móvil de la misma red,
+usa la IP privada del ordenador (`ip addr` en Linux):
 
 ```bash
 cp frontend/.env.example frontend/.env.local
@@ -107,10 +108,14 @@ Por ejemplo, si la IP del ordenador es `192.168.1.42`:
 
 ```dotenv
 PUBLIC_API_URL=http://192.168.1.42:8080
+PUBLIC_MAP_PMTILES_URL=http://192.168.1.42:8081/maps/spain.pmtiles
+PUBLIC_MAP_ASSET_URL=http://192.168.1.42:8081
 ```
 
-Si `PUBLIC_API_URL` no está definida, Compose usa `http://localhost:8080`, que
-es el valor apto para CI y para el acceso desde el propio ordenador.
+En un equipo nuevo hay que generar el mapa una vez con `task tiles:build`. El
+resultado no se versiona. Después, `task` levanta también Caddy en el puerto
+8081; `task frontend` levanta el frontend y el mapa sin backend ni base de
+datos y prepara automáticamente el pequeño contexto terrestre de baja escala.
 
 Añade el origen del frontend al archivo `backend/.env.local`:
 
@@ -134,8 +139,9 @@ Cloud basados en Ampere).
 | :--- | :--- |
 | Solo PostgreSQL + PostGIS | `docker compose --env-file backend/.env.local -f docker-compose.dev.yml --profile db up -d` |
 | Backend y su base de datos | `docker compose --env-file backend/.env.local -f docker-compose.dev.yml --profile backend up --build` |
-| Solo frontend | `docker compose -f docker-compose.dev.yml --profile frontend up --build` |
-| Aplicación completa | `docker compose --env-file backend/.env.local -f docker-compose.dev.yml --profile all up --build` |
+| Solo mapa vectorial | `task map` |
+| Frontend + mapa vectorial | `task frontend` |
+| Aplicación completa | `task` |
 
 La primera ejecución descarga las imágenes y dependencias. En el propio
 ordenador, la aplicación completa queda disponible en `http://localhost:4321`
@@ -320,12 +326,20 @@ El despliegue está automatizado con GitHub Actions
  temporal: `DOMAIN=api.<IP>.nip.io` y
  `PUBLIC_API_URL=https://api.<IP>.nip.io`.
 - Caddy en Oracle hace `reverse_proxy` de todo el tráfico a `backend:8080`.
+- El PMTiles y sus fuentes se sirven estáticamente desde Oracle en
+  `https://tiles.tudominio.com`; no hay proxy raster, Sharp ni generación en
+  cada petición.
+- Los puntos se sirven desde `GET /api/stations/map` con un DTO ligero y
+  comprimido. MapLibre carga todas las estaciones aplicables una vez por
+  combinación de combustible, precio y marcas, y realiza el recorte por radio,
+  zoom y clustering en el navegador. El listado mantiene su consulta de
+  viewport limitada a 500 y solo monta 50 tarjetas cada vez.
 
 ### Secretos y variables de GitHub
 
 Configúralos en *Settings → Secrets and variables → Actions*:
 
-| Secreto / variable | Descripción |
+| Secreto | Descripción |
 | :--- | :--- |
 | `CLOUDFLARE_API_TOKEN` | Token de Cloudflare con permiso `Pages:Edit`. |
 | `CLOUDFLARE_ACCOUNT_ID` | Identificador de la cuenta de Cloudflare. |
@@ -333,19 +347,30 @@ Configúralos en *Settings → Secrets and variables → Actions*:
 | `ORACLE_HOST` | IP o hostname del servidor de Oracle. |
 | `ORACLE_SSH_USER` | Usuario SSH del servidor (p. ej. `ubuntu` u `opc`). |
 | `ORACLE_SSH_KEY` | Clave privada SSH de despliegue. |
+| `ORACLE_SSH_PASSPHRASE` | Frase de paso de la clave SSH; déjalo sin crear si la clave no tiene. |
+| `ORACLE_SSH_PORT` | Puerto SSH; es opcional y usa `22` si no existe. |
 | `POSTGRES_DB` | Nombre de la base de datos de producción. |
 | `POSTGRES_USER` | Usuario de la base de datos de producción. |
 | `POSTGRES_PASSWORD` | Contraseña de la base de datos de producción. |
 | `DOMAIN` | `api.tudominio.com` (subdominio de la API). |
-| `PUBLIC_API_URL` *(variable)* | `https://api.tudominio.com`. |
-| `PUBLIC_MAP_TILE_URL` *(variable)* | URL del proveedor de teselas; por defecto OpenStreetMap (`https://tile.openstreetmap.org/{z}/{x}/{y}.png`). |
+
+| Variable | Descripción / ejemplo |
+| :--- | :--- |
+| `PUBLIC_API_URL` | `https://api.tudominio.com`. |
+| `PUBLIC_SITE_URL` | `https://tudominio.com`. |
+| `PUBLIC_MAP_PMTILES_URL` | `https://tiles.tudominio.com/maps/spain.pmtiles`. |
+| `PUBLIC_MAP_ASSET_URL` | `https://tiles.tudominio.com` (sirve tipografías y contexto terrestre vectorial). |
+| `CORS_ALLOWED_ORIGINS` | Origen exacto del frontend, por ejemplo `https://tudominio.com`. |
+| `MAP_ALLOWED_ORIGIN` | El mismo origen del frontend, autorizado para PMTiles, fuentes y contexto terrestre. |
+| `MAP_DOMAIN` | Solo el hostname del mapa: `tiles.tudominio.com`. |
+| `MAP_DATA_DIR` | Ruta absoluta persistente: `/home/ubuntu/mapaGasolineras-map-data/publish`. |
 
 ### Preparación del servidor de Oracle
 
 1. Instalar Docker y Compose v2:
 
  ```bash
- sudo apt update && sudo apt install -y docker.io docker-compose-v2
+ sudo apt update && sudo apt install -y docker.io docker-compose-v2 curl unzip coreutils python3
  sudo systemctl enable --now docker
  sudo usermod -aG docker $USER
  ```
@@ -355,6 +380,14 @@ Configúralos en *Settings → Secrets and variables → Actions*:
 
  No hace falta clonar el repositorio: GitHub Actions sube el código por SCP en
  cada despliegue.
+
+3. Reserva al menos 160 GB libres en SSD para la construcción y configura
+   `MAP_DATA_DIR` bajo el home del usuario SSH. Tras el primer despliegue a
+   `main`, ejecuta una vez *Actions → Build production vector map → Run
+   workflow*. La construcción puede durar horas y usar unos 120 GB temporales,
+   que se eliminan al terminar o interrumpirse; el PMTiles publicado ocupa
+   aproximadamente 2,1 GB y se publica mediante el enlace `spain.pmtiles` de
+   forma atómica.
 
 ### Preparación en Cloudflare
 
@@ -366,6 +399,8 @@ Configúralos en *Settings → Secrets and variables → Actions*:
 3. Crear los registros DNS:
  - `@` y `www` → Cloudflare Pages.
  - `api` (tipo A) → IP pública del servidor Oracle, con proxy (nube naranja).
+ - `tiles` (tipo A) → la misma IP pública de Oracle, con proxy; debe coincidir
+   con `MAP_DOMAIN`.
 4. Configurar SSL/TLS en modo **Full (strict)** (Caddy emite certificado real).
 
 ### Despliegue manual (opcional)
@@ -394,8 +429,8 @@ frontend deberán añadirse en `frontend/.env.local` usando el prefijo `PUBLIC_`
 
 ```bash
 PUBLIC_API_URL=https://api.example.com
-# Proveedor de teselas (opcional; por defecto OpenStreetMap)
-PUBLIC_MAP_TILE_URL=https://tile.openstreetmap.org/{z}/{x}/{y}.png
+PUBLIC_MAP_PMTILES_URL=https://tiles.example.com/maps/spain.pmtiles
+PUBLIC_MAP_ASSET_URL=https://tiles.example.com
 ```
 
 Las variables de base de datos y del backend pertenecen a la configuración del

@@ -55,6 +55,41 @@ describe('stations — formato de precios, distancias y fechas', () => {
 });
 
 describe('stations — capa de datos', () => {
+	it('consulta el conjunto completo del mapa sin viewport, orden ni límite', async () => {
+		const { fetchMapStations } = await import('./stations');
+		const fetchMock = vi.fn().mockResolvedValue({
+			ok: true,
+			json: () => Promise.resolve([{ id: 'm1' }]),
+		});
+		vi.stubGlobal('fetch', fetchMock);
+
+		const result = await fetchMapStations({
+			combustible: 'GASOLINA_95',
+			minPrecio: 1.4,
+			maxPrecio: 1.8,
+			marcas: ['repsol', 'otras'],
+		});
+
+		const [url, options] = fetchMock.mock.calls[0];
+		expect(String(url)).toContain('/api/stations/map?');
+		expect(String(url)).toContain('combustible=GASOLINA_95');
+		expect(String(url)).toContain('minPrecio=1.4');
+		expect(String(url)).toContain('maxPrecio=1.8');
+		expect(String(url)).toContain('marcas=repsol%2Cotras');
+		expect(String(url)).not.toContain('limit=');
+		expect(String(url)).not.toContain('minLat=');
+		expect(options).toEqual({ signal: undefined });
+		expect(result).toEqual([{ id: 'm1' }]);
+	});
+
+	it('comunica el fallo del conjunto completo del mapa', async () => {
+		const { fetchMapStations } = await import('./stations');
+		vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 503 }));
+
+		await expect(fetchMapStations({ combustible: 'DIESEL' }))
+			.rejects.toThrow('map stations 503');
+	});
+
 	it('consulta el endpoint de cercanía con todos los parámetros', async () => {
 		const { fetchNearbyStations } = await import('./stations');
 		const fetchMock = vi.fn().mockResolvedValue({

@@ -14,6 +14,36 @@ public interface StationRepository extends JpaRepository<Station, String> {
 	Optional<Station> findByOfficialId(String officialId);
 
 	/**
+	 * Devuelve todas las estaciones necesarias para el mapa con el contrato
+	 * mínimo posible. No calcula distancias ni devuelve campos de las tarjetas;
+	 * MapLibre se encarga de recortar y agrupar los puntos en el cliente.
+	 */
+	@Query(value = """
+			SELECT
+				s.official_id AS officialId,
+				s.rotulo AS rotulo,
+				ST_Y(s.location) AS latitud,
+				ST_X(s.location) AS longitud,
+				cp.price AS precio,
+				(cp.price IS NOT NULL AND cp.price = MIN(cp.price) OVER ()) AS bestOption,
+				s.data_date AS dataDate
+			FROM stations s
+			LEFT JOIN current_prices cp
+				ON cp.station_id = s.official_id AND cp.fuel_type = :fuelType
+			WHERE s.location IS NOT NULL
+				AND (:marcas IS NULL OR COALESCE(s.marca, 'otras') = ANY(string_to_array(:marcas, ',')))
+				AND (:minPrecio IS NULL OR cp.price >= :minPrecio)
+				AND (:maxPrecio IS NULL OR cp.price <= :maxPrecio)
+			ORDER BY s.official_id ASC
+			""", nativeQuery = true)
+	List<MapStationProjection> findAllForMap(
+			@Param("fuelType") String fuelType,
+			@Param("minPrecio") Double minPrecio,
+			@Param("maxPrecio") Double maxPrecio,
+			@Param("marcas") String marcas
+	);
+
+	/**
 	 * Devuelve estaciones dentro de un radio (en metros) junto con su distancia
 	 * y el precio del combustible solicitado. El radio se mide sobre geografía
 	 * (SRID 4326) para usar metros de forma correcta. Los resultados se

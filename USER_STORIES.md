@@ -158,12 +158,47 @@ fluido **para** entender dónde están las gasolineras.
 
 **Tareas**
 
-- [x] T-10.1 Integrar Leaflet en un componente React aislado de la página Astro.
-- [x] T-10.2 Configurar proveedor de teselas mediante variable de entorno y
-  establecer OpenStreetMap como valor base.
+- [x] T-10.1 Integrar el mapa en un componente React aislado de la página Astro.
+- [x] T-10.2 Configurar la fuente cartográfica mediante variables de entorno.
 - [x] T-10.3 Ajustar vista, zoom mínimo/máximo y atribución obligatoria del mapa.
 - [x] T-10.4 Renderizar un estado alternativo de listado cuando el mapa no pueda
   cargarse.
+- [x] T-10.5 Generar un PMTiles vectorial versionado de España peninsular,
+  Baleares, Ceuta, Melilla y Canarias hasta zoom nativo 15.
+- [x] T-10.6 Servir el PMTiles y las fuentes propios, con el estilo incluido en
+  el frontend (sin recursos gráficos externos), CORS y caché HTTP segura.
+- [x] T-10.7 Sustituir el mapa anterior por MapLibre con renderizado
+  Retina nativo, límites responsive y zoom visual hasta 19.
+- [x] T-10.8 Migrar marcadores, agrupaciones, ubicación y selección sin perder
+  navegación accesible, fallback ni sincronización con el listado.
+- [x] T-10.9 Refinar la cartografía vectorial, el encuadre inicial y los
+  controles para ofrecer una presentación profesional de toda España a la vez,
+  sin cargar teselas externas.
+- [x] T-10.10 Completar el contexto insular, retirar Gibraltar y la etiqueta
+  nacional de España, y enriquecer la paleta cartográfica sin separar los
+  territorios en vistas distintas.
+- [x] T-10.11 Simplificar las etiquetas territoriales, refinar la paleta y
+  garantizar que ningún marcador o clúster se dibuje fuera de España.
+- [x] T-10.12 Eliminar los tirones de los marcadores y actualizar las
+  agrupaciones durante el zoom mediante capas GeoJSON nativas de MapLibre.
+- [x] T-10.13 Mostrar en el mapa todas las estaciones aplicables mediante un
+  conjunto ligero independiente del listado limitado, sin nuevas consultas al
+  desplazar o ampliar el mapa.
+- [x] T-10.14 Diferenciar visualmente las estaciones de sus agrupaciones con
+  iconos nativos de MapLibre y reservar las etiquetas de precio para el zoom
+  de detalle, sin perder rendimiento ni contraste.
+- [x] T-10.15 Refinar los símbolos del mapa con clústeres compactos en forma de
+  tarjeta apilada y estaciones individuales que muestren siempre su precio.
+- [x] T-10.16 Restaurar las estaciones al cambiar de tema, suavizar la paleta
+  oscura y desagrupar todas las estaciones desde el zoom urbano.
+- [x] T-10.17 Mantener una cartografía diurna legible dentro del tema oscuro,
+  componer cada precio como una cápsula compacta e indivisible al solaparse y
+  reducir el radio de agrupación para obtener clústeres más locales, dibujando
+  los precios baratos por encima de los caros.
+- [x] T-10.18 Eliminar el encuadre transitorio de Madrid, iniciar inmediatamente
+  la hidratación del mapa y mantener sincronizadas las acciones de su popup.
+- [x] T-10.19 Encuadrar el mapa al radio seleccionado para que su circunferencia
+  sea visible completa y no quede fuera del viewport tras centrar la ubicación.
 
 ### US-11 — Obtener ubicación del dispositivo
 
@@ -209,9 +244,11 @@ los resultados a una distancia razonable.
 
 **Criterios de producto decididos**
 
-- Al entrar en la web se consultan las estaciones del **área visible en el
-  mapa** (viewport), sin pedir ubicación: las estaciones en pantalla aparecen
-  nada más cargar y mover o alejar el mapa vuelve a consultar.
+- Al entrar en la web, el **listado** consulta las estaciones del área visible
+  (viewport), sin pedir ubicación, y se actualiza al mover el mapa. La capa de
+  MapLibre recibe por separado todas las estaciones aplicables mediante
+  `GET /api/stations/map`; zoom y desplazamiento recortan y agrupan ese conjunto
+  localmente sin volver a pedir sus puntos.
 - El alcance se elige con un **control segmentado** («Área visible en el mapa»
   / «Radio de búsqueda», esta opción deshabilitada sin ubicación): el radio
   aplica 10 km por defecto y muestra los chips 5, 10, 25 y 50 km; el área
@@ -223,10 +260,11 @@ los resultados a una distancia razonable.
   «Resultados», no entre la ubicación y el alcance.
 - Los resultados se pueden **ordenar** por más barato, más cercano o mejor
   opción (ahorro); el orden se conserva en la URL.
-- El backend acota el modo **viewport** (`limit`, default 200, máx 500; 400
-  fuera de rango) tras ordenar según el criterio pedido; con **radio** se
-  devuelven todas las estaciones del rango sin límite. El ahorro se calcula
-  sobre todo el rango, no solo sobre los devueltos.
+- El backend acota el modo **viewport del listado** (`limit`, default 200, máx
+  500; 400 fuera de rango) tras ordenar según el criterio pedido; con **radio**
+  se devuelven todas las estaciones del rango sin límite. El ahorro se calcula
+  sobre todo el rango, no solo sobre los devueltos. El endpoint ligero del mapa
+  no comparte ese límite.
 - Si se comparte la ubicación y luego se busca manualmente (o al revés), gana
   la **última acción**; el marcador distingue el origen (punto azul del
   dispositivo frente a cruz de búsqueda).
@@ -403,7 +441,7 @@ entender el plan antes de iniciarlo.
 
 **Tareas**
 
-- [ ] T-27.1 Dibujar geometría de ruta, origen, destino y paradas en Leaflet.
+- [ ] T-27.1 Dibujar geometría de ruta, origen, destino y paradas en MapLibre.
 - [ ] T-27.2 Distinguir visualmente paradas recomendadas y alternativas.
 - [ ] T-27.3 Conectar la selección de una parada con su ficha resumida.
 - [ ] T-27.4 Ajustar automáticamente el encuadre sin impedir la exploración.
@@ -640,6 +678,37 @@ pruebas son parte de la aceptación de la historia, no una tarea opcional.
   utilizables.
 - [x] TEST-10.3 Un fallo de teselas muestra alternativa o mensaje sin romper la
   lista de estaciones.
+- [x] TEST-10.4 La construcción completa valida fuentes, checksum, zoom máximo,
+  cobertura peninsular, insular y ciudades autónomas, y falla de forma segura
+  ante descargas o artefactos inválidos.
+- [x] TEST-10.5 El mapa vectorial conserva límites móvil/tableta/escritorio,
+  zoom 3–19, resolución Retina, agrupaciones, teclado y fallback ante un
+  PMTiles no disponible.
+- [x] TEST-10.6 El estilo distingue agua, terreno, jerarquía viaria y etiquetas;
+  la vista inicial mantiene Península, Baleares y Canarias simultáneamente y el
+  contexto terrestre no termina en los límites rectangulares del PMTiles.
+- [x] TEST-10.7 El mapa dibuja las islas, no muestra Gibraltar ni la etiqueta
+  nacional de España y conserva una paleta diferenciada en claro y oscuro.
+- [x] TEST-10.8 No se muestran nombres de comunidades autónomas ni estaciones
+  fuera del territorio español, tanto con datos nuevos como heredados.
+- [x] TEST-10.9 Los marcadores no se reconstruyen como nodos HTML al cambiar
+  de zoom y las agrupaciones nativas reaccionan sin esperar una nueva consulta.
+- [x] TEST-10.10 El mapa recibe todas las estaciones aplicables, conserva el
+  filtro activo y degrada de forma segura si falla la consulta completa,
+  mientras el listado continúa limitado y paginado visualmente.
+- [x] TEST-10.11 Las estaciones y los clústeres usan símbolos nativos
+  visualmente distintos y no se crean marcadores HTML por estación.
+- [x] TEST-10.12 Cada estación individual muestra su precio en cualquier zoom,
+  los clústeres conservan un símbolo diferenciado y no se crean nodos HTML.
+- [x] TEST-10.13 El cambio claro/oscuro conserva estaciones e iconos, el mapa
+  oscuro usa una paleta contenida y el clustering termina antes del zoom urbano.
+- [x] TEST-10.14 El tema de la interfaz no recarga la cartografía; cada cápsula
+  compacta contiene fondo y precio en un solo sprite ordenable, y el clustering
+  usa un radio intermedio de 35 px antes de desaparecer desde z10.
+- [x] TEST-10.15 El mapa nace directamente encuadrado en España y el popup cambia
+  entre añadir y quitar cuando se actualiza el comparador.
+- [x] TEST-10.16 Al activar o cambiar un radio válido, el mapa dibuja y encuadra
+  su circunferencia; al volver al área visible elimina la capa.
 
 ### US-11 — Geolocalización
 

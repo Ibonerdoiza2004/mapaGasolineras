@@ -148,10 +148,11 @@ gráficos históricos.
 
 ### Mapa y datos
 
-- Usar Leaflet con OpenStreetMap como solución base gratuita: zoom fluido,
-  desplazamiento, marcadores agrupados y trazado claro.
-- Mantener el proveedor de teselas configurable por entorno para poder cambiar
-  de proveedor sin rediseñar la interfaz.
+- Usar MapLibre con un PMTiles vectorial propio de OpenStreetMap (España y
+  Canarias, detalle nativo hasta z15 y overzoom visual hasta z19): zoom fluido,
+  desplazamiento, marcadores agrupados y renderizado Retina nativo.
+- Mantener la URL del PMTiles y el origen de tipografías configurables por
+  entorno sin introducir proveedores raster alternativos.
 - Integrar en el backend los datos oficiales del Geoportal/MITECO, normalizarlos
   en PostGIS y actualizarlos con una tarea programada.
 - No consultar el proveedor de precios directamente desde el navegador.

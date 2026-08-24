@@ -27,15 +27,14 @@ const canonical = new URL(Astro.url.pathname, siteUrl).href;
 const jsonLdList = Array.isArray(jsonLd) ? jsonLd : jsonLd ? [jsonLd] : [];
 const ldJson = jsonLdList.length > 0 ? JSON.stringify(jsonLdList) : null;
 
-// El origen de las teselas (para preconnect) sigue al proveedor configurado
-// con PUBLIC_MAP_TILE_URL; si no está definido, OpenStreetMap por defecto.
-const rawTileUrl = (import.meta.env.PUBLIC_MAP_TILE_URL as string | undefined)?.trim();
-let tileOrigin = 'https://tile.openstreetmap.org';
-if (rawTileUrl && /^https?:\/\//.test(rawTileUrl)) {
+// Preconecta únicamente con el origen HTTPS del PMTiles configurado.
+const rawMapUrl = (import.meta.env.PUBLIC_MAP_PMTILES_URL as string | undefined)?.trim();
+let mapOrigin: string | null = null;
+if (rawMapUrl?.startsWith('https://')) {
 	try {
-		tileOrigin = new URL(rawTileUrl).origin;
+		mapOrigin = new URL(rawMapUrl).origin;
 	} catch {
-		// URL inválida: se mantiene el preconnect por defecto.
+		// Una URL inválida no produce una conexión especulativa.
 	}
 }
 ---
@@ -59,7 +58,7 @@ if (rawTileUrl && /^https?:\/\//.test(rawTileUrl)) {
 		<meta name="twitter:title" content={title} />
 		<meta name="twitter:description" content={description} />
 		{noindex && <meta name="robots" content="noindex, nofollow" />}
-		<link rel="preconnect" href={tileOrigin} />
+		{mapOrigin && <link rel="preconnect" href={mapOrigin} crossorigin />}
 		<link rel="preconnect" href={siteUrl} crossorigin />
 		<script is:inline>
 			try {

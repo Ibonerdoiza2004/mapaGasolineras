@@ -10,8 +10,8 @@ import {
 	PRICE_FILTER_EVENT,
 	PRICE_RANGE_REQUEST_EVENT,
 	RADIO_EVENT,
-	STATIONS_EVENT,
 	VIEWPORT_EVENT,
+	dispatchNearbyStations,
 	dispatchPriceRange,
 	dispatchStationDetail,
 	dispatchStationFocus,
@@ -27,7 +27,7 @@ import {
 	type UserLocation,
 	isValidCoordinates,
 } from '../lib/geolocation';
-import { isRadioValue, DEFAULT_RADIO } from '../lib/radio';
+import { isRadioValue, DEFAULT_RADIO, DEFAULT_RADIUS_KM } from '../lib/radio';
 import { updateResultCount } from '../lib/resultCount';
 import {
 	DEFAULT_ORDER,
@@ -50,6 +50,7 @@ type Status = 'idle' | 'loading' | 'success' | 'empty' | 'error';
 const FUEL_URL_PARAM = 'combustible';
 const ORDEN_URL_PARAM = 'orden';
 const MAX_VIEWPORT_DEGREES = 180;
+export const LIST_PAGE_SIZE = 50;
 
 function isValidBounds(bounds: ViewportBounds): boolean {
 	return (
@@ -101,9 +102,15 @@ export default function StationList() {
 		return last && isValidCoordinates(last.lat, last.lon) ? last : null;
 	});
 	const [fuel, setFuel] = useState<FuelType>(readFuelFromUrl);
-	const [radio, setRadio] = useState<number | null>(() =>
-		isRadioValue(getLastRadio()) ? getLastRadio() : DEFAULT_RADIO,
-	);
+	const [radio, setRadio] = useState<number | null>(() => {
+		const remembered = getLastRadio();
+		// Una ubicación puede haberse emitido antes de que RadioFilter publique
+		// su primer evento. En ese caso null significa "aún no recordado", no
+		// "área visible": arranca con el radio predeterminado para no consultar
+		// toda España en la primera carga.
+		if (getLastLocation() !== null && remembered === null) return DEFAULT_RADIUS_KM;
+		return isRadioValue(remembered) ? remembered : DEFAULT_RADIO;
+	});
 	const [orden, setOrden] = useState<OrderBy>(readOrdenFromUrl);
 	const [viewport, setViewport] = useState<ViewportBounds | null>(null);
 	const [status, setStatus] = useState<Status>('idle');
@@ -121,6 +128,9 @@ export default function StationList() {
 	const [priceFilter, setPriceFilter] = useState<PriceRange | null>(null);
 	// Marcas seleccionadas para filtrar (vacío = sin filtro).
 	const [marcas, setMarcas] = useState<string[]>([]);
+	// El mapa usa su propio conjunto completo; este panel mantiene como máximo
+	// 500 resultados y monta solo 50 tarjetas cada vez en el hilo principal.
+	const [visibleCount, setVisibleCount] = useState(LIST_PAGE_SIZE);
 	// En móvil el comparador no existe: tocar una tarjeta abre la ficha.
 	const isMobile = useMediaQuery(MOBILE_MEDIA_QUERY);
 	const requestIdRef = useRef(0);
@@ -134,6 +144,10 @@ export default function StationList() {
 	// (vacío o error) durante un refresco por movimiento del mapa, evitando
 	// que el panel parpadee entre el mensaje y el esqueleto.
 	const lastStatusRef = useRef<Status>('idle');
+	// Mover el mapa solo cambia una consulta basada en el área visible. En modo
+	// radio, MapLibre puede emitir `moveend` al centrar la ubicación, pero ese
+	// viewport no forma parte de la consulta y no debe provocar un duplicado.
+	const queryViewport = radio === null ? viewport : null;
 	useEffect(() => {
 		lastStatusRef.current = status;
 	}, [status]);
@@ -247,7 +261,7 @@ export default function StationList() {
 		// Con radio se necesita el punto de referencia; sin él (todas), basta
 		// con el área visible del mapa.
 		if (radio === null) {
-			if (!viewport) return;
+			if (!queryViewport) return;
 		} else if (!location) {
 			return;
 		}
@@ -276,33 +290,30 @@ export default function StationList() {
 			const reference = location
 				? { lat: location.lat, lon: location.lon }
 				: {
-						lat: (viewport!.minLat + viewport!.maxLat) / 2,
-						lon: (viewport!.minLon + viewport!.maxLon) / 2,
+						lat: (queryViewport!.minLat + queryViewport!.maxLat) / 2,
+						lon: (queryViewport!.minLon + queryViewport!.maxLon) / 2,
 					};
 			const result = await fetchNearbyStations({
 				lat: reference.lat,
 				lon: reference.lon,
 				radio,
-				bounds: radio === null ? viewport ?? undefined : undefined,
+				bounds: queryViewport ?? undefined,
 				combustible: fuel,
 				orden,
 				limit: NEARBY_LIMIT,
 				minPrecio: priceFilter?.min,
 				maxPrecio: priceFilter?.max,
 				marcas,
-			});
+			}, controller.signal);
 			if (requestIdRef.current !== requestId) return;
 			setStations(result);
+			setVisibleCount(LIST_PAGE_SIZE);
 			hasContentRef.current = result.length > 0;
 			setIsRefreshing(false);
 			setRefreshFailed(false);
 			setStatus(result.length === 0 ? 'empty' : 'success');
 			updateResultCount(result.length);
-			window.dispatchEvent(
-				new CustomEvent<{ stations: NearbyStation[] }>(STATIONS_EVENT, {
-					detail: { stations: result },
-				}),
-			);
+			dispatchNearbyStations(result);
 		} catch {
 			if (requestIdRef.current === requestId) {
 				// Si ya había resultados se conservan visibles (datos en caché):
@@ -315,7 +326,7 @@ export default function StationList() {
 				}
 			}
 		}
-	}, [location, fuel, radio, orden, viewport, priceFilter, marcas]);
+	}, [location, fuel, radio, orden, queryViewport, priceFilter, marcas]);
 
 	useEffect(() => {
 		// El rango del slider es global (toda la base de datos, todos los
@@ -402,6 +413,7 @@ export default function StationList() {
 	}
 
 	const capped = radio === null && stations.length >= NEARBY_LIMIT;
+	const visibleStations = stations.slice(0, visibleCount);
 
 	return (
 		<>
@@ -423,7 +435,7 @@ export default function StationList() {
 				aria-label="Lista de gasolineras cercanas"
 				aria-busy={isRefreshing}
 			>
-			{stations.map((station) => {
+			{visibleStations.map((station) => {
 				const hasPrice = station.precio != null;
 				// Mejor opción: precio válido, reciente y el más bajo del rango
 				// (ahorro 0). Un precio caducado, nulo o no positivo nunca se
@@ -549,6 +561,16 @@ export default function StationList() {
 				);
 			})}
 			</ol>
+			{visibleCount < stations.length && (
+				<button
+					type="button"
+					className="explorer__list-more"
+					onClick={() => setVisibleCount((current) => Math.min(current + LIST_PAGE_SIZE, stations.length))}
+				>
+					Mostrar más
+					<span>{visibleStations.length} de {stations.length}</span>
+				</button>
+			)}
 		</>
 	);
 }

@@ -1,21 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
 
-// Las teselas de OSM son dependencia de red y se limitan con la suite en
-// paralelo; se simulan para que el zoom se verifique de forma determinista
-// por la URL de la tesela (el nivel lo genera Leaflet, no la respuesta).
-async function stubTiles(page: Page) {
-	await page.route('**/tile.openstreetmap.org/**', (route) =>
-		route.fulfill({
-			status: 200,
-			contentType: 'image/png',
-			body: Buffer.from(
-				'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
-				'base64',
-			),
-		}),
-	);
-}
-
 const SUGGESTIONS = [
 	{
 		id: '230445241',
@@ -44,7 +28,6 @@ function stubGeocode(page: Page, body: unknown) {
 // El listado consulta el área visible del mapa al cargar; se simula el
 // backend para que la página quede limpia.
 test.beforeEach(async ({ page }) => {
-	await stubTiles(page);
 	await page.route('**/api/stations/nearby*', (route) =>
 		route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }),
 	);
@@ -75,7 +58,12 @@ test.describe('búsqueda manual — sugerencias y centrado del mapa', () => {
 			page.getByRole('status').filter({ hasText: 'Gasolineras actualizadas a Madrid.' }),
 		).toHaveText('Gasolineras actualizadas a Madrid.');
 		await expect(listbox).not.toBeVisible();
-		await expect(page.locator('img.leaflet-tile[src*="/15/"]').first()).toBeVisible();
+		// La búsqueda activa el radio de 10 km y encuadra su circunferencia
+		// completa, en lugar de acercarse tanto que el borde quede fuera.
+		const map = page.locator('.vector-map');
+		await expect(map).toHaveAttribute('data-radius-km', '10');
+		await expect.poll(async () => Number(await map.getAttribute('data-map-zoom'))).toBeGreaterThan(10);
+		await expect.poll(async () => Number(await map.getAttribute('data-map-zoom'))).toBeLessThan(15);
 	});
 
 	test('la búsqueda funciona solo con el teclado (escritorio)', async ({ page, isMobile }) => {

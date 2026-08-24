@@ -106,6 +106,36 @@ class NearbyStationQueryTest {
 	}
 
 	@Test
+	@DisplayName("La consulta del mapa devuelve todas las estaciones y marca el precio mínimo")
+	void mapQueryReturnsCompleteLightweightDataset() {
+		saveStationWithoutPrice("SINPRECIO", "SHELL", -3.0, 41.0);
+
+		var result = stationRepository.findAllForMap("GASOLINA_95", null, null, null);
+
+		assertThat(result).hasSize(4);
+		assertThat(result).extracting("officialId")
+				.containsExactly("A5KM", "CERCANA", "LEJOS", "SINPRECIO");
+		var cheapest = result.stream().filter(item -> item.getOfficialId().equals("CERCANA"))
+				.findFirst().orElseThrow();
+		assertThat(cheapest.getBestOption()).isTrue();
+		assertThat(result.stream().filter(item -> item.getOfficialId().equals("SINPRECIO"))
+				.findFirst().orElseThrow().getPrecio()).isNull();
+	}
+
+	@Test
+	@DisplayName("La consulta del mapa filtra precio y marca antes de elegir la mejor opción")
+	void mapQueryAppliesFiltersBeforeBestOption() {
+		var result = stationRepository.findAllForMap(
+				"GASOLINA_95", 1.60, 1.70, "cepsa,bp");
+
+		assertThat(result).extracting("officialId").containsExactly("A5KM", "LEJOS");
+		assertThat(result.getFirst().getBestOption()).isTrue();
+		assertThat(result.getLast().getBestOption()).isFalse();
+		assertThat(stationRepository.findAllForMap(
+				"GASOLINA_95", null, null, "otras")).isEmpty();
+	}
+
+	@Test
 	@DisplayName("El viewport del mapa limita las estaciones al rectángulo geográfico")
 	void boundsLimitStationsToViewport() {
 		// Rectángulo que excluye a A5KM (~5 km al oeste) pero incluye a LEJOS.

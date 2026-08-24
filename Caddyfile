@@ -8,15 +8,49 @@ https://{$DOMAIN} {
 	reverse_proxy backend:8080
 }
 
-# Teselas del mapa convertidas a WebP. Requiere un registro DNS `tiles` que
-# apunte a la IP de la VM ANTES de recargar Caddy (si no, no puede emitir el
-# certificado). El frontend las consume vía PUBLIC_MAP_TILE_URL.
-https://tiles.{$DOMAIN} {
+# Mapa vectorial PMTiles y tipografías. MAP_DOMAIN debe resolver a esta VM.
+https://{$MAP_DOMAIN} {
 	header {
 		Strict-Transport-Security "max-age=31536000; includeSubDomains"
 		X-Content-Type-Options nosniff
+		Access-Control-Allow-Origin "{$MAP_ALLOWED_ORIGIN}"
+		Access-Control-Allow-Methods "GET, HEAD, OPTIONS"
+		Access-Control-Allow-Headers "Range, If-None-Match, If-Modified-Since"
+		Access-Control-Expose-Headers "Accept-Ranges, Content-Length, Content-Range, ETag"
+		Vary Origin
 	}
 
-	encode zstd gzip
-	reverse_proxy tile-proxy:8080
+	@preflight method OPTIONS
+	handle @preflight {
+		respond 204
+	}
+
+	@pmtiles path /maps/*.pmtiles
+	@versioned path_regexp versioned ^/maps/spain-[0-9]{8}T[0-9]{6}Z\.pmtiles$
+	handle @pmtiles {
+		root * /srv/maps
+		header Content-Type application/vnd.pmtiles
+		header Cache-Control "public, max-age=3600, must-revalidate"
+		header @versioned Cache-Control "public, max-age=31536000, immutable"
+		file_server
+	}
+
+	@fonts path /fonts/*
+	handle @fonts {
+		root * /srv/maps
+		header Cache-Control "public, max-age=31536000, immutable"
+		file_server
+	}
+
+	@context path /context/*
+	handle @context {
+		root * /srv/maps
+		header Content-Type application/geo+json
+		header Cache-Control "public, max-age=31536000, immutable"
+		file_server
+	}
+
+	handle {
+		respond 404
+	}
 }

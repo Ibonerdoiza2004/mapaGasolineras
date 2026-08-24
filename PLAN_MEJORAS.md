@@ -5,6 +5,12 @@ accesibilidad 97, buenas prácticas 96, SEO 92) y de la estrategia de
 indexación. Cada cambio debe acompañarse de sus pruebas (unitarias/E2E) y
 registrarse en `PROGRESS.md`.
 
+**Estado actual (medido en producción, `mapagasolineras.pages.dev`):**
+rendimiento **75**, accesibilidad **97**, buenas prácticas **100**, SEO **100**.
+La arquitectura del mapa ya usa un PMTiles vectorial propio z0–z15, renderizado
+en el navegador hasta z19. El artefacto completo está generado y validado en
+local; quedan el despliegue y la medición final en producción.
+
 ## A. Ya implementado — pendiente de desplegar
 
 - [x] Saneo de coordenadas invertidas (la estación 16268 deja de rechazarse).
@@ -27,29 +33,36 @@ registrarse en `PROGRESS.md`.
 
 ## C. Rendimiento (Lighthouse 67 → objetivo ≥90)
 
-- [x] Carga diferida: `LeafletMap` y las islas no críticas (`StationDetail`,
+- [x] Carga diferida: `VectorMap` y las islas no críticas (`StationDetail`,
       `ComparePanel`, `BrandFilter`, `PriceFilter`) hidratan con `client:idle`
-      tras el primer pintado; el resto sigue en `client:load`. Ataca el bloqueo
-      inicial de `client.js` + Leaflet (LCP 4.4 s / TBT 690 ms).
-- [x] Proxy de teselas en WebP: `tile-proxy/` (Node + sharp) autocontenido que
-      convierte las teselas de OSM a WebP y las cachea. `BaseLayout` emite el
-      `preconnect` del proveedor configurado con `PUBLIC_MAP_TILE_URL`.
-- [ ] **HACERLO TÚ (despliegue del proxy):** crear el registro DNS `tiles`
-      apuntando a la IP de la VM, redesplegar en Oracle (`docker compose up -d
-      --build` en `docker-compose.prod.yml`), comprobar
-      `curl -sI https://tiles.DOMINIO/16/34684/22495.png | grep -i content-type`
-      (debe devolver `image/webp`) y fijar
-      `PUBLIC_MAP_TILE_URL=https://tiles.DOMINIO/{z}/{x}/{y}.png` en Cloudflare
-      Pages. No recargar Caddy antes de que exista el DNS.
-- [x] `detectRetina: true` en el tile layer (nitidez en pantallas de alta densidad).
-- [x] `preconnect`/`dns-prefetch` a los dominios de teselas y la API.
+      tras el primer pintado; el resto sigue en `client:load`.
+- [x] Pipeline reproducible de España + Canarias a un único PMTiles z0–z15,
+      validado y publicado de forma atómica con versiones recuperables.
+- [x] Servicio estático en Caddy con peticiones Range, CORS explícito y caché;
+      no existe conversión ni generación en la ruta de una petición web.
+- [x] MapLibre GL JS renderiza el vector en GPU, mantiene z19 mediante overzoom
+      del detalle z15 y usa la densidad real del dispositivo para Retina.
+- [x] CSS inline en el HTML (`build.inlineStylesheets: 'always'`) — elimina el
+      CSS bloqueante (Lighthouse estimaba −330 ms).
+- [x] El archivo persistente vive fuera del directorio reemplazado por deploy;
+      la actualización conmuta el enlace estable solo tras validarlo.
+- [x] `preconnect` al dominio del PMTiles y la API.
 - [x] Compresión gzip habilitada en la API (`server.compression.enabled=true`;
       brotli lo aplica Cloudflare en el borde).
+- [x] Generar y validar localmente el PMTiles completo de España y Canarias.
+- [ ] Desplegarlo y repetir Lighthouse para medir
+      LCP/TBT, tráfico Range y tiempo de movimiento/zoom en móvil y escritorio.
 
-## D. Accesibilidad (97)
+## D. Accesibilidad (97 → objetivo 100)
 
 - [x] Touch targets de clústeres ≥44 px + `aria-label` descriptivo y test
       (requisito de altura mínima de AGENTS.md).
+- [x] `<summary>` de la hoja inferior con nombre accesible que incluye el texto
+      visible: `aria-label` sustituido por un `span.visually-hidden`
+      «Gasolineras cercanas» (corrige `label-content-name-mismatch`).
+- [ ] (Parcial) `target-size`: los clústeres miden 48 px pero Lighthouse
+      puntúa que hay marcadores solapados (área clicable segura < 24 px). Los
+      clústeres cercanos se solapan visualmente en el zoom de España entera.
 
 ## E. Seguridad / Buenas prácticas (96)
 
@@ -85,8 +98,11 @@ registrarse en `PROGRESS.md`.
 
 ## Verificación transversal
 
-- [ ] **HACERLO TÚ:** Reejecutar Lighthouse en móvil y escritorio tras el
-      despliegue para confirmar la mejora real.
+- [x] Lighthouse de producción previo (móvil, `?combustible=DIESEL`):
+      rendimiento 75, accesibilidad 97, buenas prácticas 100 y SEO 100.
+- [ ] **HACERLO TÚ:** Reejecutar Lighthouse en móvil y escritorio tras
+      desplegar las mejoras C (CSS inline, caché 30 días) para confirmar la
+      subida.
 - [x] Cada cambio con sus pruebas (unitarias/E2E) y registro en `PROGRESS.md`:
-      backend 184/184, frontend unitario 416/416, E2E 55 passed + 11 skipped,
-      lint, typecheck y build limpios.
+      backend 184/184, frontend unitario 363/363, E2E 56 passed + 10 skipped,
+      pipeline PMTiles, Compose, lint, typecheck y build limpios.

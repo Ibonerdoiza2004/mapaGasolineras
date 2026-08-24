@@ -6,6 +6,8 @@ services:
       context: ./frontend
       dockerfile: Dockerfile.test
     working_dir: /app
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
   db-test:
     build:

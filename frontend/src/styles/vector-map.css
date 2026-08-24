@@ -1,0 +1,145 @@
+.vector-map {
+	height: 100%;
+	min-height: 320px;
+	position: relative;
+	width: 100%;
+}
+
+.vector-map__container {
+	height: 100%;
+	touch-action: none;
+	width: 100%;
+}
+
+.vector-map__container .maplibregl-canvas:focus-visible,
+.vector-map__zoom button:focus-visible {
+	box-shadow: var(--focus-ring);
+	outline: none;
+}
+
+.vector-map__zoom {
+	background: color-mix(in srgb, var(--color-surface) 94%, transparent);
+	border: 1px solid var(--color-border);
+	border-radius: 0.75rem;
+	box-shadow: 0 0.25rem 1rem rgb(19 38 46 / 14%);
+	display: grid;
+	left: 0.875rem;
+	overflow: hidden;
+	position: absolute;
+	top: 0.875rem;
+	z-index: 3;
+}
+
+.vector-map__zoom button {
+	align-items: center;
+	background: transparent;
+	border: 0;
+	color: var(--color-text);
+	cursor: pointer;
+	display: flex;
+	height: 2.75rem;
+	justify-content: center;
+	width: 2.75rem;
+}
+
+.vector-map__zoom button + button { border-top: 1px solid var(--color-border); }
+.vector-map__zoom button:hover { background: var(--color-surface-emphasis); }
+.vector-map__zoom button:disabled { cursor: not-allowed; opacity: 0.5; }
+.vector-map__zoom svg { fill: none; height: 1.125rem; stroke: currentColor; stroke-linecap: round; stroke-width: 1.8; width: 1.125rem; }
+
+.vector-map__empty {
+	background: var(--color-surface);
+	border: 1px solid var(--color-border);
+	border-radius: var(--radius-pill);
+	box-shadow: var(--shadow-md);
+	color: var(--color-text);
+	left: 50%;
+	margin: 0;
+	max-width: min(calc(100% - var(--space-8)), 28rem);
+	padding: var(--space-2) var(--space-4);
+	pointer-events: none;
+	position: absolute;
+	text-align: center;
+	top: 4.25rem;
+	transform: translateX(-50%);
+	z-index: 4;
+}
+
+.location-marker {
+	background: var(--color-surface);
+	border: 3px solid var(--color-brand-700);
+	border-radius: 50%;
+	box-shadow: var(--shadow-md);
+	height: 26px;
+	pointer-events: none;
+	width: 26px;
+	z-index: 2;
+}
+
+.location-marker::before,
+.location-marker::after {
+	background: var(--color-brand-700);
+	content: '';
+	left: 50%;
+	position: absolute;
+	top: 50%;
+	transform: translate(-50%, -50%);
+}
+.location-marker::before { height: 3px; width: 10px; }
+.location-marker::after { height: 10px; width: 3px; }
+.location-marker--device { background: var(--color-brand-700); border-color: var(--color-surface); }
+.location-marker--device::before,
+.location-marker--device::after { background: var(--color-surface); }
+
+.maplibregl-popup-content {
+	background: var(--color-surface);
+	border: 1px solid var(--color-border);
+	border-radius: var(--radius-md);
+	box-shadow: var(--shadow-lg);
+	color: var(--color-text);
+	padding: 0;
+}
+.maplibregl-popup-tip { border-top-color: var(--color-surface) !important; }
+.maplibregl-popup-close-button { color: var(--color-text); font-size: 1.25rem; height: 2rem; width: 2rem; }
+.station-popup { display: grid; gap: var(--space-2); min-width: 200px; padding: var(--space-4); }
+.station-popup__title { font-size: var(--font-size-sm); font-weight: 700; margin: 0 var(--space-8) var(--space-2) 0; }
+.station-popup button,
+.vector-map__fallback button {
+	background: var(--color-surface-muted);
+	border: 1px solid var(--color-border-strong);
+	border-radius: var(--radius-md);
+	color: var(--color-text);
+	cursor: pointer;
+	font: inherit;
+	font-size: var(--font-size-sm);
+	font-weight: 600;
+	min-height: 2.75rem;
+	padding: var(--space-2) var(--space-3);
+}
+.station-popup .station-popup__primary { background: var(--color-brand-700); color: var(--color-text-on-brand); }
+
+.vector-map__fallback {
+	display: grid;
+	gap: var(--space-2);
+	height: 100%;
+	margin: 0;
+	overflow: auto;
+	padding: var(--space-3);
+}
+.vector-map__fallback ul { display: grid; gap: var(--space-2); list-style: none; margin: 0; padding: 0; }
+.vector-map__fallback p { color: var(--color-text); margin: 0; }
+.vector-map__fallback button { text-align: left; width: 100%; }
+
+.maplibregl-ctrl-attrib {
+	background: color-mix(in srgb, var(--color-surface) 90%, transparent) !important;
+	border-radius: 0.5rem 0 0 !important;
+	color: var(--color-text) !important;
+}
+.maplibregl-ctrl-attrib a { color: var(--color-brand-700) !important; }
+
+@media (max-width: 48rem) {
+	.vector-map,
+	.vector-map__container { height: 100%; min-height: 0; }
+	.maplibregl-ctrl-bottom-right { bottom: 0.5rem; }
+	.vector-map__zoom { left: 0.625rem; top: 0.625rem; }
+}

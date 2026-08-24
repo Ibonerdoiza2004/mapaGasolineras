@@ -47,17 +47,13 @@ services:
       start_period: 30s
     networks: [app]
 
-  tile-proxy:
-    build:
-      context: ./tile-proxy
-    restart: unless-stopped
-    networks: [app]
-
   caddy:
     image: caddy:2.8-alpine
     restart: unless-stopped
     environment:
       DOMAIN: ${DOMAIN:?DOMAIN no está definido}
+      MAP_DOMAIN: ${MAP_DOMAIN:?MAP_DOMAIN no está definido}
+      MAP_ALLOWED_ORIGIN: ${MAP_ALLOWED_ORIGIN:?MAP_ALLOWED_ORIGIN no está definido}
     depends_on:
       backend:
         condition: service_healthy
@@ -66,6 +62,7 @@ services:
       - "443:443"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ${MAP_DATA_DIR:?MAP_DATA_DIR no está definido}:/srv/maps:ro
       - caddy-data:/data
       - caddy-config:/config
     networks: [edge, app]

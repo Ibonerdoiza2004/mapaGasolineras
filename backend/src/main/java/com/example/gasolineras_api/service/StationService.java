@@ -4,6 +4,7 @@ import com.example.gasolineras_api.domain.CurrentPrice;
 import com.example.gasolineras_api.domain.FuelType;
 import com.example.gasolineras_api.domain.Station;
 import com.example.gasolineras_api.dto.BrandDto;
+import com.example.gasolineras_api.dto.MapStationDto;
 import com.example.gasolineras_api.dto.NearbyStationDto;
 import com.example.gasolineras_api.dto.PriceRangeDto;
 import com.example.gasolineras_api.dto.StationDetailDto;
@@ -11,6 +12,7 @@ import com.example.gasolineras_api.exception.ResourceNotFoundException;
 import com.example.gasolineras_api.mapper.BrandCatalog;
 import com.example.gasolineras_api.repository.BrandCountProjection;
 import com.example.gasolineras_api.repository.CurrentPriceRepository;
+import com.example.gasolineras_api.repository.MapStationProjection;
 import com.example.gasolineras_api.repository.NearbyStationProjection;
 import com.example.gasolineras_api.repository.PriceRangeProjection;
 import com.example.gasolineras_api.repository.StationRepository;
@@ -112,6 +114,19 @@ public class StationService {
 	public List<NearbyStationDto> findNearby(double lat, double lon, Double radioKm,
 			Bounds bounds, FuelType fuelType, OrderBy orderBy, Integer limit) {
 		return findNearby(lat, lon, radioKm, bounds, fuelType, orderBy, limit, null, null, null, null);
+	}
+
+	/**
+	 * Devuelve el conjunto completo y ligero usado por MapLibre. Los filtros se
+	 * aplican en SQL y el movimiento del mapa no vuelve a consultar el backend.
+	 */
+	public List<MapStationDto> findAllForMap(FuelType fuelType, Double minPrecio,
+			Double maxPrecio, List<String> marcas) {
+		String marcasCsv = marcas == null || marcas.isEmpty() ? null : String.join(",", marcas);
+		return stationRepository.findAllForMap(fuelType.name(), minPrecio, maxPrecio, marcasCsv)
+				.stream()
+				.map(this::toMapDto)
+				.toList();
 	}
 
 	/**
@@ -220,6 +235,18 @@ public class StationService {
 				p.getDistanciaKm(),
 				p.getPrecio(),
 				ahorro,
+				normalizeDataDate(p.getDataDate())
+		);
+	}
+
+	private MapStationDto toMapDto(MapStationProjection p) {
+		return new MapStationDto(
+				p.getOfficialId(),
+				p.getRotulo(),
+				p.getLatitud(),
+				p.getLongitud(),
+				p.getPrecio(),
+				Boolean.TRUE.equals(p.getBestOption()),
 				normalizeDataDate(p.getDataDate())
 		);
 	}

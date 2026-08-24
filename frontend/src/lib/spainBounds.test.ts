@@ -12,21 +12,12 @@ describe('SPAIN_BOUNDS', () => {
 	it('define un centro visual para la península dentro del encuadre', () => {
 		expect(PENINSULA_CENTER).toEqual([39.9, -3.1]);
 		expect(isInside(PENINSULA_CENTER[0], PENINSULA_CENTER[1])).toBe(true);
-		// El punto medio del rectángulo en píxeles Mercator queda en lat ~41,1º
-		// (la proyección estira el norte), así que el centro visual debe quedar
-		// por debajo de ese punto medio.
-		const mercY = (lat: number) => Math.log(Math.tan(Math.PI / 4 + (lat * Math.PI) / 360));
-		const midY = (mercY(south) + mercY(north)) / 2;
-		const midLat = (2 * Math.atan(Math.exp(midY)) * 180) / Math.PI - 90;
-		expect(midLat).toBeGreaterThan(39.9);
-		expect(PENINSULA_CENTER[0]).toBeLessThan(midLat);
 	});
 
-	it('queda centrado en la península', () => {
-		const centerLat = (south + north) / 2;
-		const centerLon = (west + east) / 2;
-		expect(centerLat).toBeCloseTo(39.9, 1);
-		expect(centerLon).toBeCloseTo(-3.1, 1);
+	it('se ajusta a España sin el gran margen artificial que ocultaba Canarias', () => {
+		expect(north - south).toBeLessThan(17);
+		expect(east - west).toBeLessThan(24);
+		expect(north).toBeLessThan(45);
 	});
 
 	it('incluye la península, Baleares y Canarias', () => {
@@ -39,10 +30,10 @@ describe('SPAIN_BOUNDS', () => {
 		expect(isInside(27.64, -18.16)).toBe(true); // El Hierro (extremo suroeste)
 	});
 
-	it('las Canarias entran justas por el suroeste', () => {
-		expect(isInside(27.63, -18.16)).toBe(true); // borde sur-oeste, aún dentro
-		expect(isInside(27.6, -18.16)).toBe(false); // justo al sur queda fuera
-		expect(isInside(27.63, -18.2)).toBe(false); // justo al oeste queda fuera
+	it('las Canarias tienen margen por el suroeste', () => {
+		expect(isInside(27.63, -18.16)).toBe(true);
+		expect(isInside(27.34, -18.16)).toBe(false);
+		expect(isInside(27.63, -18.46)).toBe(false);
 	});
 
 	it('excluye puntos fuera del encuadre', () => {
