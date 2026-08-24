@@ -5,8 +5,11 @@ WORKDIR /app
 # Las dependencias se instalan en la imagen y se conservan en un volumen al
 # montar el código fuente durante el desarrollo.
 COPY package.json package-lock.json ./
-RUN npm ci
+RUN npm ci \
+	&& sha256sum package-lock.json | awk '{ print $1 }' > node_modules/.package-lock.sha256
+
+COPY entrypoint.dev.sh /usr/local/bin/frontend-entrypoint-dev
 
 EXPOSE 4321
 
-CMD ["sh", "-c", "rm -f .astro/dev.json && npm run dev -- --host 0.0.0.0"]
+CMD ["sh", "/usr/local/bin/frontend-entrypoint-dev"]

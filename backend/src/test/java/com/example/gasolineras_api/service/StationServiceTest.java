@@ -448,6 +448,31 @@ class StationServiceTest {
 				.findNearby(40.4168, -3.7038, 10000.0, "GASOLINA_95", "precio", 200, null, null, "repsol,cepsa");
 	}
 
+	@Test
+	@DisplayName("El conjunto del mapa conserva solo los campos ligeros y normaliza la fecha")
+	void mapDatasetMapsProjectionAndForwardsFilters() {
+		var projection = new com.example.gasolineras_api.repository.MapStationProjection() {
+			@Override public String getOfficialId() { return "m1"; }
+			@Override public String getRotulo() { return "REPSOL"; }
+			@Override public Double getLatitud() { return 40.4168; }
+			@Override public Double getLongitud() { return -3.7038; }
+			@Override public BigDecimal getPrecio() { return new BigDecimal("1.499"); }
+			@Override public Boolean getBestOption() { return true; }
+			@Override public String getDataDate() { return "22/08/2026 9:05:00"; }
+		};
+		when(stationRepository.findAllForMap("DIESEL", 1.4, 1.8, "repsol,otras"))
+				.thenReturn(List.of(projection));
+
+		var result = service.findAllForMap(
+				FuelType.DIESEL, 1.4, 1.8, List.of("repsol", "otras"));
+
+		assertThat(result).hasSize(1);
+		assertThat(result.getFirst().id()).isEqualTo("m1");
+		assertThat(result.getFirst().precio()).isEqualByComparingTo("1.499");
+		assertThat(result.getFirst().mejorOpcion()).isTrue();
+		assertThat(result.getFirst().fechaActualizacion()).isEqualTo("2026-08-22T09:05");
+	}
+
 	private com.example.gasolineras_api.repository.BrandCountProjection count(String marca, long count) {
 		return new com.example.gasolineras_api.repository.BrandCountProjection() {
 			@Override public String getMarca() { return marca; }

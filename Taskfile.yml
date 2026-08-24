@@ -29,14 +29,81 @@ tasks:
       - docker compose --env-file {{.ENV_FILE}} -f {{.COMPOSE_FILE}} --profile backend up --build
 
   frontend:
-    desc: Arranca solo el frontend (Astro)
+    desc: Arranca el frontend (Astro) y el servidor local del PMTiles
     cmds:
+      - bash map-tiles/prepare-context.sh
       - docker compose --env-file {{.FRONTEND_ENV_FILE}} -f {{.COMPOSE_FILE}} --profile frontend up --build
+
+  map:
+    desc: Arranca solo el servidor local del PMTiles en http://localhost:8081
+    cmds:
+      - bash map-tiles/prepare-context.sh
+      - docker compose -f {{.COMPOSE_FILE}} --profile map up map-server
+
+  tiles:context:
+    desc: Descarga y valida el contexto terrestre vectorial de baja escala
+    cmds:
+      - bash map-tiles/prepare-context.sh
 
   deps:
     desc: Reinstala las dependencias del frontend en el volumen de desarrollo
     cmds:
       - docker compose --env-file {{.ENV_FILE}} -f {{.COMPOSE_FILE}} --profile frontend run --rm frontend npm ci
+
+  deps:update:
+    desc: Actualiza package-lock.json del frontend dentro de Node 22
+    cmds:
+      - docker run --rm -v "{{.ROOT_DIR}}/frontend:/app" -w /app node:22-bookworm npm install
+
+  tiles:build:
+    desc: Genera el PMTiles vectorial de España y Canarias hasta z15
+    cmds:
+      - bash map-tiles/build.sh
+
+  tiles:test:
+    desc: Valida el pipeline y la configuración del PMTiles sin descargar el mapa
+    cmds:
+      - bash map-tiles/tests/build.test.sh
+
+  tiles:validate:
+    desc: Valida cabecera, formato vectorial y zoom 0-15 del PMTiles publicado
+    cmds:
+      - PMTILES_EXPECT_MIN_ZOOM=0 PMTILES_EXPECT_MAX_ZOOM=15 PMTILES_REQUIRED_BOUNDS_E7='-180000000 270000000 45000000 438000000' bash map-tiles/validate-pmtiles.sh map-tiles/data/publish/maps/spain.pmtiles
+
+  tiles:smoke:
+    desc: Arranca Caddy local y comprueba una petición Range contra el PMTiles generado
+    cmds:
+      - defer: docker compose -f {{.COMPOSE_FILE}} --profile map stop map-server
+      - docker compose -f {{.COMPOSE_FILE}} --profile map up -d --wait map-server
+      - bash map-tiles/tests/server-smoke.test.sh
+
+  tiles:browser-smoke:
+    desc: Comprueba con Chromium que el frontend local carga MapLibre y solicita el PMTiles por Range
+    cmds:
+      - docker compose --ansi never -f {{.TEST_COMPOSE_FILE}} run --rm -T --build frontend-test node scripts/local-map-smoke.mjs
+
+  tiles:visual:
+    desc: Genera una captura local del mapa real para revisión visual
+    cmds:
+      - mkdir -p /tmp/mapa-gasolineras-visual
+      - docker compose --ansi never -f {{.TEST_COMPOSE_FILE}} run --rm -T --build -e MAP_SMOKE_SCREENSHOT=/artifacts/map.png -e MAP_SMOKE_ZOOM_STEPS=2 -v /tmp/mapa-gasolineras-visual:/artifacts frontend-test node scripts/local-map-smoke.mjs
+
+  tiles:visual:dark:
+    desc: Genera una captura del mapa oscuro después de cambiar el tema en navegador real
+    cmds:
+      - mkdir -p /tmp/mapa-gasolineras-visual
+      - docker compose --ansi never -f {{.TEST_COMPOSE_FILE}} run --rm -T --build -e MAP_SMOKE_SCREENSHOT=/artifacts/map-dark.png -e MAP_SMOKE_ZOOM_STEPS=2 -e MAP_SMOKE_THEME=dark -v /tmp/mapa-gasolineras-visual:/artifacts frontend-test node scripts/local-map-smoke.mjs
+
+  compose:validate:
+    desc: Valida la configuración Docker Compose de desarrollo y producción
+    cmds:
+      - docker compose --env-file {{.ENV_FILE}} --env-file {{.FRONTEND_ENV_FILE}} -f {{.COMPOSE_FILE}} --profile all config --quiet
+      - docker compose --env-file .env.production.example -f docker-compose.prod.yml config --quiet
+
+  caddy:validate:
+    desc: Valida la configuración Caddy de producción
+    cmds:
+      - docker run --rm -e DOMAIN=api.example.test -e MAP_DOMAIN=tiles.example.test -e MAP_ALLOWED_ORIGIN=https://example.test -v "{{.ROOT_DIR}}/Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2.8-alpine caddy validate --config /etc/caddy/Caddyfile
 
   down:
     desc: Detiene los servicios conservando los datos de la base de datos
@@ -82,7 +149,13 @@ tasks:
 
   test:
     desc: Ejecuta todos los tests (backend, frontend unitario y E2E)
-    deps: [test:backend, test:frontend, test:e2e]
+    cmds:
+      # Secuencial a propósito: Chromium/WebGL y Maven compitiendo a la vez
+      # provocaban timeouts falsos en equipos con CPU o memoria limitadas.
+      - task: tiles:test
+      - task: test:backend
+      - task: test:frontend
+      - task: test:e2e
 
   lint:
     desc: Ejecuta lint y comprobación de tipos del frontend
@@ -91,7 +164,12 @@ tasks:
 
   check:
     desc: Ejecuta el gate completo de CI local (lint, tipado, tests y build)
-    deps: [lint, test, build]
+    cmds:
+      - task: compose:validate
+      - task: caddy:validate
+      - task: lint
+      - task: test
+      - task: build
 
   build:
     desc: Compila el frontend para producción

@@ -96,7 +96,7 @@ describe('tokens visuales', () => {
 
 	it.each([
 		['light', '#ffffff', '#17232d'],
-		['dark', '#151a1f', '#f1f5f7'],
+		['dark', '#24282b', '#f3f5f6'],
 	])('define superficies y texto para el tema %s', (theme, page, text) => {
 		expect(token(theme as keyof typeof themeCss, '--color-page')).toBe(page);
 		expect(token(theme as keyof typeof themeCss, '--color-text')).toBe(text);

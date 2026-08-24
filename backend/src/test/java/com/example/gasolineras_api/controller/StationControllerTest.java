@@ -2,6 +2,7 @@ package com.example.gasolineras_api.controller;
 
 import com.example.gasolineras_api.domain.FuelType;
 import com.example.gasolineras_api.dto.NearbyStationDto;
+import com.example.gasolineras_api.dto.MapStationDto;
 import com.example.gasolineras_api.dto.PriceRangeDto;
 import com.example.gasolineras_api.exception.GlobalExceptionHandler;
 import com.example.gasolineras_api.service.StationService;
@@ -26,6 +27,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.hamcrest.Matchers.containsString;
 
 class StationControllerTest {
 
@@ -470,6 +472,67 @@ class StationControllerTest {
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.min").value(1.4))
 				.andExpect(jsonPath("$.max").value(1.9));
+	}
+
+	@Test
+	@DisplayName("El mapa devuelve el conjunto ligero completo con caché pública corta")
+	void mapEndpointReturnsLightweightStations() throws Exception {
+		when(stationService.findAllForMap(FuelType.DIESEL, null, null, List.of()))
+				.thenReturn(List.of(new MapStationDto(
+						"1", "REPSOL", 40.4168, -3.7038,
+						new BigDecimal("1.499"), true, "2026-08-22T10:00:00")));
+
+		mockMvc.perform(get("/api/stations/map")
+						.param("combustible", "DIESEL"))
+				.andExpect(status().isOk())
+				.andExpect(header().string("Cache-Control", containsString("max-age=300")))
+				.andExpect(header().string("Cache-Control", containsString("public")))
+				.andExpect(jsonPath("$[0].id").value("1"))
+				.andExpect(jsonPath("$[0].rotulo").value("REPSOL"))
+				.andExpect(jsonPath("$[0].latitud").value(40.4168))
+				.andExpect(jsonPath("$[0].precio").value(1.499))
+				.andExpect(jsonPath("$[0].mejorOpcion").value(true));
+	}
+
+	@Test
+	@DisplayName("El mapa aplica precio y marcas sin admitir valores desconocidos")
+	void mapEndpointValidatesAndForwardsFilters() throws Exception {
+		when(stationService.findAllForMap(FuelType.GASOLINA_95, 1.4, 1.8,
+				List.of("repsol", "otras"))).thenReturn(List.of());
+
+		mockMvc.perform(get("/api/stations/map")
+						.param("combustible", "GASOLINA_95")
+						.param("minPrecio", "1.4")
+						.param("maxPrecio", "1.8")
+						.param("marcas", "repsol,otras"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$").isEmpty());
+
+		org.mockito.Mockito.verify(stationService).findAllForMap(
+				FuelType.GASOLINA_95, 1.4, 1.8, List.of("repsol", "otras"));
+
+		mockMvc.perform(get("/api/stations/map")
+						.param("combustible", "DIESEL")
+						.param("marcas", "inventada"))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.code").value("INVALID_PARAMETER"));
+	}
+
+	@Test
+	@DisplayName("El mapa rechaza rangos invertidos y precios no finitos")
+	void mapEndpointRejectsInvalidPrices() throws Exception {
+		mockMvc.perform(get("/api/stations/map")
+						.param("combustible", "DIESEL")
+						.param("minPrecio", "2")
+						.param("maxPrecio", "1"))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.code").value("INVALID_PARAMETER"));
+
+		mockMvc.perform(get("/api/stations/map")
+						.param("combustible", "DIESEL")
+						.param("minPrecio", "NaN"))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.code").value("INVALID_PARAMETER"));
 	}
 
 	@Test

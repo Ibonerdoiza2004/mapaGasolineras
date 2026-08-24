@@ -10,6 +10,7 @@ import {
 	ORDEN_EVENT,
 	PRICE_FILTER_EVENT,
 	RADIO_EVENT,
+	resetLastNearbyStations,
 	resetLastRadio,
 	resetLastViewport,
 	COMPARE_EVENT,
@@ -99,6 +100,7 @@ afterEach(() => {
 	vi.restoreAllMocks();
 	resetLastViewport();
 	resetLastRadio();
+	resetLastNearbyStations();
 	resetLastLocation();
 	window.history.replaceState(null, '', '/explorar');
 	document.body.innerHTML = '';
@@ -142,11 +144,10 @@ describe('StationList — listado de estaciones cercanas', () => {
 		const fetchMock = vi.fn().mockResolvedValue(jsonResponse([station()]));
 		vi.stubGlobal('fetch', fetchMock);
 
-		// Un aterrizaje desde una landing de municipio emite la ubicación y
-		// activa el radio antes de que esta isla se hidrate: sin recuperar el
-		// último valor se quedaría consultando el área visible (toda España).
+		// Un aterrizaje desde una landing de municipio puede emitir la ubicación
+		// antes de que RadioFilter publique su primer evento. Aun así, la isla
+		// debe usar el radio predeterminado y no consultar el área visible.
 		dispatchUserLocation(40.4168, -3.7038);
-		dispatchRadioChange(10);
 
 		render(<StationList />);
 
@@ -480,6 +481,23 @@ describe('StationList — listado de estaciones cercanas', () => {
 		expect(String(url)).toContain('radio=50');
 	});
 
+	it('mover el mapa no repite la consulta cuando hay un radio activo', async () => {
+		const fetchMock = vi.fn().mockResolvedValue(jsonResponse([station()]));
+		vi.stubGlobal('fetch', fetchMock);
+
+		dispatchUserLocation(40.4168, -3.7038);
+		dispatchRadioChange(10);
+		render(<StationList />);
+		await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+
+		emitViewport();
+		await new Promise((resolve) => setTimeout(resolve, 50));
+
+		expect(fetchMock).toHaveBeenCalledTimes(1);
+		expect(String(fetchMock.mock.calls[0][0])).toContain('radio=10');
+		expect(String(fetchMock.mock.calls[0][0])).not.toContain('minLat=');
+	});
+
 	it('un radio inválido en el evento se ignora', async () => {
 		const fetchMock = vi.fn().mockResolvedValue(jsonResponse([station()]));
 		vi.stubGlobal('fetch', fetchMock);
@@ -660,7 +678,7 @@ describe('StationList — listado de estaciones cercanas', () => {
 		expect(screen.queryByRole('heading', { name: 'Estación Norte' })).not.toBeInTheDocument();
 	});
 
-	it('al alcanzar el límite de resultados avisa de que solo muestra las mejores opciones', async () => {
+	it('al alcanzar el límite avisa y monta las tarjetas en bloques de 50', async () => {
 		const results = Array.from({ length: 500 }, (_, i) =>
 			station({ id: `s${i}`, rotulo: `Estación ${i}` }),
 		);
@@ -675,7 +693,11 @@ describe('StationList — listado de estaciones cercanas', () => {
 				screen.getByText(/mostrando las 500 mejores opciones/i),
 			).toBeInTheDocument(),
 		);
-		expect(document.querySelectorAll('.station-card')).toHaveLength(500);
+		expect(document.querySelectorAll('.station-card')).toHaveLength(50);
+		const more = screen.getByRole('button', { name: /Mostrar más 50 de 500/i });
+		fireEvent.click(more);
+		await waitFor(() => expect(document.querySelectorAll('.station-card')).toHaveLength(100));
+		expect(more).toHaveTextContent('100 de 500');
 	}, 30000);
 
 	it('sin alcanzar el límite no muestra la nota', async () => {
@@ -731,7 +753,8 @@ describe('StationList — listado de estaciones cercanas', () => {
 		emitRadio(10);
 		emitLocation(40.4168, -3.7038);
 
-		await waitFor(() => expect(document.querySelectorAll('.station-card')).toHaveLength(300));
+		await waitFor(() => expect(document.querySelectorAll('.station-card')).toHaveLength(50));
+		expect(screen.getByRole('button', { name: /Mostrar más 50 de 300/i })).toBeInTheDocument();
 		expect(screen.queryByText(/mostrando las 200 mejores/i)).toBeNull();
 		const [url] = fetchMock.mock.calls[0];
 		expect(String(url)).not.toContain('limit=');

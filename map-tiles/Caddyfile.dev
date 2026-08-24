@@ -1,0 +1,46 @@
+:8080 {
+	header {
+		Access-Control-Allow-Origin "*"
+		Access-Control-Allow-Methods "GET, HEAD, OPTIONS"
+		Access-Control-Allow-Headers "Range, If-None-Match, If-Modified-Since"
+		Access-Control-Expose-Headers "Accept-Ranges, Content-Length, Content-Range, ETag"
+		X-Content-Type-Options nosniff
+	}
+
+	@preflight method OPTIONS
+	handle @preflight {
+		respond 204
+	}
+
+	@health path /health
+	handle @health {
+		respond 200
+	}
+
+	@pmtiles path /maps/*.pmtiles
+	handle @pmtiles {
+		root * /srv/maps
+		header Content-Type application/vnd.pmtiles
+		header Cache-Control "no-cache"
+		file_server
+	}
+
+	@fonts path /fonts/*
+	handle @fonts {
+		root * /srv/maps
+		header Cache-Control "public, max-age=3600"
+		file_server
+	}
+
+	@context path /context/*
+	handle @context {
+		root * /srv/maps
+		header Content-Type application/geo+json
+		header Cache-Control "public, max-age=31536000, immutable"
+		file_server
+	}
+
+	handle {
+		respond 404
+	}
+}

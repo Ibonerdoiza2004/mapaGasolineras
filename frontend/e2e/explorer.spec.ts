@@ -1,28 +1,33 @@
 import { expect, test } from '@playwright/test';
 
-// Las teselas de OSM son dependencia de red y se limitan con la suite en
-// paralelo; se simulan para que el zoom se verifique de forma determinista
-// por la URL de la tesela (el nivel lo genera Leaflet, no la respuesta).
-async function stubTiles(page: import('@playwright/test').Page) {
-	await page.route('**/tile.openstreetmap.org/**', (route) =>
-		route.fulfill({
-			status: 200,
-			contentType: 'image/png',
-			body: Buffer.from(
-				'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
-				'base64',
-			),
-		}),
-	);
-}
-
 // El listado consulta el área visible del mapa al cargar; se simula el
 // backend para que la página quede limpia (sin alertas ni botones extra).
 test.beforeEach(async ({ page }) => {
-	await stubTiles(page);
+	await page.route('**/api/stations/map*', (route) =>
+		route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }),
+	);
 	await page.route('**/api/stations/nearby*', (route) =>
 		route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }),
 	);
+});
+
+test('el mapa carga más de 500 estaciones aunque el listado siga limitado', async ({ page }) => {
+	const stations = Array.from({ length: 501 }, (_, index) => ({
+		id: `all-${index}`,
+		rotulo: `Estación ${index}`,
+		latitud: 36 + (index % 80) * 0.05,
+		longitud: -8 + (index % 100) * 0.08,
+		precio: 1.45,
+		mejorOpcion: index === 0,
+		fechaActualizacion: '2026-08-22T10:00:00',
+	}));
+	await page.route('**/api/stations/map*', (route) =>
+		route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(stations) }),
+	);
+
+	await page.goto('/');
+
+	await expect(page.locator('.vector-map')).toHaveAttribute('data-station-count', '501');
 });
 
 test.describe('disposición — el mapa llena el alto disponible', () => {
@@ -34,7 +39,7 @@ test.describe('disposición — el mapa llena el alto disponible', () => {
 		await page.goto('/');
 		await expect(page.getByRole('button', { name: 'Acercar mapa' })).toBeVisible();
 
-		const box = await page.locator('.leaflet-map__container').boundingBox();
+		const box = await page.locator('.vector-map__container').boundingBox();
 		expect(box).not.toBeNull();
 		const viewportHeight = await page.evaluate(() => window.innerHeight);
 		expect(Math.round((box as { y: number; height: number }).y + (box as { y: number; height: number }).height))
@@ -42,40 +47,16 @@ test.describe('disposición — el mapa llena el alto disponible', () => {
 	});
 });
 
-test.describe('rueda del ratón — zoom en pasos de 0.5', () => {
-	test('cada toque de la rueda cuenta un paso', async ({ page, isMobile }) => {
-		test.skip(isMobile, 'rueda de ratón de escritorio');
+test.describe('controles del mapa — zoom en pasos de 0.5', () => {
+	test('cada pulsación cambia exactamente medio nivel', async ({ page }) => {
 		await page.goto('/');
+		const map = page.locator('.vector-map');
 		await expect(page.getByRole('button', { name: 'Acercar mapa' })).toBeVisible();
-		await expect(page.locator('img.leaflet-tile').first()).toBeVisible();
-
-		const box = await page.locator('.leaflet-map__container').boundingBox();
-		if (!box) throw new Error('sin caja del mapa');
-		await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-
-		// Los toques en las fronteras de la animación del zoom pueden
-		// perderse con la suite en paralelo (Leaflet descarta zooms mientras
-		// anima), así que cada toque se reintenta hasta que el nivel de
-		// tesela observable avanza.
-		async function wheelUntilLevel(match: RegExp, deltaY: number) {
-			await expect
-				.poll(
-					async () => {
-						if ((await page.locator(`img.leaflet-tile[src*="${match.source}"]`).count()) > 0) {
-							return true;
-						}
-						await page.mouse.wheel(0, deltaY);
-						return false;
-					},
-					{ timeout: 30_000 },
-				)
-				.toBe(true);
-		}
-
-		// Tres toques suben de nivel de tesela (z5 -> z6).
-		await wheelUntilLevel(/\/6\//, -100);
-		// Dos toques vuelven al nivel anterior (z6 -> z5).
-		await wheelUntilLevel(/\/5\//, 100);
+		const initial = Number(await map.getAttribute('data-map-zoom'));
+		await page.getByRole('button', { name: 'Acercar mapa' }).click();
+		await expect.poll(async () => Number(await map.getAttribute('data-map-zoom'))).toBeCloseTo(initial + 0.5, 1);
+		await page.getByRole('button', { name: 'Alejar mapa' }).click();
+		await expect.poll(async () => Number(await map.getAttribute('data-map-zoom'))).toBeCloseTo(initial, 1);
 	});
 });
 
@@ -116,7 +97,7 @@ test.describe('teclado — orden de foco y operación', () => {
 		test.skip(isMobile, 'orden de tabulación de escritorio');
 		await page.goto('/');
 
-		// La isla Leaflet se hidrata de forma asíncrona; se espera a que sus
+		// La isla vectorial se hidrata de forma asíncrona; se espera a que sus
 		// controles existan para que el orden de foco sea estable.
 		await expect(page.getByRole('button', { name: 'Acercar mapa' })).toBeVisible();
 
@@ -141,7 +122,7 @@ test.describe('teclado — orden de foco y operación', () => {
 			await expect(page.getByRole(role, { name })).toBeFocused();
 		}
 
-		// Tras el panel, el foco entra en el mapa Leaflet (contenedor y
+		// Tras el panel, el foco entra en el mapa (lienzo y
 		// marcadores) y desde ahí se alcanzan los controles de zoom con teclado.
 		let zoomReached = false;
 		for (let i = 0; i < 10 && !zoomReached; i += 1) {

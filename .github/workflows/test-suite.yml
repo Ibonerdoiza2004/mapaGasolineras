@@ -7,6 +7,16 @@ permissions:
   contents: read
 
 jobs:
+  vector-map:
+    name: Vector map pipeline tests
+    runs-on: ubuntu-24.04
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Validate PMTiles build and serving contracts
+        run: bash map-tiles/tests/build.test.sh
+
   frontend:
     name: Frontend tests and build
     runs-on: ubuntu-24.04

@@ -57,11 +57,29 @@ services:
       CHOKIDAR_USEPOLLING: "true"
       # CI usa localhost; frontend/.env.local lo sobrescribe para la red LAN.
       PUBLIC_API_URL: "${PUBLIC_API_URL:-http://localhost:8080}"
+    depends_on:
+      map-server:
+        condition: service_healthy
     ports:
       - "4321:4321"
     volumes:
       - ./frontend:/app
       - frontend-node-modules:/app/node_modules
+
+  map-server:
+    image: caddy:2.8-alpine
+    profiles: ["frontend", "all", "map"]
+    ports:
+      - "8081:8080"
+    volumes:
+      - ./map-tiles/Caddyfile.dev:/etc/caddy/Caddyfile:ro
+      - ./map-tiles/data/publish:/srv/maps:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget --quiet --spider http://localhost:8080/health"]
+      interval: 3s
+      timeout: 2s
+      retries: 10
+      start_period: 3s
 
 volumes:
   postgres-data:

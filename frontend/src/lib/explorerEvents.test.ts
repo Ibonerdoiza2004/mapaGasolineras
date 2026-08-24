@@ -3,18 +3,24 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
 	dispatchFuelChange,
 	dispatchMarcasChange,
+	dispatchMapStations,
 	dispatchNearbyStations,
 	dispatchOrdenChange,
 	dispatchRadioChange,
 	dispatchStationFocus,
 	dispatchViewportChange,
 	FUEL_EVENT,
+	getLastNearbyStations,
+	getLastMapStations,
 	getLastRadio,
 	getLastViewport,
 	MARCAS_EVENT,
+	MAP_STATIONS_EVENT,
 	ORDEN_EVENT,
 	RADIO_EVENT,
 	resetLastRadio,
+	resetLastNearbyStations,
+	resetLastMapStations,
 	resetLastViewport,
 	STATIONS_EVENT,
 	STATION_FOCUS_EVENT,
@@ -24,6 +30,8 @@ import {
 afterEach(() => {
 	resetLastViewport();
 	resetLastRadio();
+	resetLastNearbyStations();
+	resetLastMapStations();
 	vi.restoreAllMocks();
 });
 
@@ -122,7 +130,23 @@ describe('explorerEvents — eventos entre islas', () => {
 		expect(listener).toHaveBeenCalledOnce();
 		const event = listener.mock.calls[0][0] as CustomEvent<{ stations: unknown[] }>;
 		expect(event.detail.stations).toEqual([]);
+		expect(getLastNearbyStations()).toEqual([]);
 		window.removeEventListener(STATIONS_EVENT, listener);
+	});
+
+	it('conserva y notifica el conjunto completo del mapa, incluido el vacío', () => {
+		const listener = vi.fn();
+		window.addEventListener(MAP_STATIONS_EVENT, listener);
+		const stations = [{
+			id: 'm1', rotulo: 'REPSOL', latitud: 40.4, longitud: -3.7,
+			precio: 1.499, mejorOpcion: true, fechaActualizacion: '2026-08-22T10:00:00',
+		}];
+
+		dispatchMapStations(stations);
+
+		expect(listener).toHaveBeenCalledOnce();
+		expect(getLastMapStations()).toEqual(stations);
+		window.removeEventListener(MAP_STATIONS_EVENT, listener);
 	});
 
 	it('notifica la estación resaltada desde la lista y su limpieza', () => {

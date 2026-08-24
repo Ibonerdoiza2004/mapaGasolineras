@@ -42,6 +42,14 @@ const NEARBY = [
 	},
 ];
 
+const OUTSIDE_DEFAULT_RADIUS = {
+	...NEARBY[0],
+	id: 'st-outside',
+	rotulo: 'Estación fuera del radio',
+	latitud: 41.3851,
+	longitud: 2.1734,
+};
+
 function stubNearby(page: Page, body: unknown) {
 	page.route('**/api/stations/nearby*', (route) =>
 		route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) }),
@@ -66,6 +74,7 @@ test.describe('filtro de combustible — buscar, comparar y ver detalle', () => 
 		await expect(page.getByRole('heading', { name: 'REPSOL Norte' })).toBeVisible();
 		await expect(page.getByRole('heading', { name: 'CEPSA Centro' })).toBeVisible();
 		await expect(page.getByRole('heading', { name: 'Área de servicio Este' })).toBeVisible();
+		await expect(page.locator('.station-card').first()).toHaveCSS('content-visibility', 'auto');
 
 		// La tarjeta destacada lleva la etiqueta de mejor opción.
 		await expect(page.locator('.station-card__tag')).toHaveText('Mejor opción');
@@ -77,9 +86,26 @@ test.describe('filtro de combustible — buscar, comparar y ver detalle', () => 
 		// El contador de resultados refleja la consulta.
 		await expect(page.locator('.explorer__list-title .explorer__result-count')).toHaveText('3');
 
-		// El mapa recibe los resultados: quedan marcadores y desaparece el vacío.
+		// El mapa recibe los resultados en su fuente nativa y desaparece el vacío.
 		await expect(page.getByText('No hay estaciones que mostrar en el mapa.')).not.toBeVisible();
-		await expect(page.locator('.station-marker').first()).toBeVisible();
+		await expect(page.locator('.vector-map')).toHaveAttribute('data-station-count', '3');
+		await expect(page.locator('.vector-map')).toHaveAttribute('data-marker-renderer', 'maplibre-native');
+	});
+
+	test('los clústeres se renderizan en WebGL y no reconstruyen nodos HTML al hacer zoom', async ({ page }) => {
+		stubNearby(page, [
+			NEARBY[0],
+			{ ...NEARBY[1], latitud: 40.4261, longitud: -3.7039 },
+		]);
+		await page.goto('/');
+
+		const map = page.locator('.vector-map');
+		await expect(map).toHaveAttribute('data-station-count', '2');
+		await expect(page.locator('.station-cluster, .station-marker')).toHaveCount(0);
+		await page.getByRole('button', { name: 'Acercar mapa' }).click();
+		await page.getByRole('button', { name: 'Acercar mapa' }).click();
+		await expect(map).toHaveAttribute('data-station-count', '2');
+		await expect(page.locator('.station-cluster, .station-marker')).toHaveCount(0);
 	});
 
 	test('cambiar de combustible vuelve a consultar y se refleja en la URL', async ({ page }) => {
@@ -93,13 +119,12 @@ test.describe('filtro de combustible — buscar, comparar y ver detalle', () => 
 		await expect(page.getByRole('button', { name: 'Acercar mapa' })).toBeVisible();
 
 		// Compartir la ubicación activa el radio (10 km por defecto) y consulta
-		// con el radio; el re-encuadre al centrar el mapa consulta dos veces.
+		// una sola vez con el radio.
 		await page.getByRole('button', { name: 'Usar mi ubicación' }).click();
 		await expect(page.getByRole('listitem')).toHaveCount(3);
-		await expect.poll(() => requests.length).toBe(3);
+		await expect.poll(() => requests.length).toBe(2);
 		expect(requests[1]).toContain('radio=10');
 		expect(requests[1]).toContain('combustible=DIESEL');
-		expect(requests[2]).toContain('radio=10');
 
 		await page.getByRole('radio', { name: 'Gasolina 98' }).click();
 
@@ -108,8 +133,8 @@ test.describe('filtro de combustible — buscar, comparar y ver detalle', () => 
 			'true',
 		);
 		await expect(page.getByRole('listitem')).toHaveCount(3);
-		await expect.poll(() => requests.length).toBe(4);
-		expect(requests[3]).toContain('combustible=GASOLINA_98');
+		await expect.poll(() => requests.length).toBe(3);
+		expect(requests[2]).toContain('combustible=GASOLINA_98');
 		expect(new URL(page.url()).searchParams.get('combustible')).toBe('GASOLINA_98');
 	});
 
@@ -138,16 +163,26 @@ test.describe('filtro de combustible — buscar, comparar y ver detalle', () => 
 		page,
 	}) => {
 		const requests: string[] = [];
-		page.route('**/api/stations/nearby*', (route) => {
-			requests.push(route.request().url());
-			route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(NEARBY) });
+		const firstRadioResponse: { release?: () => void } = {};
+		page.route('**/api/stations/nearby*', async (route) => {
+			const url = route.request().url();
+			requests.push(url);
+			const isRadioRequest = new URL(url).searchParams.has('radio');
+			if (isRadioRequest && firstRadioResponse.release === undefined) {
+				await new Promise<void>((resolve) => { firstRadioResponse.release = resolve; });
+			}
+			route.fulfill({
+				status: 200,
+				contentType: 'application/json',
+				body: JSON.stringify(isRadioRequest ? NEARBY : [...NEARBY, OUTSIDE_DEFAULT_RADIUS]),
+			});
 		});
 		await grantLocation(page);
 		await page.goto('/');
 		await expect(page.getByRole('button', { name: 'Acercar mapa' })).toBeVisible();
 
 		// Al cargar se consulta el área visible del mapa (sin ubicación aún).
-		await expect(page.getByRole('listitem')).toHaveCount(3);
+		await expect(page.getByRole('listitem')).toHaveCount(4);
 		await expect.poll(() => requests.length).toBe(1);
 		expect(requests[0]).not.toContain('radio=');
 		expect(requests[0]).toContain('minLat=');
@@ -167,11 +202,20 @@ test.describe('filtro de combustible — buscar, comparar y ver detalle', () => 
 			'aria-checked',
 			'true',
 		);
-		await expect(page.getByRole('listitem')).toHaveCount(3);
-		await expect.poll(() => requests.length).toBe(3);
+		await expect.poll(() => requests.length).toBe(2);
 		expect(requests[1]).toContain('radio=10');
-		expect(requests[2]).toContain('radio=10');
-		await expect(page.locator('.radius-circle')).toBeVisible();
+		const map = page.locator('.vector-map');
+		// El mapa debe excluir la estación lejana en el mismo render que recibe
+		// la ubicación, antes incluso de que responda la primera petición por radio.
+		await expect(map).toHaveAttribute('data-station-count', '3');
+		await expect(map).toHaveAttribute('data-radius-km', '10');
+		await expect(map).toHaveAttribute('data-radius-rendered', 'true');
+		expect(firstRadioResponse.release).toBeDefined();
+		firstRadioResponse.release?.();
+		await expect(page.getByRole('listitem')).toHaveCount(3);
+		await expect.poll(async () => Number(await map.getAttribute('data-map-zoom'))).toBeLessThan(15);
+		await expect.poll(async () => Number(await map.getAttribute('data-map-zoom'))).toBeGreaterThan(10);
+		const tenKmZoom = Number(await map.getAttribute('data-map-zoom'));
 
 		// Elegir 50 km vuelve a consultar con el nuevo valor.
 		await page.getByRole('radio', { name: '50 km' }).click();
@@ -179,9 +223,11 @@ test.describe('filtro de combustible — buscar, comparar y ver detalle', () => 
 			'aria-checked',
 			'true',
 		);
-		await expect.poll(() => requests.length).toBe(4);
-		expect(requests[3]).toContain('radio=50');
-		await expect(page.locator('.radius-circle')).toBeVisible();
+		await expect.poll(() => requests.length).toBe(3);
+		expect(requests[2]).toContain('radio=50');
+		await expect(map).toHaveAttribute('data-radius-km', '50');
+		await expect(map).toHaveAttribute('data-radius-rendered', 'true');
+		await expect.poll(async () => Number(await map.getAttribute('data-map-zoom'))).toBeLessThan(tenKmZoom);
 
 		// Volver al área visible vuelve al viewport y
 		// elimina la circunferencia.
@@ -191,10 +237,12 @@ test.describe('filtro de combustible — buscar, comparar y ver detalle', () => 
 			'true',
 		);
 		await expect(page.getByRole('radio', { name: '10 km' })).toHaveCount(0);
-		await expect.poll(() => requests.length).toBe(5);
-		expect(requests[4]).not.toContain('radio=');
-		expect(requests[4]).toContain('minLat=');
-		await expect(page.locator('.radius-circle')).not.toBeVisible();
+		await expect.poll(() => requests.length).toBeGreaterThanOrEqual(4);
+		const finalRequest = requests.at(-1) as string;
+		expect(finalRequest).not.toContain('radio=');
+		expect(finalRequest).toContain('minLat=');
+		await expect(map).not.toHaveAttribute('data-radius-km');
+		await expect(map).not.toHaveAttribute('data-radius-rendered');
 	});
 
 	test('no persiste ni restaura el radio desde la URL', async ({ page }) => {
@@ -348,7 +396,7 @@ test.describe('filtro de combustible — buscar, comparar y ver detalle', () => 
 			'true',
 		);
 		await expect(page.getByRole('radio', { name: 'Más cercano' })).toBeDisabled();
-		expect(new URL(page.url()).searchParams.get('orden')).toBe('precio');
+		await expect.poll(() => new URL(page.url()).searchParams.get('orden')).toBe('precio');
 	});
 
 	test('el anillo de foco aparece al navegar los chips con teclado', async ({ page }) => {
@@ -580,7 +628,8 @@ test.describe('filtro de combustible — buscar, comparar y ver detalle', () => 
 		await expect.poll(() => requests.some((url) => url.includes('radio=10'))).toBe(true);
 
 		// La circunferencia del radio queda dibujada sobre el mapa.
-		await expect(page.locator('.radius-circle')).toBeVisible();
+		await expect(page.locator('.vector-map')).toHaveAttribute('data-radius-km', '10');
+		await expect(page.locator('.vector-map')).toHaveAttribute('data-radius-rendered', 'true');
 	});
 
 	test('flujo MVP completo: buscar, filtrar, ordenar, abrir ficha e indicaciones', async ({

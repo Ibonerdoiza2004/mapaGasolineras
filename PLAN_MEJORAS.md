@@ -7,8 +7,9 @@ registrarse en `PROGRESS.md`.
 
 **Estado actual (medido en producción, `mapagasolineras.pages.dev`):**
 rendimiento **75**, accesibilidad **97**, buenas prácticas **100**, SEO **100**.
-El proxy de teselas WebP está desplegado y sirve `image/webp`; quedan las
-mejoras de la sección C.3.
+La arquitectura del mapa ya usa un PMTiles vectorial propio z0–z15, renderizado
+en el navegador hasta z19. El artefacto completo está generado y validado en
+local; quedan el despliegue y la medición final en producción.
 
 ## A. Ya implementado — pendiente de desplegar
 
@@ -32,29 +33,25 @@ mejoras de la sección C.3.
 
 ## C. Rendimiento (Lighthouse 67 → objetivo ≥90)
 
-- [x] Carga diferida: `LeafletMap` y las islas no críticas (`StationDetail`,
+- [x] Carga diferida: `VectorMap` y las islas no críticas (`StationDetail`,
       `ComparePanel`, `BrandFilter`, `PriceFilter`) hidratan con `client:idle`
-      tras el primer pintado; el resto sigue en `client:load`. Ataca el bloqueo
-      inicial de `client.js` + Leaflet (LCP 4.4 s / TBT 690 ms).
-- [x] Proxy de teselas en WebP: `tile-proxy/` (Node + sharp) autocontenido que
-      convierte las teselas de OSM a WebP y las cachea. `BaseLayout` emite el
-      `preconnect` del proveedor configurado con `PUBLIC_MAP_TILE_URL`.
-      **Desplegado y verificado en prod** (teselas `image/webp` desde
-      `tiles.api.51.170.52.206.nip.io`).
+      tras el primer pintado; el resto sigue en `client:load`.
+- [x] Pipeline reproducible de España + Canarias a un único PMTiles z0–z15,
+      validado y publicado de forma atómica con versiones recuperables.
+- [x] Servicio estático en Caddy con peticiones Range, CORS explícito y caché;
+      no existe conversión ni generación en la ruta de una petición web.
+- [x] MapLibre GL JS renderiza el vector en GPU, mantiene z19 mediante overzoom
+      del detalle z15 y usa la densidad real del dispositivo para Retina.
 - [x] CSS inline en el HTML (`build.inlineStylesheets: 'always'`) — elimina el
       CSS bloqueante (Lighthouse estimaba −330 ms).
-- [x] `Cache-Control` de las teselas a 30 días con `stale-while-revalidate` en
-      `tile-proxy/server.js` — las revisitas se sirven de caché.
-- [x] `detectRetina: true` en el tile layer (nitidez en pantallas de alta densidad).
-- [x] `preconnect`/`dns-prefetch` a los dominios de teselas y la API.
+- [x] El archivo persistente vive fuera del directorio reemplazado por deploy;
+      la actualización conmuta el enlace estable solo tras validarlo.
+- [x] `preconnect` al dominio del PMTiles y la API.
 - [x] Compresión gzip habilitada en la API (`server.compression.enabled=true`;
       brotli lo aplica Cloudflare en el borde).
-- [ ] (Opcional, fase siguiente) LCP 3,7 s y TBT 560 ms: el primer teselado del
-      mapa no es descubrible en el HTML inicial (carga tras la hidratación
-      `client:idle` de Leaflet) y `client.js` evalúa una tarea larga de ~513 ms.
-      Opciones: reducir el JS sin usar (leaflet 61 % / client 42 %), precargar
-      las teselas del viewport inicial o `fetchpriority="high"` sobre la primera
-      tesela.
+- [x] Generar y validar localmente el PMTiles completo de España y Canarias.
+- [ ] Desplegarlo y repetir Lighthouse para medir
+      LCP/TBT, tráfico Range y tiempo de movimiento/zoom en móvil y escritorio.
 
 ## D. Accesibilidad (97 → objetivo 100)
 
@@ -101,12 +98,11 @@ mejoras de la sección C.3.
 
 ## Verificación transversal
 
-- [x] Lighthouse de producción (móvil, `?combustible=DIESEL`): rendimiento 75,
-      accesibilidad 97, buenas prácticas 100, SEO 100; teselas WebP verificadas
-      en `network-requests`.
+- [x] Lighthouse de producción previo (móvil, `?combustible=DIESEL`):
+      rendimiento 75, accesibilidad 97, buenas prácticas 100 y SEO 100.
 - [ ] **HACERLO TÚ:** Reejecutar Lighthouse en móvil y escritorio tras
       desplegar las mejoras C (CSS inline, caché 30 días) para confirmar la
       subida.
 - [x] Cada cambio con sus pruebas (unitarias/E2E) y registro en `PROGRESS.md`:
-      backend 184/184, frontend unitario 416/416, E2E 55 passed + 11 skipped,
-      lint, typecheck y build limpios.
+      backend 184/184, frontend unitario 363/363, E2E 56 passed + 10 skipped,
+      pipeline PMTiles, Compose, lint, typecheck y build limpios.

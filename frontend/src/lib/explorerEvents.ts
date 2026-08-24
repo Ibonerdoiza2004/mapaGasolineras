@@ -1,5 +1,5 @@
 import type { FuelType } from './fuel';
-import type { NearbyStation, OrderBy } from './stations';
+import type { MapStationSummary, NearbyStation, OrderBy } from './stations';
 
 /** Cambio del combustible seleccionado por el usuario (detail: { combustible }). */
 export const FUEL_EVENT = 'gasolineras:fuel';
@@ -15,6 +15,9 @@ export const VIEWPORT_EVENT = 'gasolineras:viewport';
 
 /** Nuevos resultados de estaciones cercanas (detail: { stations }). */
 export const STATIONS_EVENT = 'gasolineras:stations';
+
+/** Conjunto completo y ligero de estaciones para el mapa. */
+export const MAP_STATIONS_EVENT = 'gasolineras:map-stations';
 
 /** Estación añadida o quitada del panel de comparar (detail: { id: string | null }). */
 export const STATION_SELECT_EVENT = 'gasolineras:station-select';
@@ -54,6 +57,8 @@ export interface ViewportBounds {
 
 let lastViewport: ViewportBounds | null = null;
 let lastRadio: number | null = null;
+let lastNearbyStations: NearbyStation[] | null = null;
+let lastMapStations: MapStationSummary[] | null = null;
 
 export function dispatchFuelChange(combustible: FuelType): void {
 	window.dispatchEvent(
@@ -110,9 +115,48 @@ export function resetLastViewport(): void {
 }
 
 export function dispatchNearbyStations(stations: NearbyStation[]): void {
+	lastNearbyStations = stations;
 	window.dispatchEvent(
 		new CustomEvent<{ stations: NearbyStation[] }>(STATIONS_EVENT, { detail: { stations } }),
 	);
+}
+
+/** Últimos resultados, disponibles si el mapa se hidrata después de la lista. */
+export function getLastNearbyStations(): NearbyStation[] | null {
+	return lastNearbyStations;
+}
+
+/** Limpia los resultados recordados (solo para aislamiento de pruebas). */
+export function resetLastNearbyStations(): void {
+	lastNearbyStations = null;
+}
+
+export function dispatchMapStations(stations: MapStationSummary[]): void {
+	lastMapStations = stations;
+	window.dispatchEvent(
+		new CustomEvent<{ stations: MapStationSummary[] }>(MAP_STATIONS_EVENT, { detail: { stations } }),
+	);
+}
+
+/**
+ * Invalida el conjunto completo al cambiar filtros. El mapa conserva lo ya
+ * pintado hasta recibir el fallback del listado o el nuevo conjunto completo.
+ */
+export function invalidateMapStations(): void {
+	lastMapStations = null;
+	window.dispatchEvent(
+		new CustomEvent<{ stations: null }>(MAP_STATIONS_EVENT, { detail: { stations: null } }),
+	);
+}
+
+/** Último conjunto completo, disponible aunque el mapa se hidrate después. */
+export function getLastMapStations(): MapStationSummary[] | null {
+	return lastMapStations;
+}
+
+/** Limpia el conjunto completo recordado (solo para aislamiento de pruebas). */
+export function resetLastMapStations(): void {
+	lastMapStations = null;
 }
 
 /** Notifica la estación que se añade o quita del panel de comparar. */

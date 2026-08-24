@@ -589,6 +589,27 @@
 	transition: opacity var(--transition-fast);
 }
 
+.explorer__list-more {
+	align-items: center;
+	background: var(--color-surface-muted);
+	border: 1px solid var(--color-border-strong);
+	border-radius: var(--radius-md);
+	color: var(--color-brand-700);
+	cursor: pointer;
+	display: flex;
+	font: inherit;
+	font-weight: 700;
+	justify-content: space-between;
+	margin-top: var(--space-3);
+	min-height: 2.75rem;
+	padding: var(--space-2) var(--space-4);
+	width: 100%;
+}
+
+.explorer__list-more:hover { background: var(--color-surface-emphasis); }
+.explorer__list-more:focus-visible { box-shadow: var(--focus-ring); outline: none; }
+.explorer__list-more span { color: var(--color-text-muted); font-size: var(--font-size-sm); font-weight: 500; }
+
 /* Esqueleto de carga: tarjetas decorativas con barras en movimiento. */
 .station-card--skeleton {
 	cursor: default;
@@ -762,7 +783,7 @@
 	inset: 0;
 	justify-content: center;
 	position: fixed;
-	/* Por encima de los controles de Leaflet, cuyo z-index llega a 1000. */
+	/* Por encima de los controles del mapa. */
 	z-index: 1100;
 }
 
@@ -985,6 +1006,8 @@
 	background: var(--color-surface);
 	border: 1px solid var(--color-border);
 	border-radius: var(--radius-md);
+	contain-intrinsic-block-size: 11rem;
+	content-visibility: auto;
 	box-shadow: var(--shadow-sm);
 	cursor: pointer;
 	padding: var(--space-4);
@@ -1191,8 +1214,8 @@
 
 .explorer__map {
 	background: #dce7e4;
-	/* Los panes de Leaflet usan z-index 200-1000 dentro del contenedor;
-	 * sin un contexto de apilamiento propio pueden pintar por encima del
+	/* El lienzo y sus controles crean capas propias dentro del contenedor;
+	 * sin un contexto de apilamiento pueden pintar por encima del
 	 * panel lateral o del comparador. */
 	isolation: isolate;
 	min-width: 0;
@@ -1368,7 +1391,7 @@
 		width: 17rem;
 	}
 
-	.leaflet-map {
+	.vector-map {
 		min-height: 0;
 	}
 }
@@ -1378,8 +1401,8 @@
 	 * secundario no cabe en la rejilla de dos columnas. */
 	.explorer,
 	.explorer__map,
-	.explorer__map .leaflet-map,
-	.explorer__map .leaflet-map__container {
+	.explorer__map .vector-map,
+	.explorer__map .vector-map__container {
 		min-height: 0;
 	}
 
@@ -1387,11 +1410,11 @@
 		display: none;
 	}
 
-	.explorer__map .leaflet-map__container {
+	.explorer__map .vector-map__container {
 		padding-bottom: 1.5rem;
 	}
 
-	.explorer__map .leaflet-control-attribution {
+	.explorer__map .maplibregl-ctrl-attrib {
 		margin-bottom: 0.5rem;
 	}
 
@@ -1412,7 +1435,7 @@
 		/* En móvil el mapa ocupa viewport − 4.75rem (franja del resumen plegado)
 		 * y no depende del min-height de 320 px de escritorio, que en pantallas
 		 * estrechas (móvil horizontal) lo inflaría sobre el slot y la citación
-		 * de OSM/Leaflet quedaría cortada. Se anula el piso y se fija alto: el
+		 * del mapa quedaría cortada. Se anula el piso y se fija alto: el
 		 * mapa nunca supera el viewport disponible y la citación se ve. */
 		inset: 0 0 4.75rem 0;
 		min-height: 0;
@@ -1420,19 +1443,19 @@
 		position: absolute;
 	}
 
-	.explorer__map .leaflet-map,
-	.leaflet-map,
-	.leaflet-map__container {
+	.explorer__map .vector-map,
+	.vector-map,
+	.vector-map__container {
 		height: 100%;
 		min-height: 0;
 	}
 
-	/* Espacio para la atribución de Leaflet/OSM (abajo a la derecha) dentro del
+	/* Espacio para la atribución de OpenStreetMap (abajo a la derecha) dentro del
 	 * contenedor del mapa, para que no quede cortada por el overflow: hidden. */
-	.leaflet-map__container {
+	.vector-map__container {
 		padding-bottom: 1.5rem;
 	}
-	.leaflet-map__container .leaflet-control-attribution {
+	.vector-map__container .maplibregl-ctrl-attrib {
 		margin-bottom: 0.5rem;
 	}
 

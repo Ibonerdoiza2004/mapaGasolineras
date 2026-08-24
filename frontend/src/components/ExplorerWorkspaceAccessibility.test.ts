@@ -12,7 +12,7 @@ const fuelFilterSource = readFileSync(resolve(process.cwd(), 'src/components/Fue
 const radioFilterSource = readFileSync(resolve(process.cwd(), 'src/components/RadioFilter.tsx'), 'utf8');
 const sortFilterSource = readFileSync(resolve(process.cwd(), 'src/components/SortFilter.tsx'), 'utf8');
 const stationListSource = readFileSync(resolve(process.cwd(), 'src/components/StationList.tsx'), 'utf8');
-const leafletMapSource = readFileSync(resolve(process.cwd(), 'src/components/LeafletMap.tsx'), 'utf8');
+const vectorMapSource = readFileSync(resolve(process.cwd(), 'src/components/VectorMap.tsx'), 'utf8');
 const locationButtonSource = readFileSync(
 	resolve(process.cwd(), 'src/components/LocationButton.tsx'),
 	'utf8',
@@ -97,9 +97,11 @@ describe('ExplorerWorkspace — nombres accesibles de controles y filtros', () =
 		expect(locationButtonSource).toContain('className="explorer__location"');
 	});
 
-	it('integra el mapa Leaflet como isla accesible', () => {
-		expect(workspaceAstro).toContain('<LeafletMap');
-		expect(workspaceAstro).toContain('client:load');
+	it('integra el mapa vectorial como isla accesible', () => {
+		expect(workspaceAstro).toContain('<VectorMap');
+		expect(workspaceAstro).toContain('<VectorMap\n\t\t\tclient:load');
+		expect(workspaceAstro).toContain('<ComparePanel client:load />');
+		expect(workspaceAstro).toContain('<StationDetail client:load />');
 	});
 });
 
@@ -114,10 +116,12 @@ describe('ExplorerWorkspace — paneles y marcadores alternativos', () => {
 		expect(workspaceAstro).toContain('class="explorer__map"');
 	});
 
-	it('delega la accesibilidad del mapa a la isla Leaflet con marcadores interactivos', () => {
-		expect(leafletMapSource).toContain('role="region"');
-		expect(leafletMapSource).toContain('aria-label="Mapa de gasolineras cercanas"');
-		expect(leafletMapSource).toContain('keyboard: true');
+	it('delega el mapa a un lienzo navegable y conserva la lista como alternativa accesible', () => {
+		expect(vectorMapSource).toContain('role="region"');
+		expect(vectorMapSource).toContain('aria-label="Mapa de gasolineras cercanas"');
+		expect(vectorMapSource).toContain('data-marker-renderer="maplibre-native"');
+		expect(vectorMapSource).toContain("map.on('click', [STATION_POINT_LAYER_ID, STATION_PRICE_LAYER_ID]");
+		expect(vectorMapSource).toContain('canvas.tabIndex = 0');
 	});
 
 	it('ofrece una lista ordenada como alternativa a los marcadores numerados', () => {

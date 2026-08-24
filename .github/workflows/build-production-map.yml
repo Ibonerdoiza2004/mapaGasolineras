@@ -1,0 +1,58 @@
+name: Build production vector map
+
+on:
+  workflow_dispatch:
+    inputs:
+      release:
+        description: Identificador opcional de versión (vacío = fecha UTC)
+        required: false
+        type: string
+  # Cartografía OSM: actualización mensual sin acceder manualmente a Oracle.
+  # Las tarifas de las estaciones se actualizan por separado cada hora desde
+  # el backend, por lo que no esperan a esta tarea pesada.
+  schedule:
+    - cron: '17 3 1 * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-vector-map
+  cancel-in-progress: false
+
+jobs:
+  build-map:
+    name: Generate and publish Spain PMTiles on Oracle
+    runs-on: ubuntu-24.04
+    env:
+      MAP_DATA_DIR: ${{ vars.MAP_DATA_DIR }}
+      MAP_TILES_RELEASE: ${{ inputs.release }}
+
+    steps:
+      - name: Build and atomically publish PMTiles
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.ORACLE_HOST }}
+          username: ${{ secrets.ORACLE_SSH_USER }}
+          key: ${{ secrets.ORACLE_SSH_KEY }}
+          passphrase: ${{ secrets.ORACLE_SSH_PASSPHRASE }}
+          port: ${{ secrets.ORACLE_SSH_PORT || 22 }}
+          envs: MAP_DATA_DIR,MAP_TILES_RELEASE
+          command_timeout: 12h
+          script: |
+            set -eu
+            case "$MAP_DATA_DIR" in
+              /home/*/mapaGasolineras-map-data/publish) ;;
+              *) echo "MAP_DATA_DIR debe ser una ruta absoluta persistente terminada en /mapaGasolineras-map-data/publish"; exit 1 ;;
+            esac
+            case "${MAP_TILES_RELEASE:-auto}" in
+              *[!0-9A-Za-z._-]*) echo "release contiene caracteres no permitidos"; exit 1 ;;
+            esac
+            project_dir=/home/${{ secrets.ORACLE_SSH_USER }}/mapaGasolineras
+            test -x "$project_dir/map-tiles/build.sh"
+            build_data_dir=${MAP_DATA_DIR%/publish}
+            mkdir -p "$build_data_dir"
+            cd "$project_dir"
+            MAP_TILES_DATA_DIR="$build_data_dir" MAP_TILES_RELEASE="${MAP_TILES_RELEASE:-}" bash map-tiles/build.sh
+            test -f "$MAP_DATA_DIR/maps/spain.pmtiles"
+            bash map-tiles/validate-pmtiles.sh "$MAP_DATA_DIR/maps/spain.pmtiles"

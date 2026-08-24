@@ -89,3 +89,7 @@ coverage/
 pgdata/
 tmp/
 temp/
+map-tiles/data/*
+!map-tiles/data/publish/
+map-tiles/data/publish/*
+!map-tiles/data/publish/.gitkeep
