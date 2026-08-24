@@ -11,8 +11,8 @@ sus pruebas han terminado correctamente.
 - **Siguiente historia:** US-24 — Calcular una ruta de conducción
 - **Tarea pendiente:** T-23.1 — crear página y formulario de planificación de ruta
 - **Tarea activa:** ninguna
-- **Última tarea completada:** T-10.19 — renderizado estable, filtrado inicial y
-  circunferencia visible del radio
+- **Última tarea completada:** Corrección de despliegue — worker de MapLibre en
+  Cloudflare Pages
 - **Porcentaje de tareas completadas:** 103 / 165
 - **Pruebas automatizadas:** 569 unitarias (190 backend + 379 frontend) y
   60 E2E (10 skipped), además de validaciones y smokes del PMTiles y del
@@ -82,6 +82,7 @@ sus pruebas han terminado correctamente.
 
 | Fecha | Elemento | Cambio | Resultado |
 | --- | --- | --- | --- |
+| 2026-08-24 | Corrección de despliegue — worker de MapLibre | En el bundle estático de MapLibre 6 el worker no quedaba disponible automáticamente en Cloudflare Pages: el mapa arrancaba, pero no emitía `load` y solo se veía el fondo azul. `VectorMap` importa el worker con la transformación Vite `?worker&url` y configura `maplibre.setWorkerUrl(...)` antes de crear el mapa; se añade regresión unitaria que exige esa configuración. | `task test` completo, lint, typecheck y build correctos; 190 pruebas backend, 379 frontend y 60 E2E (10 omitidos previstos). |
 | 2026-08-24 | Regresión CI E2E | Fixture de precios vigentes | Corregido el fixture compartido de `filtro.spec.ts`: la fecha ya no queda anclada al 17 de agosto y se genera al ejecutar la prueba. Así el caso de «Mejor opción» comprueba la interfaz sin depender del día del calendario. `task test:e2e` en verde: 60 escenarios correctos y 10 omitidos previstos. |
 | 2026-08-22 | T-10.19 | Renderizado estable de etiquetas, filtro inicial y circunferencia del radio | Completada: las capas de estaciones y radio dejan de depender de `isStyleLoaded()`, que puede ser falso mientras MapLibre descarga teselas aunque el estilo ya acepte actualizaciones; ahora se sincronizan tras `load` y se reinstalan en cada `style.load`. La primera ubicación filtra inmediatamente el conjunto completo en memoria, sin vaciar las estaciones mientras llega el backend. El radio usa un contorno nativo de dos trazos, sin relleno, actualiza su fuente con `setData` y solo se declara renderizado después de instalar ambas capas. Se evita modificar el estilo antes de que el mapa esté listo. `task check` en verde: Compose, Caddy, lint, tipos, pipeline PMTiles, 190 pruebas backend, 379 frontend, 60 E2E (10 skipped) y build de 785 páginas. |
 | 2026-08-22 | T-10.18 | Arranque directo y acciones del popup sincronizadas | Completada: la isla principal del mapa se hidrata con `client:load`, MapLibre recibe los límites de España en el constructor y deja de crear primero una cámara en Madrid para corregirla tras `load`; detalle y comparador también escuchan desde la carga inicial. El popup abierto se recompone al cambiar la selección y alterna inmediatamente entre «Añadir al comparador» y «Quitar del comparador»; el marcador decorativo de ubicación ya no intercepta clics. `task check` en verde: Compose, Caddy, lint, tipos, pipeline PMTiles, 190 pruebas backend, 374 frontend, 60 E2E (10 skipped) y build de 785 páginas. El smoke Chromium del PMTiles también pasa. |

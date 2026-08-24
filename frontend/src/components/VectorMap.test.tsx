@@ -108,7 +108,7 @@ const mapMock = vi.hoisted(() => {
 		setDOMContent(content: HTMLElement) { this.content = content; return this; }
 		addTo() { return this; }
 	}
-	return { state, MockMap, MockMarker, MockPopup };
+	return { state, MockMap, MockMarker, MockPopup, setWorkerUrl: vi.fn() };
 });
 
 vi.mock('maplibre-gl', () => ({
@@ -117,6 +117,7 @@ vi.mock('maplibre-gl', () => ({
 	Popup: mapMock.MockPopup,
 	addProtocol: vi.fn(),
 	removeProtocol: vi.fn(),
+	setWorkerUrl: mapMock.setWorkerUrl,
 }));
 vi.mock('pmtiles', () => ({ Protocol: class { tile = vi.fn(); } }));
 vi.mock('../config/runtime', () => ({
@@ -131,6 +132,7 @@ describe('VectorMap', () => {
 		mapMock.state.fail = false;
 		mapMock.state.instances.length = 0;
 		mapMock.state.popups.length = 0;
+		mapMock.setWorkerUrl.mockClear();
 		vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 503 }));
 		resetLastMapStations();
 		resetLastNearbyStations();
@@ -141,6 +143,7 @@ describe('VectorMap', () => {
 	it('inicializa MapLibre, expone el lienzo y opera el zoom con botones', async () => {
 		render(<VectorMap stations={[]} center={[40.4, -3.7]} zoom={13} bounds={[[27.63, -18.16], [43.8, 4.33]]} />);
 		await screen.findByRole('button', { name: 'Acercar mapa' });
+		expect(mapMock.setWorkerUrl).toHaveBeenCalledWith(expect.any(String));
 		await waitFor(() => expect(document.querySelector('.maplibregl-canvas')).toHaveAttribute('tabindex', '0'));
 		expect(mapMock.state.instances[0].options).toMatchObject({
 			bounds: [[-18.16, 27.63], [4.33, 43.8]],
