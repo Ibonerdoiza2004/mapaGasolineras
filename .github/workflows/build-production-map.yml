@@ -10,8 +10,6 @@ on:
   # Cartografía OSM: actualización mensual sin acceder manualmente a Oracle.
   # Las tarifas de las estaciones se actualizan por separado cada hora desde
   # el backend, por lo que no esperan a esta tarea pesada.
-  schedule:
-    - cron: '17 3 1 * *'
 
 permissions:
   contents: read
